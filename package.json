@@ -1,7 +1,7 @@
 {
-  "name": "agencia-pedidos",
-  "version": "1.0.0",
-  "description": "Sistema de pedidos para agencia de diseño y publicidad",
+  "name": "grafia-studio-pedidos",
+  "version": "2.0.0",
+  "description": "Sistema de pedidos GRAFÍA Studio",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
