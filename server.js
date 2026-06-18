@@ -1,9 +1,11 @@
+require('dotenv').config();
 const express=require('express');
 const Database=require('better-sqlite3');
 const multer=require('multer');
 const cors=require('cors');
 const path=require('path');
 const fs=require('fs');
+const jwt=require('jsonwebtoken');
 
 const app=express();
 const PORT=process.env.PORT||3000;
@@ -11,6 +13,12 @@ const PORT=process.env.PORT||3000;
 const DB_DIR=path.join(__dirname,'db');
 const UP_DIR=path.join(__dirname,'public','uploads');
 [DB_DIR,UP_DIR].forEach(d=>{if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true})});
+
+const APP_PIN=process.env.APP_PIN||'1234';
+const JWT_SECRET=process.env.JWT_SECRET||'grafia-dev-secret-cambiar-en-railway';
+if(!process.env.APP_PIN||!process.env.JWT_SECRET){
+  console.warn('⚠️  Usando APP_PIN/JWT_SECRET por defecto. Configura las variables de entorno APP_PIN y JWT_SECRET en Railway antes de producción.');
+}
 
 const db=new Database(path.join(DB_DIR,'agencia.db'));
 db.pragma('journal_mode=WAL');
@@ -150,6 +158,52 @@ function asegurarCliente(nombre,tel,cid){
   const id=uid(); db.prepare('INSERT INTO clientes(id,nombre,tel)VALUES(?,?,?)').run(id,nombre.trim(),tel||''); return id;
 }
 
+// ── LOGGING DE ERRORES (persistente, sobrevive reinicios de Railway) ──
+const LOG_FILE=path.join(DB_DIR,'error.log');
+function logError(contexto,err){
+  console.error(contexto,err);
+  try{
+    const linea=`[${new Date().toISOString()}] ${contexto}: ${err.message}\n`;
+    fs.appendFileSync(LOG_FILE,linea);
+  }catch(e){/* si falla el log a archivo, no bloquear la respuesta */}
+}
+
+// ── VALIDACIÓN DE PEDIDOS ──
+function validarPedido(b){
+  const errores=[];
+  if(b.nombre!==undefined&&!String(b.nombre).trim())errores.push('El nombre del cliente no puede estar vacío');
+  if(b.nombre&&String(b.nombre).trim().length>120)errores.push('El nombre es demasiado largo');
+  if(b.tel&&!/^[0-9+\-\s()]{0,20}$/.test(b.tel))errores.push('El teléfono tiene caracteres no válidos');
+  if(b.fecha_entrega&&!/^\d{4}-\d{2}-\d{2}$/.test(b.fecha_entrega))errores.push('La fecha de entrega no es válida');
+  if(b.encargos!==undefined&&!Array.isArray(b.encargos))errores.push('Los encargos no tienen el formato correcto');
+  if(b.pagos!==undefined&&!Array.isArray(b.pagos))errores.push('Los pagos no tienen el formato correcto');
+  if(b.costos!==undefined&&!Array.isArray(b.costos))errores.push('Los costos no tienen el formato correcto');
+  return errores;
+}
+
+// ── AUTENTICACIÓN (PIN simple) ──
+app.post('/api/auth/login',(req,res)=>{
+  const{pin}=req.body||{};
+  if(!pin||String(pin)!==String(APP_PIN)){
+    return res.status(401).json({error:'PIN incorrecto'});
+  }
+  const token=jwt.sign({auth:true},JWT_SECRET,{expiresIn:'90d'});
+  res.json({token});
+});
+
+app.use('/api',(req,res,next)=>{
+  if(req.path==='/auth/login')return next();
+  const header=req.headers.authorization||'';
+  const token=header.startsWith('Bearer ')?header.slice(7):null;
+  if(!token)return res.status(401).json({error:'No autorizado, ingresa el PIN'});
+  try{
+    jwt.verify(token,JWT_SECRET);
+    next();
+  }catch(e){
+    res.status(401).json({error:'Sesión expirada, ingresa el PIN de nuevo'});
+  }
+});
+
 // ── PEDIDOS ──
 app.get('/api/pedidos',(req,res)=>{
   const{estado,urgente,q}=req.query;
@@ -175,6 +229,8 @@ app.post('/api/pedidos',(req,res)=>{
   try{
     const b=req.body;
     if(!b.nombre)return res.status(400).json({error:'Nombre requerido'});
+    const errores=validarPedido(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid(); const ref=nextRef();
     const cid=asegurarCliente(b.nombre,b.tel,b.cliente_id||null);
     db.prepare(`INSERT INTO pedidos(id,ref,cliente_id,nombre,tel,urgente,entregado,cancelado,pendiente_pago,fecha_pedido,fecha_entrega,notas)
@@ -185,7 +241,7 @@ app.post('/api/pedidos',(req,res)=>{
     (b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto)VALUES(?,?,?,?,?)').run(uid(),id,c.encargo_id||'',c.descripcion||'',c.monto||''));
     addHist(id,'Pedido creado');
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
-  }catch(e){console.error(e);res.status(500).json({error:e.message})}
+  }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
 });
 
 app.put('/api/pedidos/:id',(req,res)=>{
@@ -193,6 +249,8 @@ app.put('/api/pedidos/:id',(req,res)=>{
     const b=req.body; const pid=req.params.id;
     const p=db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid);
     if(!p)return res.status(404).json({error:'No encontrado'});
+    const errores=validarPedido(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id);
     // Log cambios de estado checkboxes
     if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado');
@@ -203,7 +261,7 @@ app.put('/api/pedidos/:id',(req,res)=>{
     if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=?').run(pid);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,fecha,tipo,nota)VALUES(?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||''));}
     if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=?').run(pid);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto)VALUES(?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.monto||''));}
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
-  }catch(e){console.error(e);res.status(500).json({error:e.message})}
+  }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}
 });
 
 app.delete('/api/pedidos/:id',(req,res)=>{

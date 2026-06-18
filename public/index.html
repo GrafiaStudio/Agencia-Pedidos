@@ -381,9 +381,30 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   .enc-top{grid-template-columns:1fr;gap:8px}
   .enc-left{flex-direction:row;justify-content:flex-start;padding-top:0}
 }
+/* ══ PANTALLA PIN ══ */
+.pin-screen{display:none;position:fixed;inset:0;background:var(--navy);z-index:500;align-items:center;justify-content:center;padding:16px}
+.pin-box{background:var(--white);border-radius:var(--r-lg);box-shadow:var(--sh-lg);padding:36px 32px;max-width:340px;width:100%;text-align:center}
+.pin-box .tri{display:inline-block;width:14px;height:14px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%);margin-bottom:14px}
+.pin-box h2{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.pin-box p{font-size:11px;color:var(--muted);margin-bottom:20px}
+.pin-input{font-size:28px;letter-spacing:14px;text-align:center;font-family:'DM Mono',monospace;padding:12px 11px}
+.pin-err{color:var(--red);font-size:11px;font-weight:700;min-height:16px;margin-top:10px}
 </style>
 </head>
 <body>
+
+<!-- PANTALLA PIN -->
+<div class="pin-screen" id="pinScreen">
+  <div class="pin-box">
+    <span class="tri"></span>
+    <h2>GRAFÍA Studio</h2>
+    <p>Ingresa el PIN para entrar</p>
+    <input type="password" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" autocomplete="off" placeholder="••••">
+    <div class="pin-err" id="pinErr"></div>
+    <button class="btn-pri" style="width:100%;justify-content:center;margin-top:8px" onclick="intentarPin()"><i class="ti ti-lock-open"></i> Entrar</button>
+  </div>
+</div>
+
 <div class="layout">
 
 <!-- SIDEBAR -->
@@ -405,6 +426,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   </nav>
   <div class="sb-footer">
     <button class="nav-item" onclick="abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
+    <button class="nav-item" onclick="cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
   </div>
 </aside>
 
@@ -607,9 +629,51 @@ let editId=null,editCliId=null;
 let fEnc=[],fPag=[],fArch=[],fCostos=[];
 let encCounter=0;
 
+/* ══ AUTENTICACIÓN (PIN) ══ */
+const TOKEN_KEY='grafia_token';
+function getToken(){return localStorage.getItem(TOKEN_KEY)}
+function setToken(t){localStorage.setItem(TOKEN_KEY,t)}
+function clearToken(){localStorage.removeItem(TOKEN_KEY)}
+
+function showPinScreen(msg){
+  document.getElementById('pinScreen').style.display='flex';
+  document.getElementById('pinErr').textContent=msg||'';
+  const inp=document.getElementById('pinInput');
+  inp.value='';
+  setTimeout(()=>inp.focus(),100);
+}
+function hidePinScreen(){document.getElementById('pinScreen').style.display='none'}
+
+async function intentarPin(){
+  const pin=document.getElementById('pinInput').value.trim();
+  if(pin.length!==4){document.getElementById('pinErr').textContent='Ingresa los 4 dígitos';return}
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
+    const data=await r.json();
+    if(!r.ok){
+      document.getElementById('pinErr').textContent=data.error||'PIN incorrecto';
+      document.getElementById('pinInput').value='';
+      document.getElementById('pinInput').focus();
+      return;
+    }
+    setToken(data.token);
+    hidePinScreen();
+    init();
+  }catch(e){document.getElementById('pinErr').textContent='Sin conexión con el servidor'}
+}
+document.getElementById('pinInput').addEventListener('keydown',e=>{if(e.key==='Enter')intentarPin()});
+
+function cerrarSesion(){
+  if(!confirm('¿Cerrar sesión?'))return;
+  clearToken();
+  showPinScreen();
+}
+
 /* ══ API ══ */
 async function api(m,p,b){
   const o={method:m,headers:{'Content-Type':'application/json'}};
+  const tk=getToken();
+  if(tk)o.headers['Authorization']='Bearer '+tk;
   if(b)o.body=JSON.stringify(b);
   const r=await fetch('/api'+p,o);
   const ct=r.headers.get('content-type')||'';
@@ -617,6 +681,7 @@ async function api(m,p,b){
     throw new Error('Sin conexión con el servidor. Abre la app desde el link de Railway (el archivo HTML solo es vista previa).');
   }
   const data=await r.json();
+  if(r.status===401){clearToken();showPinScreen(data.error);throw new Error(data.error||'Sesión expirada')}
   if(!r.ok)throw new Error(data.error||'Error');
   return data;
 }
@@ -1045,7 +1110,9 @@ function renderCostosRes(){
 async function subirArchivos(e){
   if(!editId){toast('Guarda el pedido primero',false);return}
   const fd=new FormData();Array.from(e.target.files).forEach(f=>fd.append('files',f));
-  const r=await fetch(`/api/pedidos/${editId}/archivos`,{method:'POST',body:fd});
+  const tk=getToken();
+  const r=await fetch(`/api/pedidos/${editId}/archivos`,{method:'POST',body:fd,headers:tk?{'Authorization':'Bearer '+tk}:{}});
+  if(r.status===401){clearToken();showPinScreen('Sesión expirada, ingresa el PIN de nuevo');return}
   const nuevos=await r.json();fArch.push(...nuevos);renderArchivos();toast('Archivos subidos');
 }
 async function remArch(id){await api('DELETE',`/archivos/${id}`);fArch=fArch.filter(x=>x.id!==id);renderArchivos()}
@@ -1163,7 +1230,22 @@ async function eliminarPed(){
 /* ══ EXPORT ══ */
 function abrirExp(){document.getElementById('ovExp').classList.add('open')}
 function cerrarExp(){document.getElementById('ovExp').classList.remove('open')}
-function exportar(){const e=document.getElementById('exp-est').value;window.location=`/api/export/csv?estado=${e}`;cerrarExp();toast('Descargando…')}
+async function exportar(){
+  const e=document.getElementById('exp-est').value;
+  cerrarExp();toast('Descargando…');
+  try{
+    const tk=getToken();
+    const r=await fetch(`/api/export/csv?estado=${e}`,{headers:tk?{'Authorization':'Bearer '+tk}:{}});
+    if(r.status===401){clearToken();showPinScreen('Sesión expirada, ingresa el PIN de nuevo');return}
+    if(!r.ok){toast('Error al descargar',false);return}
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='pedidos_grafia.csv';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }catch(err){toast('Error al descargar el archivo',false)}
+}
 
 /* ══ REGISTROS ══ */
 async function renderRegistros(){
@@ -1263,7 +1345,7 @@ async function init(){
     document.getElementById('lista').innerHTML='<div class="empty"><i class="ti ti-plug-x"></i><p>'+e.message+'</p></div>';
   }
 }
-init();
+if(getToken()){init()}else{showPinScreen()}
 </script>
 </body>
 </html>
