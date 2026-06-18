@@ -104,6 +104,28 @@ try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario_calc TEXT"); } ca
 try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE pagos ADD COLUMN monto_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN monto_calc TEXT"); } catch(e){}
+// ── WORKSPACES (aislamiento multi-tenant) ──
+// Cada PIN mapea a un workspace independiente. 'main' es el negocio real (PIN=APP_PIN);
+// los 'prueba-N' son accesos temporales para testers, con su propio espacio aislado.
+// Sin FK hacia workspaces (consistente con el resto del esquema, que tampoco usa FKs
+// estrictas en todos los campos) y sin separar el contador de refs (ver nextRef): el
+// aislamiento pedido es sobre los datos, no sobre la numeración de referencia.
+db.exec(`CREATE TABLE IF NOT EXISTS workspaces(
+  id TEXT PRIMARY KEY, nombre TEXT NOT NULL, pin TEXT UNIQUE NOT NULL,
+  tipo TEXT DEFAULT 'prueba', creado TEXT DEFAULT(datetime('now','localtime')))`);
+const seedWs=db.prepare(`INSERT INTO workspaces(id,nombre,pin,tipo) VALUES(?,?,?,?)
+  ON CONFLICT(id) DO UPDATE SET pin=excluded.pin`);
+seedWs.run('main','GRAFÍA Studio',APP_PIN,'real');
+[['prueba-1','0010'],['prueba-2','0021'],['prueba-3','0032'],['prueba-4','0043'],['prueba-5','0054']]
+  .forEach(([id,pin])=>{ try{ seedWs.run(id,`Workspace de prueba ${id.split('-')[1]}`,pin,'prueba'); }
+  catch(e){ console.error('Seed workspace falló:',id,e.message); } });
+
+['clientes','pedidos','encargos','enc_items','pagos','costos','historial','archivos'].forEach(t=>{
+  try { db.exec(`ALTER TABLE ${t} ADD COLUMN workspace_id TEXT`); } catch(e){}
+});
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_pedidos_workspace ON pedidos(workspace_id)`); } catch(e){}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_clientes_workspace ON clientes(workspace_id)`); } catch(e){}
+
 // Migración única de datos: el viejo default '0' en encargos.valor nunca fue una decisión
 // deliberada (la UI siempre partía en '0'); lo convertimos a NULL para poder distinguir
 // "Valor Encargo vacío" de "Valor Encargo puesto en 0 a propósito" de aquí en adelante.
@@ -127,6 +149,17 @@ try {
     db.prepare('SELECT id,monto FROM pagos').all().forEach(r=>db.prepare('UPDATE pagos SET monto_calc=? WHERE id=?').run(normCalc(r.monto),r.id));
     db.prepare('SELECT id,monto FROM costos').all().forEach(r=>db.prepare('UPDATE costos SET monto_calc=? WHERE id=?').run(normCalc(r.monto),r.id));
     db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('backfill_valor_calc_v1');
+  }
+} catch(e){}
+// Migración única: asigna workspace_id='main' a todos los datos creados antes de existir
+// el concepto de workspace (todo lo real de GRAFÍA Studio hasta hoy).
+try {
+  const yaCorridaWs=db.prepare("SELECT 1 FROM migraciones WHERE nombre=?").get('backfill_workspace_main_v1');
+  if(!yaCorridaWs){
+    ['clientes','pedidos','encargos','enc_items','pagos','costos','historial','archivos'].forEach(t=>{
+      db.exec(`UPDATE ${t} SET workspace_id='main' WHERE workspace_id IS NULL`);
+    });
+    db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('backfill_workspace_main_v1');
   }
 } catch(e){}
 
@@ -211,32 +244,36 @@ function pedidoCompleto(p){
   return p;
 }
 
-function addHist(pid,txt){
-  db.prepare('INSERT INTO historial(id,pedido_id,texto,fecha,hora)VALUES(?,?,?,?,?)').run(uid(),pid,txt,hoy(),ahora());
+function addHist(pid,txt,wsId){
+  db.prepare('INSERT INTO historial(id,pedido_id,texto,fecha,hora,workspace_id)VALUES(?,?,?,?,?,?)').run(uid(),pid,txt,hoy(),ahora(),wsId);
 }
 
-function saveEncargos(pid,encargos){
-  db.prepare('DELETE FROM encargos WHERE pedido_id=?').run(pid);
+function saveEncargos(pid,encargos,wsId){
+  db.prepare('DELETE FROM encargos WHERE pedido_id=? AND workspace_id=?').run(pid,wsId);
   (encargos||[]).forEach((enc,i)=>{
     const eid=enc.id||uid();
-    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,estado,valor,valor_calc,anotacion,orden)VALUES(?,?,?,?,?,?,?,?,?,?)')
-      .run(eid,pid,enc.numero||i+1,enc.categoria||'',enc.subcategoria||'',enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i);
+    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,estado,valor,valor_calc,anotacion,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+      .run(eid,pid,enc.numero||i+1,enc.categoria||'',enc.subcategoria||'',enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i,wsId);
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
-      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,orden)VALUES(?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',j);
+      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',j,wsId);
     });
   });
 }
 
-function asegurarCliente(nombre,tel,cid){
+function asegurarCliente(nombre,tel,cid,wsId){
   if(cid){
-    if(nombre)db.prepare('UPDATE clientes SET nombre=? WHERE id=?').run(nombre.trim(),cid);
-    if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=?').run(tel,cid);
+    const existe=db.prepare('SELECT id FROM clientes WHERE id=? AND workspace_id=?').get(cid,wsId);
+    if(!existe)cid=null; // cliente_id de otro workspace (o inexistente): se ignora, no se usa a ciegas
+  }
+  if(cid){
+    if(nombre)db.prepare('UPDATE clientes SET nombre=? WHERE id=? AND workspace_id=?').run(nombre.trim(),cid,wsId);
+    if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=? AND workspace_id=?').run(tel,cid,wsId);
     return cid;
   }
-  const ex=db.prepare('SELECT id FROM clientes WHERE lower(nombre)=lower(?)').get(nombre.trim());
-  if(ex){if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=?').run(tel,ex.id);return ex.id}
-  const id=uid(); db.prepare('INSERT INTO clientes(id,nombre,tel)VALUES(?,?,?)').run(id,nombre.trim(),tel||''); return id;
+  const ex=db.prepare('SELECT id FROM clientes WHERE lower(nombre)=lower(?) AND workspace_id=?').get(nombre.trim(),wsId);
+  if(ex){if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=? AND workspace_id=?').run(tel,ex.id,wsId);return ex.id}
+  const id=uid(); db.prepare('INSERT INTO clientes(id,nombre,tel,workspace_id)VALUES(?,?,?,?)').run(id,nombre.trim(),tel||'',wsId); return id;
 }
 
 // ── LOGGING DE ERRORES (persistente, sobrevive reinicios de Railway) ──
@@ -278,10 +315,11 @@ function validarPedido(b){
 // ── AUTENTICACIÓN (PIN simple) ──
 app.post('/api/auth/login',(req,res)=>{
   const{pin}=req.body||{};
-  if(!pin||String(pin)!==String(APP_PIN)){
+  const ws=pin?db.prepare('SELECT id FROM workspaces WHERE pin=?').get(String(pin)):null;
+  if(!ws){
     return res.status(401).json({error:'PIN incorrecto'});
   }
-  const token=jwt.sign({auth:true},JWT_SECRET,{expiresIn:'90d'});
+  const token=jwt.sign({wsId:ws.id},JWT_SECRET,{expiresIn:'90d'});
   res.json({token});
 });
 
@@ -291,7 +329,9 @@ app.use('/api',(req,res,next)=>{
   const token=header.startsWith('Bearer ')?header.slice(7):null;
   if(!token)return res.status(401).json({error:'No autorizado, ingresa el PIN'});
   try{
-    jwt.verify(token,JWT_SECRET);
+    const payload=jwt.verify(token,JWT_SECRET);
+    if(!payload.wsId)return res.status(401).json({error:'Sesión expirada, ingresa el PIN de nuevo'});
+    req.wsId=payload.wsId;
     next();
   }catch(e){
     res.status(401).json({error:'Sesión expirada, ingresa el PIN de nuevo'});
@@ -301,7 +341,7 @@ app.use('/api',(req,res,next)=>{
 // ── PEDIDOS ──
 app.get('/api/pedidos',(req,res)=>{
   const{estado,urgente,q}=req.query;
-  let sql='SELECT * FROM pedidos WHERE 1=1'; const params=[];
+  let sql='SELECT * FROM pedidos WHERE workspace_id=?'; const params=[req.wsId];
   if(urgente==='1'){sql+=' AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0'}
   else if(estado==='cotizacion'){sql+=' AND es_cotizacion=1'}
   else if(estado==='entregado'){sql+=' AND entregado=1'}
@@ -315,7 +355,7 @@ app.get('/api/pedidos',(req,res)=>{
 });
 
 app.get('/api/pedidos/:id',(req,res)=>{
-  const p=db.prepare('SELECT * FROM pedidos WHERE id=?').get(req.params.id);
+  const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
   if(!p)return res.status(404).json({error:'No encontrado'});
   res.json(pedidoCompleto(p));
 });
@@ -327,14 +367,14 @@ app.post('/api/pedidos',(req,res)=>{
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid(); const ref=nextRef();
-    const cid=asegurarCliente(b.nombre,b.tel,b.cliente_id||null);
-    db.prepare(`INSERT INTO pedidos(id,ref,cliente_id,nombre,tel,urgente,entregado,cancelado,pendiente_pago,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega,notas)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,ref,cid,b.nombre.trim(),b.tel||'',b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,normVF(b.valor_final),normCalc(b.valor_final),hoy(),b.fecha_entrega||'',b.notas||'');
-    saveEncargos(id,b.encargos);
-    (b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota)VALUES(?,?,?,?,?,?,?)').run(uid(),id,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||''));
-    (b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc)VALUES(?,?,?,?,?,?)').run(uid(),id,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto)));
-    addHist(id,'Pedido creado');
+    const cid=asegurarCliente(b.nombre,b.tel,b.cliente_id||null,req.wsId);
+    db.prepare(`INSERT INTO pedidos(id,ref,cliente_id,nombre,tel,urgente,entregado,cancelado,pendiente_pago,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega,notas,workspace_id)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,ref,cid,b.nombre.trim(),b.tel||'',b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,normVF(b.valor_final),normCalc(b.valor_final),hoy(),b.fecha_entrega||'',b.notas||'',req.wsId);
+    saveEncargos(id,b.encargos,req.wsId);
+    (b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),id,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||'',req.wsId));
+    (b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc,workspace_id)VALUES(?,?,?,?,?,?,?)').run(uid(),id,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto),req.wsId));
+    addHist(id,'Pedido creado',req.wsId);
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
   }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
 });
@@ -342,48 +382,55 @@ app.post('/api/pedidos',(req,res)=>{
 app.put('/api/pedidos/:id',(req,res)=>{
   try{
     const b=req.body; const pid=req.params.id;
-    const p=db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid);
+    const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(pid,req.wsId);
     if(!p)return res.status(404).json({error:'No encontrado'});
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
-    const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id);
+    const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id,req.wsId);
     // Log cambios de estado checkboxes
-    if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado');
-    if(b.cancelado&&!p.cancelado)addHist(pid,'Pedido cancelado');
-    db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=?`)
-      .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid);
-    if(b.encargos!==undefined)saveEncargos(pid,b.encargos);
-    if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=?').run(pid);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota)VALUES(?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||''));}
-    if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=?').run(pid);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc)VALUES(?,?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto)));}
+    if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado',req.wsId);
+    if(b.cancelado&&!p.cancelado)addHist(pid,'Pedido cancelado',req.wsId);
+    db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=? AND workspace_id=?`)
+      .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid,req.wsId);
+    if(b.encargos!==undefined)saveEncargos(pid,b.encargos,req.wsId);
+    if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||'',req.wsId));}
+    if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc,workspace_id)VALUES(?,?,?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto),req.wsId));}
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
   }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}
 });
 
 app.delete('/api/pedidos/:id',(req,res)=>{
-  db.prepare('DELETE FROM pedidos WHERE id=?').run(req.params.id);
+  const r=db.prepare('DELETE FROM pedidos WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'No encontrado'});
   res.json({ok:true});
 });
 
 // Archivos
-app.post('/api/pedidos/:id/archivos',upload.array('files',10),(req,res)=>{
+app.post('/api/pedidos/:id/archivos',(req,res,next)=>{
+  const p=db.prepare('SELECT id FROM pedidos WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!p)return res.status(404).json({error:'No encontrado'});
+  next();
+},upload.array('files',10),(req,res)=>{
   const pid=req.params.id; const inserted=[];
   (req.files||[]).forEach(f=>{
     const id=uid();
-    db.prepare('INSERT INTO archivos(id,pedido_id,nombre,tipo,ruta)VALUES(?,?,?,?,?)').run(id,pid,f.originalname,f.mimetype,'/uploads/'+f.filename);
+    db.prepare('INSERT INTO archivos(id,pedido_id,nombre,tipo,ruta,workspace_id)VALUES(?,?,?,?,?,?)').run(id,pid,f.originalname,f.mimetype,'/uploads/'+f.filename,req.wsId);
     inserted.push({id,nombre:f.originalname,tipo:f.mimetype,ruta:'/uploads/'+f.filename});
   });
-  if(req.files.length) addHist(pid,`${req.files.length} archivo(s) adjuntado(s)`);
+  if(req.files.length) addHist(pid,`${req.files.length} archivo(s) adjuntado(s)`,req.wsId);
   res.json(inserted);
 });
 app.delete('/api/archivos/:id',(req,res)=>{
-  const a=db.prepare('SELECT * FROM archivos WHERE id=?').get(req.params.id);
-  if(a){const fp=path.join(UP_DIR,path.basename(a.ruta));if(fs.existsSync(fp))fs.unlinkSync(fp);db.prepare('DELETE FROM archivos WHERE id=?').run(req.params.id);}
+  const a=db.prepare('SELECT * FROM archivos WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!a)return res.status(404).json({error:'No encontrado'});
+  const fp=path.join(UP_DIR,path.basename(a.ruta));if(fs.existsSync(fp))fs.unlinkSync(fp);
+  db.prepare('DELETE FROM archivos WHERE id=?').run(req.params.id);
   res.json({ok:true});
 });
 
 // Clientes
 app.get('/api/clientes',(req,res)=>{
-  const{q}=req.query; let sql='SELECT * FROM clientes WHERE 1=1'; const params=[];
+  const{q}=req.query; let sql='SELECT * FROM clientes WHERE workspace_id=?'; const params=[req.wsId];
   if(q){sql+=' AND(nombre LIKE ? OR tel LIKE ?)';params.push(`%${q}%`,`%${q}%`)}
   sql+=' ORDER BY nombre';
   const clientes=db.prepare(sql).all(...params);
@@ -391,7 +438,7 @@ app.get('/api/clientes',(req,res)=>{
   res.json(clientes);
 });
 app.get('/api/clientes/:id',(req,res)=>{
-  const c=db.prepare('SELECT * FROM clientes WHERE id=?').get(req.params.id);
+  const c=db.prepare('SELECT * FROM clientes WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
   if(!c)return res.status(404).json({error:'No encontrado'});
   const peds=db.prepare('SELECT id,ref,entregado,cancelado,urgente,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega FROM pedidos WHERE cliente_id=? ORDER BY creado DESC').all(c.id);
   c.pedidos=peds.map(p=>{
@@ -408,25 +455,26 @@ app.get('/api/clientes/:id',(req,res)=>{
 
 // Stats
 app.get('/api/stats',(req,res)=>{
-  const activos=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE entregado=0 AND cancelado=0 AND es_cotizacion=0").get().n;
-  const urgentes=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get().n;
+  const wsId=req.wsId;
+  const activos=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
+  const urgentes=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
   // Listo: todos sus encargos en Listo/Entregado y pedido no entregado/cancelado/cotización
-  const candidatos=db.prepare("SELECT id FROM pedidos WHERE entregado=0 AND cancelado=0 AND es_cotizacion=0").all();
+  const candidatos=db.prepare("SELECT id FROM pedidos WHERE workspace_id=? AND entregado=0 AND cancelado=0 AND es_cotizacion=0").all(wsId);
   let listos=0;
   candidatos.forEach(p=>{
     const encs=db.prepare('SELECT estado FROM encargos WHERE pedido_id=?').all(p.id);
     if(encs.length&&encs.every(e=>e.estado==='Listo'||e.estado==='Entregado'))listos++;
   });
-  const clientes=db.prepare('SELECT COUNT(*) as n FROM clientes').get().n;
-  const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get().n;
-  const cotizaciones=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE es_cotizacion=1").get().n;
+  const clientes=db.prepare('SELECT COUNT(*) as n FROM clientes WHERE workspace_id=?').get(wsId).n;
+  const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
+  const cotizaciones=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND es_cotizacion=1").get(wsId).n;
   res.json({activos,urgentes,listos,clientes,pendPago,cotizaciones});
 });
 
 // Export CSV
 app.get('/api/export/csv',(req,res)=>{
   const{estado}=req.query;
-  let sql='SELECT * FROM pedidos WHERE 1=1'; const params=[];
+  let sql='SELECT * FROM pedidos WHERE workspace_id=?'; const params=[req.wsId];
   if(estado==='entregado')sql+=' AND entregado=1';
   else if(estado==='cancelado')sql+=' AND cancelado=1';
   else if(estado&&estado!=='todos')sql+=' AND entregado=0 AND cancelado=0';
@@ -447,7 +495,7 @@ app.get('/api/export/csv',(req,res)=>{
 
 // Registros financieros
 app.get('/api/registros/utilidades',(req,res)=>{
-  const pedidos=db.prepare('SELECT * FROM pedidos').all().map(pedidoCompleto);
+  const pedidos=db.prepare('SELECT * FROM pedidos WHERE workspace_id=?').all(req.wsId).map(pedidoCompleto);
   const rows=pedidos.map(p=>{
     const ing=p.valor_total||0;
     const cos=(p.costos||[]).reduce((a,c)=>a+toNum(c.monto_calc),0);
