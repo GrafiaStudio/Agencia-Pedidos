@@ -96,6 +96,39 @@ try { db.exec("ALTER TABLE encargos ADD COLUMN numero INTEGER DEFAULT 1"); } cat
 try { db.exec("ALTER TABLE costos ADD COLUMN descripcion TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN encargo_id TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("CREATE TABLE IF NOT EXISTS enc_items(id TEXT PRIMARY KEY,encargo_id TEXT REFERENCES encargos(id) ON DELETE CASCADE,cantidad TEXT DEFAULT '',detalle TEXT DEFAULT '',orden INTEGER DEFAULT 0)"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN es_cotizacion INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario TEXT DEFAULT '0'"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE encargos ADD COLUMN valor_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE pagos ADD COLUMN monto_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE costos ADD COLUMN monto_calc TEXT"); } catch(e){}
+// Migración única de datos: el viejo default '0' en encargos.valor nunca fue una decisión
+// deliberada (la UI siempre partía en '0'); lo convertimos a NULL para poder distinguir
+// "Valor Encargo vacío" de "Valor Encargo puesto en 0 a propósito" de aquí en adelante.
+try {
+  db.exec("CREATE TABLE IF NOT EXISTS migraciones(nombre TEXT PRIMARY KEY)");
+  const yaCorrida=db.prepare("SELECT 1 FROM migraciones WHERE nombre=?").get('encargo_valor_cero_a_null');
+  if(!yaCorrida){
+    db.exec("UPDATE encargos SET valor=NULL WHERE valor='0'");
+    db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('encargo_valor_cero_a_null');
+  }
+} catch(e){}
+// Migración única: backfill de las nuevas columnas _calc para datos que ya existían
+// antes de soportar expresiones matemáticas (siempre fueron números planos, así que
+// evalExpr los calcula trivialmente sin cambiar su significado).
+try {
+  const yaCorridaCalc=db.prepare("SELECT 1 FROM migraciones WHERE nombre=?").get('backfill_valor_calc_v1');
+  if(!yaCorridaCalc){
+    db.prepare('SELECT id,valor FROM encargos').all().forEach(r=>db.prepare('UPDATE encargos SET valor_calc=? WHERE id=?').run(normCalc(r.valor),r.id));
+    db.prepare('SELECT id,valor_unitario FROM enc_items').all().forEach(r=>db.prepare('UPDATE enc_items SET valor_unitario_calc=? WHERE id=?').run(normCalc(r.valor_unitario),r.id));
+    db.prepare('SELECT id,valor_final FROM pedidos').all().forEach(r=>db.prepare('UPDATE pedidos SET valor_final_calc=? WHERE id=?').run(normCalc(r.valor_final),r.id));
+    db.prepare('SELECT id,monto FROM pagos').all().forEach(r=>db.prepare('UPDATE pagos SET monto_calc=? WHERE id=?').run(normCalc(r.monto),r.id));
+    db.prepare('SELECT id,monto FROM costos').all().forEach(r=>db.prepare('UPDATE costos SET monto_calc=? WHERE id=?').run(normCalc(r.monto),r.id));
+    db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('backfill_valor_calc_v1');
+  }
+} catch(e){}
 
 app.use(cors());
 app.use(express.json({limit:'10mb'}));
@@ -118,6 +151,46 @@ function nextRef(){
   return ref;
 }
 function toNum(s){return parseInt(String(s||0).replace(/\D/g,''))||0}
+function definido(v){return v!=null&&String(v).trim()!==''}
+function normVF(v){return definido(v)?String(v):null}
+
+// Evaluador seguro de expresiones matemáticas para campos de valor monetario.
+// Sólo deja pasar dígitos, + - * / ( ) y espacios (tras quitar separadores de
+// miles y normalizar x/X a *), así que Function() no puede ejecutar nada que
+// no sea aritmética pura.
+function evalExpr(raw){
+  if(raw==null)return null;
+  let s=String(raw).trim();
+  if(s==='')return null;
+  s=s.replace(/[.,]/g,'').replace(/[xX]/g,'*');
+  if(!/^[0-9+\-*/()\s]+$/.test(s)||!/[0-9]/.test(s))return null;
+  try{
+    const v=Function('"use strict";return('+s+')')();
+    return(typeof v==='number'&&isFinite(v))?Math.round(v):null;
+  }catch(e){return null}
+}
+function normCalc(raw){const v=evalExpr(raw);return v==null?null:String(v)}
+
+// Jerarquía de valores (de abajo hacia arriba):
+// Items (cantidad×valor_unitario) -> Referencial del Encargo -> Valor Encargo (si está definido, reemplaza
+// al referencial) -> Valor Sugerido del Pedido (suma de los valores EFECTIVOS de los encargos) -> Valor Final
+// del Pedido (si está definido, reemplaza al sugerido). El "valor oficial" para todo lo financiero es siempre
+// valor_total = valor_final ?? valor_sugerido — nunca los referenciales, que son solo ayuda visual.
+function calcReferencialEncargo(enc){
+  return(enc.items||[]).reduce((a,it)=>{
+    const cant=toNum(it.cantidad),unit=toNum(it.valor_unitario_calc);
+    return(cant>0&&unit>0)?a+cant*unit:a;
+  },0);
+}
+function calcValorEncargoEfectivo(enc){
+  return definido(enc.valor)?toNum(enc.valor_calc):calcReferencialEncargo(enc);
+}
+function calcValorSugerido(encargos){
+  return(encargos||[]).reduce((a,e)=>a+calcValorEncargoEfectivo(e),0);
+}
+function valorOficialPedido(p,valorSugerido){
+  return definido(p.valor_final)?toNum(p.valor_final_calc):valorSugerido;
+}
 
 function pedidoCompleto(p){
   if(!p)return null;
@@ -128,9 +201,13 @@ function pedidoCompleto(p){
   p.costos  =db.prepare('SELECT * FROM costos WHERE pedido_id=? ORDER BY creado').all(p.id);
   p.historial=db.prepare('SELECT * FROM historial WHERE pedido_id=? ORDER BY creado DESC').all(p.id);
   p.archivos =db.prepare('SELECT * FROM archivos WHERE pedido_id=? ORDER BY creado').all(p.id);
-  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago;
-  // Calcular valor total desde encargos
-  p.valor_total=encargos.reduce((a,e)=>a+toNum(e.valor),0);
+  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago; p.es_cotizacion=!!p.es_cotizacion;
+  encargos.forEach(enc=>{
+    enc.valor_referencial=calcReferencialEncargo(enc);
+    enc.valor_efectivo=calcValorEncargoEfectivo(enc);
+  });
+  p.valor_sugerido=calcValorSugerido(encargos);
+  p.valor_total=valorOficialPedido(p,p.valor_sugerido);
   return p;
 }
 
@@ -142,11 +219,11 @@ function saveEncargos(pid,encargos){
   db.prepare('DELETE FROM encargos WHERE pedido_id=?').run(pid);
   (encargos||[]).forEach((enc,i)=>{
     const eid=enc.id||uid();
-    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,estado,valor,anotacion,orden)VALUES(?,?,?,?,?,?,?,?,?)')
-      .run(eid,pid,enc.numero||i+1,enc.categoria||'',enc.subcategoria||'',enc.estado||'Nuevo',enc.valor||'0',enc.anotacion||'',i);
+    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,estado,valor,valor_calc,anotacion,orden)VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .run(eid,pid,enc.numero||i+1,enc.categoria||'',enc.subcategoria||'',enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i);
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
-      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,orden)VALUES(?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',j);
+      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,orden)VALUES(?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',j);
     });
   });
 }
@@ -178,6 +255,19 @@ function validarPedido(b){
   if(b.encargos!==undefined&&!Array.isArray(b.encargos))errores.push('Los encargos no tienen el formato correcto');
   if(b.pagos!==undefined&&!Array.isArray(b.pagos))errores.push('Los pagos no tienen el formato correcto');
   if(b.costos!==undefined&&!Array.isArray(b.costos))errores.push('Los costos no tienen el formato correcto');
+  if(definido(b.valor_final)&&evalExpr(b.valor_final)===null)errores.push('El Valor Final del Pedido no es una expresión válida');
+  (b.encargos||[]).forEach((enc,i)=>{
+    if(definido(enc.valor)&&evalExpr(enc.valor)===null)errores.push(`Valor Encargo del encargo #${i+1} no es una expresión válida`);
+    (enc.items||[]).forEach((it,j)=>{
+      if(definido(it.valor_unitario)&&evalExpr(it.valor_unitario)===null)errores.push(`V. Unitario (encargo #${i+1}, fila ${j+1}) no es una expresión válida`);
+    });
+  });
+  (b.pagos||[]).forEach((pg,i)=>{
+    if(definido(pg.monto)&&evalExpr(pg.monto)===null)errores.push(`Monto del pago #${i+1} no es una expresión válida`);
+  });
+  (b.costos||[]).forEach((c,i)=>{
+    if(definido(c.monto)&&evalExpr(c.monto)===null)errores.push(`Monto del costo #${i+1} no es una expresión válida`);
+  });
   return errores;
 }
 
@@ -208,7 +298,8 @@ app.use('/api',(req,res,next)=>{
 app.get('/api/pedidos',(req,res)=>{
   const{estado,urgente,q}=req.query;
   let sql='SELECT * FROM pedidos WHERE 1=1'; const params=[];
-  if(urgente==='1'){sql+=' AND urgente=1 AND entregado=0 AND cancelado=0'}
+  if(urgente==='1'){sql+=' AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0'}
+  else if(estado==='cotizacion'){sql+=' AND es_cotizacion=1'}
   else if(estado==='entregado'){sql+=' AND entregado=1'}
   else if(estado==='cancelado'){sql+=' AND cancelado=1'}
   else if(estado==='listo'){sql+=' AND entregado=0 AND cancelado=0'}
@@ -233,12 +324,12 @@ app.post('/api/pedidos',(req,res)=>{
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid(); const ref=nextRef();
     const cid=asegurarCliente(b.nombre,b.tel,b.cliente_id||null);
-    db.prepare(`INSERT INTO pedidos(id,ref,cliente_id,nombre,tel,urgente,entregado,cancelado,pendiente_pago,fecha_pedido,fecha_entrega,notas)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,ref,cid,b.nombre.trim(),b.tel||'',b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,hoy(),b.fecha_entrega||'',b.notas||'');
+    db.prepare(`INSERT INTO pedidos(id,ref,cliente_id,nombre,tel,urgente,entregado,cancelado,pendiente_pago,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega,notas)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,ref,cid,b.nombre.trim(),b.tel||'',b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,normVF(b.valor_final),normCalc(b.valor_final),hoy(),b.fecha_entrega||'',b.notas||'');
     saveEncargos(id,b.encargos);
-    (b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,fecha,tipo,nota)VALUES(?,?,?,?,?,?)').run(uid(),id,pg.monto||'',pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||''));
-    (b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto)VALUES(?,?,?,?,?)').run(uid(),id,c.encargo_id||'',c.descripcion||'',c.monto||''));
+    (b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota)VALUES(?,?,?,?,?,?,?)').run(uid(),id,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||''));
+    (b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc)VALUES(?,?,?,?,?,?)').run(uid(),id,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto)));
     addHist(id,'Pedido creado');
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
   }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
@@ -255,11 +346,11 @@ app.put('/api/pedidos/:id',(req,res)=>{
     // Log cambios de estado checkboxes
     if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado');
     if(b.cancelado&&!p.cancelado)addHist(pid,'Pedido cancelado');
-    db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=?`)
-      .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid);
+    db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=?`)
+      .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid);
     if(b.encargos!==undefined)saveEncargos(pid,b.encargos);
-    if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=?').run(pid);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,fecha,tipo,nota)VALUES(?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||''));}
-    if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=?').run(pid);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto)VALUES(?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.monto||''));}
+    if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=?').run(pid);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota)VALUES(?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||''));}
+    if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=?').run(pid);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc)VALUES(?,?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto)));}
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
   }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}
 });
@@ -298,25 +389,34 @@ app.get('/api/clientes',(req,res)=>{
 app.get('/api/clientes/:id',(req,res)=>{
   const c=db.prepare('SELECT * FROM clientes WHERE id=?').get(req.params.id);
   if(!c)return res.status(404).json({error:'No encontrado'});
-  const peds=db.prepare('SELECT id,ref,entregado,cancelado,urgente,fecha_pedido,fecha_entrega FROM pedidos WHERE cliente_id=? ORDER BY creado DESC').all(c.id);
-  c.pedidos=peds.map(p=>{p.valor_total=db.prepare('SELECT COALESCE(SUM(CAST(REPLACE(valor,"$","") AS INTEGER)),0) as t FROM encargos WHERE pedido_id=?').get(p.id)?.t||0;return p});
+  const peds=db.prepare('SELECT id,ref,entregado,cancelado,urgente,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega FROM pedidos WHERE cliente_id=? ORDER BY creado DESC').all(c.id);
+  c.pedidos=peds.map(p=>{
+    p.es_cotizacion=!!p.es_cotizacion;
+    const encs=db.prepare('SELECT id,categoria,subcategoria,valor,valor_calc FROM encargos WHERE pedido_id=? ORDER BY orden').all(p.id);
+    encs.forEach(e=>{e.items=db.prepare('SELECT cantidad,valor_unitario,valor_unitario_calc FROM enc_items WHERE encargo_id=?').all(e.id)});
+    p.valor_sugerido=calcValorSugerido(encs);
+    p.valor_total=valorOficialPedido(p,p.valor_sugerido);
+    p.encargosResumen=encs.map(e=>({categoria:e.categoria,subcategoria:e.subcategoria}));
+    return p;
+  });
   res.json(c);
 });
 
 // Stats
 app.get('/api/stats',(req,res)=>{
-  const activos=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE entregado=0 AND cancelado=0").get().n;
-  const urgentes=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE urgente=1 AND entregado=0 AND cancelado=0").get().n;
-  // Listo: todos sus encargos en Listo/Entregado y pedido no entregado/cancelado
-  const candidatos=db.prepare("SELECT id FROM pedidos WHERE entregado=0 AND cancelado=0").all();
+  const activos=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE entregado=0 AND cancelado=0 AND es_cotizacion=0").get().n;
+  const urgentes=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get().n;
+  // Listo: todos sus encargos en Listo/Entregado y pedido no entregado/cancelado/cotización
+  const candidatos=db.prepare("SELECT id FROM pedidos WHERE entregado=0 AND cancelado=0 AND es_cotizacion=0").all();
   let listos=0;
   candidatos.forEach(p=>{
     const encs=db.prepare('SELECT estado FROM encargos WHERE pedido_id=?').all(p.id);
     if(encs.length&&encs.every(e=>e.estado==='Listo'||e.estado==='Entregado'))listos++;
   });
   const clientes=db.prepare('SELECT COUNT(*) as n FROM clientes').get().n;
-  const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE pendiente_pago=1 AND entregado=0 AND cancelado=0").get().n;
-  res.json({activos,urgentes,listos,clientes,pendPago});
+  const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get().n;
+  const cotizaciones=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE es_cotizacion=1").get().n;
+  res.json({activos,urgentes,listos,clientes,pendPago,cotizaciones});
 });
 
 // Export CSV
@@ -330,7 +430,7 @@ app.get('/api/export/csv',(req,res)=>{
   const rows=[['Ref','Cliente','Tel','Estado','Urgente','Encargos','Valor Total','Pagado','Saldo','F.Pedido','F.Entrega','Notas']];
   pedidos.forEach(p=>{
     const encRes=(p.encargos||[]).map(e=>`[${e.categoria||''}] ${(e.items||[]).map(i=>`${i.cantidad} ${i.detalle}`).join(', ')}`).join(' | ');
-    const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto),0);
+    const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0);
     const val=p.valor_total||0;
     const estado=p.entregado?'Entregado':p.cancelado?'Cancelado':p.urgente?'Urgente':'Activo';
     rows.push([p.ref,p.nombre,p.tel||'',estado,p.urgente?'Sí':'No',encRes,val,pag,Math.max(0,val-pag),p.fecha_pedido||'',p.fecha_entrega||'',p.notas||'']);
@@ -346,8 +446,8 @@ app.get('/api/registros/utilidades',(req,res)=>{
   const pedidos=db.prepare('SELECT * FROM pedidos').all().map(pedidoCompleto);
   const rows=pedidos.map(p=>{
     const ing=p.valor_total||0;
-    const cos=(p.costos||[]).reduce((a,c)=>a+toNum(c.monto),0);
-    const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto),0);
+    const cos=(p.costos||[]).reduce((a,c)=>a+toNum(c.monto_calc),0);
+    const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0);
     return{ref:p.ref,nombre:p.nombre,ing,cos,gan:ing-cos,pag,saldo:Math.max(0,ing-pag)};
   }).filter(r=>r.ing||r.cos);
   res.json(rows);

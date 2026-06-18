@@ -120,6 +120,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pcard.done{opacity:.5;background:var(--line-lt)}.pcard.done::before{background:#aaa}
 .pcard.canc{opacity:.38;background:#f9f9f9}.pcard.canc::before{background:#ccc}
 .pcard.pend{opacity:.68;border-color:#F5D5A0;background:#FDFAF3}.pcard.pend::before{background:var(--amber)}
+.pcard.cot{opacity:.6;border-color:#D9D3FF;background:#F8F6FF}.pcard.cot::before{background:var(--purple)}
 
 .pc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:7px}
 .pc-ref{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:2px;display:flex;align-items:center;gap:5px}
@@ -138,6 +139,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .b-no{background:var(--red-lt);color:var(--red)}
 .b-urg{color:var(--red);font-size:9px;font-weight:800}
 .b-pend{background:var(--amber-lt);color:#9B6500;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
+.b-cot{background:var(--purple-lt);color:var(--purple);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .b-done{background:var(--green-lt);color:#1A6B45;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .b-canc{background:var(--line-lt);color:var(--muted);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 
@@ -192,7 +194,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .msec:first-child{margin-top:0}
 
 /* Checkboxes especiales */
-.checks-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.checks-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
 .ck-box{display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 8px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--white);cursor:pointer;transition:all .13s;user-select:none}
 .ck-box input[type=checkbox]{width:14px;height:14px;flex-shrink:0;cursor:pointer}
 .ck-box label{font-size:10px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;white-space:nowrap}
@@ -204,6 +206,8 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .ck-box:has(input:checked).ck-can label{color:var(--slate)}
 .ck-box:has(input:checked).ck-pnd{border-color:var(--amber);background:var(--amber-lt)}
 .ck-box:has(input:checked).ck-pnd label{color:#9B6500}
+.ck-box:has(input:checked).ck-cot{border-color:var(--purple);background:var(--purple-lt)}
+.ck-box:has(input:checked).ck-cot label{color:var(--purple)}
 
 /* AUTOCOMPLETE */
 .ac-wrap{position:relative}
@@ -247,7 +251,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 /* Estado encargo select */
 .enc-est-sel{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:6px 9px;font-size:10px;font-weight:700;font-family:'Montserrat',sans-serif;background:var(--white);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238A9EAD' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;padding-right:24px;cursor:pointer}
 .enc-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
-.enc-val-wrap{display:flex;align-items:center;gap:6px}
+.enc-val-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .enc-val-wrap label{margin:0;white-space:nowrap}
 .enc-val-inp{width:120px;font-weight:700;font-size:12px}
 
@@ -293,7 +297,6 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .coll-body.open{display:block}
 .costo-item{display:flex;align-items:center;gap:7px;margin-bottom:7px}
 .costo-item input{flex:1}
-.costo-item input:last-of-type{max-width:110px}
 .costo-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px}
 .costo-del:hover{color:var(--red)}
 
@@ -336,6 +339,11 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .his-item:hover{border-color:var(--teal-lt)}
 
 /* REGISTROS */
+.reg-filtros{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.rfpill{padding:6px 13px;border-radius:20px;border:1.5px solid var(--line);background:var(--white);color:var(--slate);font-size:10px;font-weight:700;cursor:pointer;transition:all .13s}
+.rfpill.active{border-color:var(--teal);background:var(--teal);color:white}
+.rf-rango{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.rf-rango input[type=date]{border:1.5px solid var(--line);border-radius:8px;padding:5px 8px;font-size:11px;font-family:'Montserrat',sans-serif}
 .reg-tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
 .rtab{padding:6px 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--white);color:var(--slate);font-size:10px;font-weight:700;cursor:pointer;transition:all .13s}
 .rtab.active{border-color:var(--navy);background:var(--navy);color:white}
@@ -421,8 +429,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
     <button class="nav-item" onclick="filtroRapido('pendiente')"><i class="ti ti-clock"></i>Pendientes</button>
-    <button class="nav-item" onclick="filtroRapido('entregado')"><i class="ti ti-package-check"></i>Entregados</button>
+    <button class="nav-item" onclick="filtroRapido('entregado')"><i class="ti ti-circle-check"></i>Entregados</button>
     <button class="nav-item" onclick="filtroRapido('cancelado')"><i class="ti ti-ban"></i>Cancelados</button>
+    <button class="nav-item" onclick="filtroRapido('cotizacion')"><i class="ti ti-file-invoice"></i>Cotizaciones<span class="nb" id="sb-cot">0</span></button>
   </nav>
   <div class="sb-footer">
     <button class="nav-item" onclick="abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
@@ -463,6 +472,19 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <!-- REGISTROS -->
     <div id="view-registros" class="view">
+      <div class="reg-filtros" id="reg-filtros">
+        <button class="rfpill active" data-tipo="todos" onclick="regSetFiltro('todos')">Todos</button>
+        <button class="rfpill" data-tipo="hoy" onclick="regSetFiltro('hoy')">Hoy</button>
+        <button class="rfpill" data-tipo="semana" onclick="regSetFiltro('semana')">Esta semana</button>
+        <button class="rfpill" data-tipo="mes" onclick="regSetFiltro('mes')">Este mes</button>
+        <button class="rfpill" data-tipo="anio" onclick="regSetFiltro('anio')">Este año</button>
+        <button class="rfpill" data-tipo="personalizado" onclick="regSetFiltro('personalizado')">Rango personalizado</button>
+        <div class="rf-rango" id="rf-rango" style="display:none">
+          <input type="date" id="rf-desde" onchange="regAplicarPersonalizado()">
+          <span>—</span>
+          <input type="date" id="rf-hasta" onchange="regAplicarPersonalizado()">
+        </div>
+      </div>
       <div class="reg-tabs">
         <button class="rtab active" onclick="showReg('ingresos')">Ingresos</button>
         <button class="rtab" onclick="showReg('costos')">Costos</button>
@@ -516,8 +538,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="fr3 fg">
       <div><label>Fecha de entrega</label><input type="date" id="f-fecha"></div>
       <div>
-        <label>Valor total</label>
-        <div id="valor-auto" style="font-size:19px;font-weight:800;color:var(--navy);padding:6px 0">$0</div>
+        <label>Valor final del pedido</label>
+        <input type="text" id="f-valor-final" placeholder="= sugerido" oninput="fValorFinalRaw=this.value;actualizarValorTotal()" onfocus="focusValorFinal(this)" onblur="blurValorFinal(this)" style="font-size:15px;font-weight:800;color:var(--navy)">
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+          <span id="vf-prev" style="font-size:10px;font-weight:700;color:var(--teal-dk);display:none"></span>
+          <span id="valor-sugerido-cap" style="font-size:10px;color:var(--muted);font-weight:600">Valor sugerido: $0</span>
+          <span id="valor-ajustado" class="b-cot" style="display:none">Ajustado manualmente</span>
+        </div>
       </div>
       <div>
         <label>Avance general</label>
@@ -531,6 +558,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div class="ck-box ck-ent"><input type="checkbox" id="ck-ent"><label for="ck-ent">Entregado</label></div>
       <div class="ck-box ck-can"><input type="checkbox" id="ck-can"><label for="ck-can">Cancelado</label></div>
       <div class="ck-box ck-pnd"><input type="checkbox" id="ck-pnd"><label for="ck-pnd">Pendiente</label></div>
+      <div class="ck-box ck-cot"><input type="checkbox" id="ck-cot"><label for="ck-cot">Cotización</label></div>
     </div>
 
     <div class="fg"><label>Anotaciones generales</label><textarea id="f-notas" placeholder="Observaciones del pedido…" style="min-height:44px"></textarea></div>
@@ -618,7 +646,7 @@ const CATS=[
   {id:'servicios',  label:'Servicios', tc:'tc-servicios',
    subs:['Consultas','Trabajo en PC','Asesorías']},
 ];
-const ENC_ESTS=['Nuevo','Diseño','Aprobación','Producción','Listo','Entregado','Cancelado'];
+const ENC_ESTS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 const EST_CLS={Nuevo:'es-nuevo',Diseño:'es-diseno','En diseño':'es-diseno',Aprobación:'es-aprobacion',Producción:'es-produccion','En producción':'es-produccion',Listo:'es-listo',Entregado:'es-entregado',Cancelado:'es-cancelado'};
 const ECOL_MAP={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb'};
 
@@ -628,6 +656,7 @@ let filtroAct='todos',busq='';
 let editId=null,editCliId=null;
 let fEnc=[],fPag=[],fArch=[],fCostos=[];
 let encCounter=0;
+let fValorFinalRaw='';
 
 /* ══ AUTENTICACIÓN (PIN) ══ */
 const TOKEN_KEY='grafia_token';
@@ -706,14 +735,59 @@ function toggleColl(head){
   chev.classList.toggle('open');
 }
 
-/* Calcular progreso encargos */
+/* Calcular progreso encargos: cada etapa del proceso pesa un % del avance */
+const PROG_PESOS={Nuevo:0,Diseño:25,'En diseño':25,Aprobación:50,Producción:75,'En producción':75,Listo:100,Entregado:100,Cancelado:100};
 function calcProg(encs){
   if(!encs||!encs.length)return 0;
-  const done=encs.filter(e=>e.estado==='Listo'||e.estado==='Entregado').length;
-  return Math.round(done/encs.length*100);
+  const total=encs.reduce((a,e)=>a+(PROG_PESOS[e.estado||'Nuevo']??0),0);
+  return Math.round(total/encs.length);
 }
-function calcValorTotal(encs){
-  return(encs||[]).reduce((a,e)=>a+(parseInt(String(e.valor||0).replace(/\D/g,''))||0),0);
+// Evaluador seguro de expresiones matemáticas para campos de valor monetario
+// (mismo comportamiento que evalExpr en server.js — debe mantenerse igual).
+function evalExpr(raw){
+  if(raw==null)return null;
+  let s=String(raw).trim();
+  if(s==='')return null;
+  s=s.replace(/[.,]/g,'').replace(/[xX]/g,'*');
+  if(!/^[0-9+\-*/()\s]+$/.test(s)||!/[0-9]/.test(s))return null;
+  try{
+    const v=Function('"use strict";return('+s+')')();
+    return(typeof v==='number'&&isFinite(v))?Math.round(v):null;
+  }catch(e){return null}
+}
+function esExpresion(raw){return/[+\-*/xX()]/.test(String(raw||''))}
+function previewExpr(raw){
+  if(!esExpresion(raw))return'';
+  const v=evalExpr(raw);
+  return v==null?'<span style="color:var(--red)">⚠ expresión inválida</span>':'= '+fCOP(v);
+}
+// Texto a mostrar en el input cuando NO está enfocado: el resultado calculado
+// (grande/protagonista), no la expresión cruda — esa sólo se ve al editar.
+function displayMoneyVal(raw){
+  if(raw==null||String(raw).trim()==='')return'';
+  const v=evalExpr(raw);
+  return v==null?String(raw):fCOP(v);
+}
+function calcReferencialEncargo(enc){
+  return(enc.items||[]).reduce((a,it)=>{
+    const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+    const unit=evalExpr(it.valor_unitario)||0;
+    return(cant>0&&unit>0)?a+cant*unit:a;
+  },0);
+}
+function valorEncargoDefinido(enc){
+  return enc.valor!=null&&String(enc.valor).trim()!=='';
+}
+function calcValorEncargoEfectivo(enc){
+  return valorEncargoDefinido(enc)?(evalExpr(enc.valor)||0):calcReferencialEncargo(enc);
+}
+function calcValorSugerido(encs){
+  return(encs||[]).reduce((a,e)=>a+calcValorEncargoEfectivo(e),0);
+}
+function valorOficialModal(){
+  const sug=calcValorSugerido(fEnc);
+  const vfRaw=(fValorFinalRaw||'').trim();
+  return vfRaw!==''?(evalExpr(vfRaw)||0):sug;
 }
 
 /* Fecha alerta html */
@@ -729,7 +803,7 @@ function faHTML(p){
 }
 function pagoHTML(p){
   const val=p.valor_total||0;
-  const pag=(p.pagos||[]).reduce((a,x)=>a+(parseInt(String(x.monto||0).replace(/\D/g,''))||0),0);
+  const pag=(p.pagos||[]).reduce((a,x)=>a+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0);
   if(!val)return'';
   if(pag>=val)return'<span class="badge b-ok">✓ Pagado</span>';
   if(pag>0)return'<span class="badge b-par">Abono</span>';
@@ -756,6 +830,7 @@ async function cargarStats(){
   const s=await api('GET','/stats');
   document.getElementById('sb-act').textContent=s.activos||0;
   document.getElementById('sb-urg').textContent=s.urgentes||0;
+  document.getElementById('sb-cot').textContent=s.cotizaciones||0;
   document.getElementById('stats').innerHTML=`
     <div class="sc-mini dark">
       <div class="ico"><i class="ti ti-clipboard-list"></i></div>
@@ -769,7 +844,7 @@ async function cargarStats(){
 
 /* ══ FILTROS ══ */
 function renderFiltros(){
-  const ops=[{id:'todos',l:'Todos'},{id:'Nuevo',l:'Nuevo'},{id:'Diseño',l:'Diseño'},{id:'Aprobación',l:'Aprobación'},{id:'Producción',l:'Producción'},{id:'Listo',l:'Listo'},{id:'Entregado',l:'Entregado'}];
+  const ops=[{id:'todos',l:'Todos'},{id:'Nuevo',l:'Nuevo'},{id:'Diseño',l:'Diseño'},{id:'Aprobación',l:'Aprobación'},{id:'Producción',l:'Producción'},{id:'Listo',l:'Listo'}];
   document.getElementById('filtros').innerHTML=ops.map(o=>`<button class="pill${filtroAct===o.id?' active':''}" onclick="setFiltro('${o.id}')">${o.l}</button>`).join('');
 }
 async function setFiltro(id){filtroAct=id;busq='';document.getElementById('s-inp').value='';renderFiltros();await cargarPedidos();showView('pedidos')}
@@ -780,6 +855,7 @@ function buscar(q){busq=q;filtroAct='todos';renderFiltros();cargarPedidos()}
 function estadoGeneral(p){
   if(p.cancelado)return'Cancelado';
   if(p.entregado)return'Entregado';
+  if(p.es_cotizacion)return'Cotización';
   const encs=p.encargos||[];
   if(!encs.length)return'Nuevo';
   const ests=encs.map(e=>e.estado||'Nuevo');
@@ -797,21 +873,20 @@ async function cargarPedidos(){
   if(filtroAct==='urgente')p.set('urgente','1');
   else if(filtroAct==='entregado')p.set('estado','entregado');
   else if(filtroAct==='cancelado')p.set('estado','cancelado');
+  else if(filtroAct==='cotizacion')p.set('estado','cotizacion');
   else p.set('estado','todos');
   if(busq)p.set('q',busq);
   let lista=await api('GET',`/pedidos?${p}`);
   // Filtros de proceso (cliente)
   const procesos=['Nuevo','Diseño','Aprobación','Producción','Listo'];
   if(procesos.includes(filtroAct)){
-    lista=lista.filter(x=>!x.entregado&&!x.cancelado&&estadoGeneral(x)===filtroAct);
-  } else if(filtroAct==='Entregado'){
-    lista=lista.filter(x=>x.entregado);
+    lista=lista.filter(x=>!x.entregado&&!x.cancelado&&!x.es_cotizacion&&estadoGeneral(x)===filtroAct);
   } else if(filtroAct==='pendiente'){
-    lista=lista.filter(x=>x.pendiente_pago&&!x.entregado&&!x.cancelado);
+    lista=lista.filter(x=>x.pendiente_pago&&!x.entregado&&!x.cancelado&&!x.es_cotizacion);
   } else if(filtroAct==='todos'){
-    // Orden: urgentes → activos → pendientes → entregados → cancelados
+    // Orden: urgentes → activos → pendientes → entregados → cotizaciones → cancelados
     lista.sort((a,b)=>{
-      const w=x=>x.cancelado?4:x.entregado?3:x.pendiente_pago?2:x.urgente?0:1;
+      const w=x=>x.cancelado?5:x.es_cotizacion?4:x.entregado?3:x.pendiente_pago?2:x.urgente?0:1;
       return w(a)-w(b);
     });
   }
@@ -822,7 +897,7 @@ async function cargarPedidos(){
 function renderLista(){
   const el=document.getElementById('lista');
   if(!pedidos.length){el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i><p>Sin pedidos aquí</p></div>';return}
-  const EG_COL={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb'};
+  const EG_COL={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb',Cotización:'#7B6EF6'};
   el.innerHTML=pedidos.map(p=>{
     const prog=calcProg(p.encargos);
     const val=p.valor_total||0;
@@ -830,9 +905,9 @@ function renderLista(){
     const egCol=EG_COL[eg]||'#8A9EAD';
     const cats=[...new Set((p.encargos||[]).map(e=>e.categoria).filter(Boolean))];
     const tags=cats.map(c=>{const cat=CATS.find(x=>x.id===c);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
-    const isDone=p.entregado,isCan=p.cancelado,isUrg=p.urgente&&!isDone&&!isCan,isPend=p.pendiente_pago&&!isDone&&!isCan;
+    const isDone=p.entregado,isCan=p.cancelado,isCot=p.es_cotizacion,isUrg=p.urgente&&!isDone&&!isCan,isPend=p.pendiente_pago&&!isDone&&!isCan;
     const encSummary=buildEncSummary(p.encargos||[]);
-    return`<div class="pcard ${isUrg?'urg':''} ${isDone?'done':''} ${isCan?'canc':''} ${isPend&&!isDone&&!isCan?'pend':''}" onclick="abrirEditar('${p.id}')">
+    return`<div class="pcard ${isUrg?'urg':''} ${isDone?'done':''} ${isCan?'canc':''} ${isCot&&!isDone&&!isCan?'cot':''} ${isPend&&!isDone&&!isCan?'pend':''}" onclick="abrirEditar('${p.id}')">
       <div class="pc-top">
         <div style="flex:1;min-width:0">
           <div class="pc-ref">
@@ -840,6 +915,7 @@ function renderLista(){
             <span>· ${fd(p.fecha_pedido)}</span>
             ${isUrg?'<span class="b-urg">⚡ URGENTE</span>':''}
             ${isPend?'<span class="b-pend">⏳ Pendiente</span>':''}
+            ${isCot?'<span class="b-cot">📋 COTIZACIÓN</span>':''}
           </div>
           <div class="pc-name">${p.nombre}</div>
           <div class="pc-sub">${p.tel||''}${(p.encargos||[]).length>1?` · ${(p.encargos||[]).length} encargos`:''}</div>
@@ -900,16 +976,22 @@ async function verCli(id){
       <div class="sc tl"><div class="sc-l">Tel</div><div class="sc-n" style="font-size:14px">${c.tel||'—'}</div></div>
     </div>
     <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px">Historial</div>
-    ${(c.pedidos||[]).length?(c.pedidos||[]).map(p=>`
+    ${(c.pedidos||[]).length?(c.pedidos||[]).map(p=>{
+      const resumen=(p.encargosResumen||[]).map(e=>{
+        const cat=CATS.find(x=>x.id===e.categoria);
+        return[cat?cat.label:e.categoria,e.subcategoria].filter(Boolean).join(' - ');
+      }).filter(Boolean).join(', ');
+      return`
       <div class="his-item" onclick="cerrarCli();abrirEditar('${p.id}')">
-        <div>
+        <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:800;color:var(--navy)">#${p.ref} &middot; ${fd(p.fecha_pedido)}</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:1px">${fd(p.fecha_entrega)}</div>
+          <div style="font-size:10.5px;color:var(--slate);margin-top:2px">${resumen||'Sin encargos'}${p.valor_total?` &middot; ${fCOP(p.valor_total)}`:''}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:5px">
-          ${p.entregado?'<span class="b-done">Entregado</span>':p.cancelado?'<span class="b-canc">Cancelado</span>':'<span style="font-size:10px;color:var(--muted)">Activo</span>'}
+        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;margin-left:8px">
+          ${p.entregado?'<span class="b-done">Entregado</span>':p.cancelado?'<span class="b-canc">Cancelado</span>':p.es_cotizacion?'<span class="b-cot">Cotización</span>':'<span style="font-size:10px;color:var(--muted)">Activo</span>'}
         </div>
-      </div>`).join(''):'<div style="text-align:center;padding:14px;color:var(--muted);font-size:11px">Sin pedidos aún</div>'}
+      </div>`;
+    }).join(''):'<div style="text-align:center;padding:14px;color:var(--muted);font-size:11px">Sin pedidos aún</div>'}
     <div style="display:flex;justify-content:flex-end;margin-top:12px">
       <button class="btn-pri" onclick="nuevoPedidoDesdeCliente()"><i class="ti ti-plus"></i>Nuevo pedido</button>
     </div>`;
@@ -953,18 +1035,26 @@ document.addEventListener('click',e=>{
 /* ══ ENCARGOS ══ */
 function addEnc(){
   encCounter++;
-  fEnc.push({id:uid(),numero:encCounter,categoria:'',subcategoria:'',estado:'Nuevo',valor:'0',anotacion:'',items:[{id:uid(),cantidad:'',detalle:''}]});
+  fEnc.push({id:uid(),numero:encCounter,categoria:'',subcategoria:'',estado:'Nuevo',valor:'',anotacion:'',items:[{id:uid(),cantidad:'',detalle:'',valor_unitario:''}]});
   renderEncs();
   actualizarValorTotal();
 }
 function remEnc(id){fEnc=fEnc.filter(x=>x.id!==id);renderEncs();actualizarValorTotal()}
 function setEncCat(id,cat){const e=fEnc.find(x=>x.id===id);if(e){e.categoria=cat;e.subcategoria=''}renderEncs()}
 function setEncSub(id,sub){const e=fEnc.find(x=>x.id===id);if(e)e.subcategoria=sub;renderEncSubcats(id)}
-function setEncVal(id,k,v){const e=fEnc.find(x=>x.id===id);if(e)e[k]=v;if(k==='valor')actualizarValorTotal()}
+function setEncVal(id,k,v){
+  const e=fEnc.find(x=>x.id===id);
+  if(e)e[k]=v;
+  if(k==='valor'){
+    actualizarValorTotal();
+    const elp=document.getElementById('encprev-'+id);
+    if(elp){const show=esExpresion(v);elp.style.display=show?'block':'none';if(show)elp.innerHTML=previewExpr(v)}
+  }
+}
 function setEncEst(id,v){const e=fEnc.find(x=>x.id===id);if(e)e.estado=v;actualizarProgreso()}
-function addItem(encId){const e=fEnc.find(x=>x.id===encId);if(e)e.items.push({id:uid(),cantidad:'',detalle:''});renderEncItems(encId)}
-function remItem(encId,itemId){const e=fEnc.find(x=>x.id===encId);if(e)e.items=e.items.filter(i=>i.id!==itemId);renderEncItems(encId)}
-function setItem(encId,itemId,k,v){const e=fEnc.find(x=>x.id===encId);if(e){const it=e.items.find(i=>i.id===itemId);if(it)it[k]=v}}
+function addItem(encId){const e=fEnc.find(x=>x.id===encId);if(e)e.items.push({id:uid(),cantidad:'',detalle:'',valor_unitario:''});renderEncItems(encId)}
+function remItem(encId,itemId){const e=fEnc.find(x=>x.id===encId);if(e)e.items=e.items.filter(i=>i.id!==itemId);renderEncItems(encId);actualizarValorTotal()}
+function setItem(encId,itemId,k,v){const e=fEnc.find(x=>x.id===encId);if(e){const it=e.items.find(i=>i.id===itemId);if(it)it[k]=v}if(k==='cantidad'||k==='valor_unitario')actualizarValorTotal()}
 
 function renderEncs(){
   const el=document.getElementById('enc-lista');
@@ -992,16 +1082,18 @@ function renderEncs(){
         </div>
       </div>
       <div class="enc-body">
-        <label>Cant. &nbsp;·&nbsp; Detalle / Especificación</label>
         <table class="items-table" id="it-${enc.id}">
+          <thead><tr><th style="width:70px">Cant.</th><th>Detalle / Especificación</th><th style="width:100px">V. Unitario</th><th style="width:30px"></th></tr></thead>
           <tbody>${renderItemsHTML(enc)}</tbody>
         </table>
         <button class="btn-add-row" style="margin:4px 0 10px" onclick="addItem('${enc.id}')"><i class="ti ti-plus"></i>Agregar fila</button>
         <div class="enc-footer" style="border:none;padding:0;margin:0">
           <div style="flex:1;margin-right:10px"><label style="margin:0 0 3px">Anotación de encargo</label><input type="text" value="${enc.anotacion||''}" placeholder="Detalle adicional…" oninput="setEncVal('${enc.id}','anotacion',this.value)" style="font-size:11px"></div>
           <div class="enc-val-wrap" style="align-self:flex-end">
-            <label style="margin:0">Valor</label>
-            <input class="enc-val-inp" type="text" value="${enc.valor||'0'}" placeholder="$ 0" oninput="setEncVal('${enc.id}','valor',this.value)" style="width:110px;text-align:right">
+            <label style="margin:0">Valor Encargo</label>
+            <input class="enc-val-inp" type="text" value="${displayMoneyVal(enc.valor)}" placeholder="= referencial" oninput="setEncVal('${enc.id}','valor',this.value)" onfocus="focusEncVal(this,'${enc.id}')" onblur="blurEncVal(this,'${enc.id}')" style="width:110px;text-align:right">
+            <div id="encprev-${enc.id}" style="font-size:9.5px;font-weight:700;color:var(--teal-dk);display:none"></div>
+            <div id="encref-${enc.id}" style="font-size:9.5px;color:var(--muted)">Ref ${fCOP(calcReferencialEncargo(enc))}</div>
           </div>
         </div>
       </div>
@@ -1011,8 +1103,9 @@ function renderEncs(){
 function renderItemsHTML(enc){
   return(enc.items||[]).map((it,j)=>`
     <tr>
-      <td style="width:80px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"></td>
+      <td style="width:70px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"></td>
       <td><textarea class="item-ta" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this)">${it.detalle||''}</textarea></td>
+      <td style="width:100px"><input class="item-inp" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
 }
@@ -1035,10 +1128,67 @@ function renderEncItems(encId){
   setTimeout(()=>tb.querySelectorAll('.item-ta').forEach(t=>autoTA(t)),0);
 }
 
+function previewItemUnit(itemId,v){
+  const el=document.getElementById('itprev-'+itemId);
+  if(!el)return;
+  const show=esExpresion(v);
+  el.style.display=show?'block':'none';
+  if(show)el.innerHTML=previewExpr(v);
+}
+/* Swap foco/desenfoque: enfocado = expresión cruda editable; desenfocado = resultado grande */
+function focusEncVal(el,encId){
+  const e=fEnc.find(x=>x.id===encId);
+  el.value=(e&&e.valor)||'';
+  const elp=document.getElementById('encprev-'+encId);
+  if(elp){const show=esExpresion(e&&e.valor);elp.style.display=show?'block':'none';if(show)elp.innerHTML=previewExpr(e&&e.valor)}
+}
+function blurEncVal(el,encId){
+  const e=fEnc.find(x=>x.id===encId);
+  el.value=displayMoneyVal(e&&e.valor);
+  const elp=document.getElementById('encprev-'+encId);
+  if(elp)elp.style.display='none';
+}
+function focusItemVal(el,encId,itemId){
+  const e=fEnc.find(x=>x.id===encId);
+  const it=e&&e.items.find(i=>i.id===itemId);
+  el.value=(it&&it.valor_unitario)||'';
+  previewItemUnit(itemId,el.value);
+}
+function blurItemVal(el,encId,itemId){
+  const e=fEnc.find(x=>x.id===encId);
+  const it=e&&e.items.find(i=>i.id===itemId);
+  el.value=displayMoneyVal(it&&it.valor_unitario);
+  const elp=document.getElementById('itprev-'+itemId);
+  if(elp)elp.style.display='none';
+}
+function focusValorFinal(el){
+  el.value=fValorFinalRaw||'';
+  const vfPrevEl=document.getElementById('vf-prev');
+  if(vfPrevEl){const show=esExpresion(fValorFinalRaw);vfPrevEl.style.display=show?'inline':'none';if(show)vfPrevEl.innerHTML=previewExpr(fValorFinalRaw)}
+}
+function blurValorFinal(el){
+  el.value=displayMoneyVal(fValorFinalRaw);
+  const vfPrevEl=document.getElementById('vf-prev');
+  if(vfPrevEl)vfPrevEl.style.display='none';
+}
 function actualizarValorTotal(){
-  const total=calcValorTotal(fEnc);
-  document.getElementById('valor-auto').textContent=fCOP(total);
+  fEnc.forEach(e=>{
+    const elx=document.getElementById('encref-'+e.id);
+    if(elx)elx.textContent='Ref '+fCOP(calcReferencialEncargo(e));
+  });
+  const sug=calcValorSugerido(fEnc);
+  document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: '+fCOP(sug);
+  const vfRaw=(fValorFinalRaw||'').trim();
+  const oficial=vfRaw!==''?(evalExpr(vfRaw)||0):sug;
+  document.getElementById('valor-ajustado').style.display=(vfRaw!==''&&oficial!==sug)?'inline-block':'none';
+  const vfPrevEl=document.getElementById('vf-prev');
+  if(vfPrevEl&&document.activeElement&&document.activeElement.id==='f-valor-final'){
+    const show=esExpresion(vfRaw);
+    vfPrevEl.style.display=show?'inline':'none';
+    if(show)vfPrevEl.innerHTML=previewExpr(vfRaw);
+  }
   renderPagRes();
+  renderCostosRes();
 }
 function actualizarProgreso(){
   const prog=calcProg(fEnc);
@@ -1048,13 +1198,31 @@ function actualizarProgreso(){
 /* ══ PAGOS ══ */
 function addPago(){fPag.push({id:uid(),monto:'',fecha:hoy(),tipo:'efectivo',nota:''});renderPagos()}
 function remPago(id){fPag=fPag.filter(x=>x.id!==id);renderPagos()}
-function setPagVal(id,k,v){const p=fPag.find(x=>x.id===id);if(p)p[k]=v;if(k==='monto')renderPagRes()}
+function setPagVal(id,k,v){const p=fPag.find(x=>x.id===id);if(p)p[k]=v;if(k==='monto'){renderPagRes();previewPago(id,v)}}
+function previewPago(id,v){
+  const el=document.getElementById('pagprev-'+id);
+  if(!el)return;
+  const show=esExpresion(v);
+  el.style.display=show?'block':'none';
+  if(show)el.innerHTML=previewExpr(v);
+}
+function focusPagVal(el,id){
+  const p=fPag.find(x=>x.id===id);
+  el.value=(p&&p.monto)||'';
+  previewPago(id,el.value);
+}
+function blurPagVal(el,id){
+  const p=fPag.find(x=>x.id===id);
+  el.value=displayMoneyVal(p&&p.monto);
+  const elp=document.getElementById('pagprev-'+id);
+  if(elp)elp.style.display='none';
+}
 function renderPagos(){
   document.getElementById('pag-lista').innerHTML=fPag.map(pg=>`
     <div class="pago-item">
       <button class="pago-del" onclick="remPago('${pg.id}')"><i class="ti ti-x"></i></button>
       <div class="fr3 fg">
-        <div><label>Monto</label><input type="text" value="${pg.monto}" placeholder="$ 0" oninput="setPagVal('${pg.id}','monto',this.value)"></div>
+        <div><label>Monto</label><input type="text" value="${displayMoneyVal(pg.monto)}" placeholder="$ 0" oninput="setPagVal('${pg.id}','monto',this.value)" onfocus="focusPagVal(this,'${pg.id}')" onblur="blurPagVal(this,'${pg.id}')"><div id="pagprev-${pg.id}" style="font-size:9px;font-weight:700;color:var(--teal-dk);margin-top:2px;display:none"></div></div>
         <div><label>Fecha</label><input type="date" value="${pg.fecha}" oninput="setPagVal('${pg.id}','fecha',this.value)"></div>
         <div><label>Forma</label>
           <select onchange="setPagVal('${pg.id}','tipo',this.value)">
@@ -1071,8 +1239,8 @@ function renderPagos(){
   renderPagRes();
 }
 function renderPagRes(){
-  const val=calcValorTotal(fEnc);
-  const pag=fPag.reduce((a,p)=>a+(parseInt(String(p.monto||0).replace(/\D/g,''))||0),0);
+  const val=valorOficialModal();
+  const pag=fPag.reduce((a,p)=>a+(evalExpr(p.monto)||0),0);
   const saldo=Math.max(0,val-pag);
   document.getElementById('pag-res').innerHTML=val?`
     <div class="pago-res-box">
@@ -1085,19 +1253,40 @@ function renderPagRes(){
 /* ══ COSTOS ══ */
 function addCosto(){fCostos.push({id:uid(),descripcion:'',monto:''});renderCostos()}
 function remCosto(id){fCostos=fCostos.filter(x=>x.id!==id);renderCostos()}
-function setCostoVal(id,k,v){const c=fCostos.find(x=>x.id===id);if(c)c[k]=v;renderCostosRes()}
+function setCostoVal(id,k,v){const c=fCostos.find(x=>x.id===id);if(c)c[k]=v;renderCostosRes();if(k==='monto')previewCosto(id,v)}
+function previewCosto(id,v){
+  const el=document.getElementById('costprev-'+id);
+  if(!el)return;
+  const show=esExpresion(v);
+  el.style.display=show?'block':'none';
+  if(show)el.innerHTML=previewExpr(v);
+}
+function focusCostoVal(el,id){
+  const c=fCostos.find(x=>x.id===id);
+  el.value=(c&&c.monto)||'';
+  previewCosto(id,el.value);
+}
+function blurCostoVal(el,id){
+  const c=fCostos.find(x=>x.id===id);
+  el.value=displayMoneyVal(c&&c.monto);
+  const elp=document.getElementById('costprev-'+id);
+  if(elp)elp.style.display='none';
+}
 function renderCostos(){
   document.getElementById('costos-lista').innerHTML=fCostos.map(c=>`
     <div class="costo-item">
       <input type="text" value="${c.descripcion||''}" placeholder="Descripción del costo…" oninput="setCostoVal('${c.id}','descripcion',this.value)">
-      <input type="text" value="${c.monto||''}" placeholder="$ 0" oninput="setCostoVal('${c.id}','monto',this.value)" style="max-width:110px">
+      <div style="max-width:110px">
+        <input type="text" value="${displayMoneyVal(c.monto)}" placeholder="$ 0" oninput="setCostoVal('${c.id}','monto',this.value)" onfocus="focusCostoVal(this,'${c.id}')" onblur="blurCostoVal(this,'${c.id}')" style="max-width:110px;width:100%">
+        <div id="costprev-${c.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);margin-top:2px;display:none"></div>
+      </div>
       <button class="costo-del" onclick="remCosto('${c.id}')"><i class="ti ti-x"></i></button>
     </div>`).join('');
   renderCostosRes();
 }
 function renderCostosRes(){
-  const val=calcValorTotal(fEnc);
-  const cos=fCostos.reduce((a,c)=>a+(parseInt(String(c.monto||0).replace(/\D/g,''))||0),0);
+  const val=valorOficialModal();
+  const cos=fCostos.reduce((a,c)=>a+(evalExpr(c.monto)||0),0);
   const gan=val-cos;
   document.getElementById('costos-res').innerHTML=cos?`
     <div style="border:1.5px solid var(--line);border-radius:var(--r-sm);overflow:hidden;font-size:11px">
@@ -1138,11 +1327,12 @@ function renderHist(hist){
 
 /* ══ MODAL ══ */
 function resetForm(){
-  fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;
-  ['f-nom','f-tel','f-fecha','f-notas'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
-  ['ck-urg','ck-ent','ck-can','ck-pnd'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
+  fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;fValorFinalRaw='';
+  ['f-nom','f-tel','f-fecha','f-notas','f-valor-final'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
+  ['ck-urg','ck-ent','ck-can','ck-pnd','ck-cot'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
   document.getElementById('ac-drop').style.display='none';
-  document.getElementById('valor-auto').textContent='$0';
+  document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: $0';
+  document.getElementById('valor-ajustado').style.display='none';
   document.getElementById('prog-pct').textContent='0%';
   document.getElementById('pag-res').innerHTML='';
   document.getElementById('costos-res').innerHTML='';
@@ -1173,7 +1363,7 @@ async function abrirEditar(id){
   editId=id;editCliId=p.cliente_id||null;
   fEnc=JSON.parse(JSON.stringify(p.encargos||[]));
   // Asegurar items en cada encargo
-  fEnc.forEach(e=>{if(!e.items||!e.items.length)e.items=[{id:uid(),cantidad:'',detalle:''}]});
+  fEnc.forEach(e=>{if(!e.items||!e.items.length)e.items=[{id:uid(),cantidad:'',detalle:'',valor_unitario:''}]});
   encCounter=fEnc.length?Math.max(...fEnc.map(e=>e.numero||0)):0;
   fPag=JSON.parse(JSON.stringify(p.pagos||[]));
   fArch=JSON.parse(JSON.stringify(p.archivos||[]));
@@ -1182,10 +1372,13 @@ async function abrirEditar(id){
   document.getElementById('f-tel').value=p.tel||'';
   document.getElementById('f-fecha').value=p.fecha_entrega||'';
   document.getElementById('f-notas').value=p.notas||'';
+  fValorFinalRaw=(p.valor_final!=null?p.valor_final:'');
+  document.getElementById('f-valor-final').value=displayMoneyVal(fValorFinalRaw);
   document.getElementById('ck-urg').checked=!!p.urgente;
   document.getElementById('ck-ent').checked=!!p.entregado;
   document.getElementById('ck-can').checked=!!p.cancelado;
   document.getElementById('ck-pnd').checked=!!p.pendiente_pago;
+  document.getElementById('ck-cot').checked=!!p.es_cotizacion;
   document.getElementById('m-tit').textContent=p.nombre;
   document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido);
   document.getElementById('btn-del').style.display='flex';
@@ -1197,6 +1390,25 @@ async function abrirEditar(id){
 function cerrar(){document.getElementById('ovP').classList.remove('open')}
 
 /* ══ GUARDAR ══ */
+function definidoFE(v){return v!=null&&String(v).trim()!==''}
+function validarExpresionesBody(b){
+  if(definidoFE(b.valor_final)&&evalExpr(b.valor_final)===null)return'El Valor Final del Pedido no es una expresión válida';
+  for(let i=0;i<(b.encargos||[]).length;i++){
+    const enc=b.encargos[i];
+    if(definidoFE(enc.valor)&&evalExpr(enc.valor)===null)return`Valor Encargo del encargo #${i+1} no es una expresión válida`;
+    for(let j=0;j<(enc.items||[]).length;j++){
+      const it=enc.items[j];
+      if(definidoFE(it.valor_unitario)&&evalExpr(it.valor_unitario)===null)return`V. Unitario (encargo #${i+1}, fila ${j+1}) no es una expresión válida`;
+    }
+  }
+  for(let i=0;i<(b.pagos||[]).length;i++){
+    if(definidoFE(b.pagos[i].monto)&&evalExpr(b.pagos[i].monto)===null)return`Monto del pago #${i+1} no es una expresión válida`;
+  }
+  for(let i=0;i<(b.costos||[]).length;i++){
+    if(definidoFE(b.costos[i].monto)&&evalExpr(b.costos[i].monto)===null)return`Monto del costo #${i+1} no es una expresión válida`;
+  }
+  return null;
+}
 async function guardar(){
   const nombre=document.getElementById('f-nom').value.trim();
   if(!nombre){document.getElementById('f-nom').focus();toast('Ingresa el nombre del cliente',false);return}
@@ -1208,12 +1420,16 @@ async function guardar(){
     entregado:document.getElementById('ck-ent').checked,
     cancelado:document.getElementById('ck-can').checked,
     pendiente_pago:document.getElementById('ck-pnd').checked,
+    es_cotizacion:document.getElementById('ck-cot').checked,
     fecha_entrega:document.getElementById('f-fecha').value,
     notas:document.getElementById('f-notas').value.trim(),
+    valor_final:(fValorFinalRaw||'').trim(),
     encargos:fEnc,
     pagos:fPag,
     costos:fCostos,
   };
+  const errExpr=validarExpresionesBody(body);
+  if(errExpr){toast(errExpr,false);return}
   try{
     if(editId){await api('PUT',`/pedidos/${editId}`,body);toast('Pedido actualizado ✓')}
     else{await api('POST','/pedidos',body);toast('Pedido creado ✓')}
@@ -1248,11 +1464,67 @@ async function exportar(){
 }
 
 /* ══ REGISTROS ══ */
+let regFiltro={tipo:'todos',desde:'',hasta:''};
+let regTabAct='ingresos';
 async function renderRegistros(){
   window._rPeds=await api('GET','/pedidos?estado=todos');
+  regFiltro={tipo:'todos',desde:'',hasta:''};
+  document.getElementById('rf-rango').style.display='none';
+  document.getElementById('rf-desde').value='';
+  document.getElementById('rf-hasta').value='';
+  document.querySelectorAll('.rfpill').forEach(b=>b.classList.toggle('active',b.dataset.tipo==='todos'));
   showReg('ingresos');
 }
+function regRango(tipo){
+  const hoy=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  if(tipo==='hoy'){const d=iso(hoy);return{desde:d,hasta:d}}
+  if(tipo==='semana'){
+    const dow=(hoy.getDay()+6)%7;
+    const lunes=new Date(hoy);lunes.setDate(hoy.getDate()-dow);
+    const domingo=new Date(lunes);domingo.setDate(lunes.getDate()+6);
+    return{desde:iso(lunes),hasta:iso(domingo)};
+  }
+  if(tipo==='mes'){
+    const ini=new Date(hoy.getFullYear(),hoy.getMonth(),1);
+    const fin=new Date(hoy.getFullYear(),hoy.getMonth()+1,0);
+    return{desde:iso(ini),hasta:iso(fin)};
+  }
+  if(tipo==='anio')return{desde:`${hoy.getFullYear()}-01-01`,hasta:`${hoy.getFullYear()}-12-31`};
+  return{desde:'',hasta:''};
+}
+function regSetFiltro(tipo){
+  regFiltro.tipo=tipo;
+  document.querySelectorAll('.rfpill').forEach(b=>b.classList.toggle('active',b.dataset.tipo===tipo));
+  if(tipo==='personalizado'){
+    document.getElementById('rf-rango').style.display='flex';
+    regFiltro.desde=document.getElementById('rf-desde').value||'';
+    regFiltro.hasta=document.getElementById('rf-hasta').value||'';
+  }else{
+    document.getElementById('rf-rango').style.display='none';
+    const r=regRango(tipo);
+    regFiltro.desde=r.desde;regFiltro.hasta=r.hasta;
+  }
+  buildRegPanel(regTabAct);
+}
+function regAplicarPersonalizado(){
+  regFiltro.desde=document.getElementById('rf-desde').value;
+  regFiltro.hasta=document.getElementById('rf-hasta').value;
+  buildRegPanel(regTabAct);
+}
+function regPedidosFiltrados(){
+  const todos=window._rPeds||[];
+  if(!regFiltro.desde&&!regFiltro.hasta)return todos;
+  return todos.filter(p=>{
+    const f=p.fecha_pedido||'';
+    if(regFiltro.desde&&f<regFiltro.desde)return false;
+    if(regFiltro.hasta&&f>regFiltro.hasta)return false;
+    return true;
+  });
+}
 function showReg(tab){
+  regTabAct=tab;
   document.querySelectorAll('.reg-panel').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.rtab').forEach(x=>x.classList.remove('active'));
   document.getElementById('reg-'+tab).classList.add('active');
@@ -1260,7 +1532,7 @@ function showReg(tab){
   buildRegPanel(tab);
 }
 function buildRegPanel(tab){
-  const todos=window._rPeds||[];
+  const todos=regPedidosFiltrados();
   const el=document.getElementById('reg-'+tab);if(!el)return;
   if(tab==='ingresos'){
     const rows=todos.filter(p=>p.valor_total>0);
@@ -1275,18 +1547,18 @@ function buildRegPanel(tab){
   }
   if(tab==='costos'){
     const all=[];todos.forEach(p=>(p.costos||[]).forEach(c=>all.push({...c,ref:p.ref,nom:p.nombre})));
-    const total=all.reduce((a,c)=>a+(parseInt(String(c.monto||0).replace(/\D/g,''))||0),0);
+    const total=all.reduce((a,c)=>a+(parseInt(String(c.monto_calc||0).replace(/\D/g,''))||0),0);
     el.innerHTML=`<div class="reg-stats">
       <div class="sc rd"><div class="sc-l">Total costos</div><div class="sc-n" style="font-size:18px">${fCOP(total)}</div></div>
       <div class="sc"><div class="sc-l">Registros</div><div class="sc-n">${all.length}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>Pedido</th><th>Descripción</th><th style="text-align:right">Monto</th></tr></thead>
-    <tbody>${all.map(c=>`<tr><td><span style="font-family:'DM Mono',monospace;font-size:10px">#${c.ref}</span> ${c.nom}</td><td>${c.descripcion||'—'}</td><td style="text-align:right" class="mneg">${fCOP(c.monto)}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${all.map(c=>`<tr><td><span style="font-family:'DM Mono',monospace;font-size:10px">#${c.ref}</span> ${c.nom}</td><td>${c.descripcion||'—'}</td><td style="text-align:right" class="mneg">${fCOP(c.monto_calc)}</td></tr>`).join('')}</tbody></table>`;
   }
   if(tab==='utilidades'){
     const rows=todos.map(p=>{
       const ing=p.valor_total||0;
-      const cos=(p.costos||[]).reduce((a,c)=>a+(parseInt(String(c.monto||0).replace(/\D/g,''))||0),0);
+      const cos=(p.costos||[]).reduce((a,c)=>a+(parseInt(String(c.monto_calc||0).replace(/\D/g,''))||0),0);
       return{...p,ing,cos,gan:ing-cos};
     }).filter(r=>r.ing||r.cos);
     const tI=rows.reduce((a,r)=>a+r.ing,0),tC=rows.reduce((a,r)=>a+r.cos,0);
@@ -1301,18 +1573,18 @@ function buildRegPanel(tab){
   if(tab==='abonos'){
     const all=[];todos.forEach(p=>(p.pagos||[]).forEach(pg=>all.push({...pg,ref:p.ref,nom:p.nombre})));
     all.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
-    const total=all.reduce((a,x)=>a+(parseInt(String(x.monto||0).replace(/\D/g,''))||0),0);
+    const total=all.reduce((a,x)=>a+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0);
     el.innerHTML=`<div class="reg-stats">
       <div class="sc tl"><div class="sc-l">Total recibido</div><div class="sc-n" style="font-size:16px">${fCOP(total)}</div></div>
       <div class="sc"><div class="sc-l">Pagos</div><div class="sc-n">${all.length}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>Fecha</th><th>Pedido</th><th>Forma</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
-    <tbody>${all.map(pg=>`<tr><td>${fd(pg.fecha)}</td><td><span style="font-family:'DM Mono',monospace;font-size:10px">#${pg.ref}</span> ${pg.nom}</td><td>${pg.tipo||'—'}</td><td style="color:var(--muted);font-size:10px">${pg.nota||'—'}</td><td style="text-align:right" class="mpos">${fCOP(pg.monto)}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${all.map(pg=>`<tr><td>${fd(pg.fecha)}</td><td><span style="font-family:'DM Mono',monospace;font-size:10px">#${pg.ref}</span> ${pg.nom}</td><td>${pg.tipo||'—'}</td><td style="color:var(--muted);font-size:10px">${pg.nota||'—'}</td><td style="text-align:right" class="mpos">${fCOP(pg.monto_calc)}</td></tr>`).join('')}</tbody></table>`;
   }
   if(tab==='saldos'){
     const rows=todos.filter(p=>!p.cancelado).map(p=>{
       const val=p.valor_total||0;
-      const pag=(p.pagos||[]).reduce((a,x)=>a+(parseInt(String(x.monto||0).replace(/\D/g,''))||0),0);
+      const pag=(p.pagos||[]).reduce((a,x)=>a+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0);
       return{...p,val,pag,saldo:val-pag};
     }).filter(r=>r.saldo>0);
     const total=rows.reduce((a,r)=>a+r.saldo,0);
