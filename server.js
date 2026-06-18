@@ -229,7 +229,11 @@ function saveEncargos(pid,encargos){
 }
 
 function asegurarCliente(nombre,tel,cid){
-  if(cid){if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=?').run(tel,cid);return cid}
+  if(cid){
+    if(nombre)db.prepare('UPDATE clientes SET nombre=? WHERE id=?').run(nombre.trim(),cid);
+    if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=?').run(tel,cid);
+    return cid;
+  }
   const ex=db.prepare('SELECT id FROM clientes WHERE lower(nombre)=lower(?)').get(nombre.trim());
   if(ex){if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=?').run(tel,ex.id);return ex.id}
   const id=uid(); db.prepare('INSERT INTO clientes(id,nombre,tel)VALUES(?,?,?)').run(id,nombre.trim(),tel||''); return id;
