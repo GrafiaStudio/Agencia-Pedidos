@@ -70,10 +70,14 @@ Efecto real hoy:
   marcado.
 - **Métodos de pago**: catálogo fijo de 6 (`efectivo`, `transferencia`, `nequi`,
   `daviplata`, `contraentrega`, `otro`) — el `<select>` de tipo de pago en cada abono solo
-  muestra los habilitados. Pagos históricos con un método luego deshabilitado siguen
-  mostrando su valor original (no se pierde el dato, solo no aparece para pagos nuevos).
-  `otro` reutiliza el campo `nota` ya existente en `pagos` para el texto libre — sin
-  cambio de esquema en esa tabla.
+  muestra los habilitados. El selector ya tiene hoy 5 de los 6 (`efectivo`,
+  `transferencia`, `nequi`, `daviplata`, `otro`); lo único nuevo en el catálogo es
+  `contraentrega`. El default de la config son esos 5 ya visibles (`contraentrega` queda
+  disponible para activar, pero no preseleccionado) — así el default no le quita "otro" a
+  nadie. Pagos históricos con un método luego deshabilitado siguen mostrando su valor
+  original (no se pierde el dato, solo no aparece para pagos nuevos). `otro` ya reutiliza
+  el campo `nota` existente en `pagos` para el texto libre — sin cambio de esquema en esa
+  tabla.
 
 ### 4. Notificaciones
 Alertas de fecha de entrega (sí/no), días de anticipación.
@@ -105,7 +109,7 @@ CREATE TABLE IF NOT EXISTS configuracion_negocio(
   zona_horaria TEXT DEFAULT 'America/Bogota',
   dias_validez_cotizacion INTEGER DEFAULT 15,
   estado_default_cotizacion INTEGER DEFAULT 0,
-  metodos_pago TEXT DEFAULT '["efectivo","transferencia","nequi","daviplata"]',
+  metodos_pago TEXT DEFAULT '["efectivo","transferencia","nequi","daviplata","otro"]',
   alertas_entrega INTEGER DEFAULT 1,
   dias_anticipacion_entrega INTEGER DEFAULT 3
 );
