@@ -333,6 +333,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cli-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .cli-card{background:var(--white);border-radius:var(--r);border:1.5px solid var(--line);padding:13px 15px;cursor:pointer;display:flex;align-items:center;gap:11px;transition:all .13s}
 .cli-card:hover{border-color:var(--teal-lt);box-shadow:var(--sh)}
+.prod-card{background:var(--white);border-radius:var(--r);border:1.5px solid var(--line);padding:13px 15px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:11px;transition:all .13s}
+.prod-card:hover{border-color:var(--teal-lt);box-shadow:var(--sh)}
+.b-tipo{background:var(--teal-lt);color:var(--teal-dk);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .cli-av{width:40px;height:40px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--teal);flex-shrink:0}
 .cli-name{font-size:13px;font-weight:800;color:var(--navy)}
 .cli-sub{font-size:11px;color:var(--muted);margin-top:1px}
@@ -435,6 +438,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item active" data-view="pedidos" onclick="showView('pedidos')"><i class="ti ti-clipboard-list"></i>Pedidos<span class="nb g" id="sb-act">0</span></button>
     <button class="nav-item" data-view="clientes" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
     <button class="nav-item" data-view="registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
+    <button class="nav-item" data-view="productos" onclick="showView('productos')"><i class="ti ti-box"></i>Productos</button>
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
     <button class="nav-item" onclick="filtroRapido('pendiente')"><i class="ti ti-clock"></i>Pendientes</button>
@@ -455,6 +459,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="tb-title" id="tb-title">Pedidos</div>
     <div class="tb-right">
       <div class="search-b"><i class="ti ti-search"></i><input type="text" id="s-inp" placeholder="Buscar…" oninput="buscar(this.value)"></div>
+      <button class="icon-btn" onclick="showView('productos')"><i class="ti ti-box"></i></button>
       <button class="icon-btn" onclick="showView('configuracion')"><i class="ti ti-settings"></i></button>
       <button class="icon-btn" onclick="abrirExp()"><i class="ti ti-download"></i></button>
       <button class="btn-new" onclick="abrirNuevo()"><span class="tri"></span> Nuevo pedido</button>
@@ -508,6 +513,16 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div id="reg-utilidades" class="reg-panel"></div>
       <div id="reg-abonos" class="reg-panel"></div>
       <div id="reg-saldos" class="reg-panel"></div>
+    </div>
+
+    <!-- PRODUCTOS -->
+    <div id="view-productos" class="view">
+      <div class="toolbar">
+        <div class="search-b" style="flex:1;max-width:300px"><i class="ti ti-search"></i>
+          <input type="text" id="prod-s" placeholder="Buscar producto…" oninput="cargarProductos(this.value)" style="max-width:100%">
+        </div>
+      </div>
+      <div class="cli-grid" id="lista-prod"></div>
     </div>
 
     <!-- CONFIGURACIÓN -->
@@ -740,7 +755,7 @@ const EST_CLS={Nuevo:'es-nuevo',Diseño:'es-diseno','En diseño':'es-diseno',Apr
 const ECOL_MAP={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb'};
 
 /* ══ ESTADO ══ */
-let pedidos=[],clientes=[];
+let pedidos=[],clientes=[],productos=[];
 let filtroAct='todos',busq='';
 let editId=null,editCliId=null;
 let fEnc=[],fPag=[],fArch=[],fCostos=[];
@@ -1051,13 +1066,14 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración'};
+  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
   document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3}[v]||0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
+  if(v==='productos')cargarProductos();
 }
 
 /* ══ STATS ══ */
@@ -1197,6 +1213,23 @@ async function cargarClientes(q=''){
       <div style="flex:1"><div class="cli-name">${c.nombre}</div><div class="cli-sub">${c.tel||'—'} · ${(c.pedidos||[]).length} pedido${(c.pedidos||[]).length!==1?'s':''}</div></div>
       <i class="ti ti-chevron-right" style="color:var(--muted);font-size:14px"></i>
     </div>`).join('');
+}
+async function cargarProductos(q=''){
+  const p=q?`?q=${encodeURIComponent(q)}`:'';
+  productos=await api('GET',`/productos${p}`);
+  const el=document.getElementById('lista-prod');
+  if(!productos.length){el.innerHTML='<div class="empty"><i class="ti ti-box-off"></i><p>Sin productos</p></div>';return}
+  const TIPO_LABEL={unitario:'Unitario',escalonado:'Escalonado',promocional:'Promocional'};
+  el.innerHTML=productos.map(p=>{
+    const cat=CATS.find(c=>c.id===p.categoria_id);
+    return`<div class="prod-card" onclick="abrirEditarProducto('${p.id}')">
+      <div style="flex:1;min-width:0">
+        <div class="cli-name">${p.nombre}</div>
+        <div class="cli-sub">${cat?`<span class="ttag ${cat.tc}">${cat.label}</span> `:''}<span class="b-tipo">${TIPO_LABEL[p.tipo_precio]||p.tipo_precio}</span> ${!p.activo?'<span class="b-canc">Inactivo</span>':''}</div>
+      </div>
+      <div style="font-weight:800;color:var(--navy);flex-shrink:0">${fCOP(p.precio_oficial)}</div>
+    </div>`;
+  }).join('');
 }
 
 // Almacena cliente actual para el modal
