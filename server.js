@@ -384,16 +384,23 @@ function saveEncargos(pid,encargos,wsId){
 function descontarStock(pid,wsId){
   const encargos=db.prepare('SELECT id FROM encargos WHERE pedido_id=?').all(pid);
   const consumo={};
+  function acumular(fichaId,cantidad){
+    const ficha=db.prepare('SELECT tipo_precio,stock_actual FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
+    if(!ficha)return;
+    if(ficha.tipo_precio==='combo'){
+      const comps=db.prepare('SELECT componente_ficha_id,cantidad_consumida FROM combo_composicion WHERE ficha_id=?').all(fichaId);
+      comps.forEach(c=>acumular(c.componente_ficha_id,cantidad*c.cantidad_consumida));
+      return;
+    }
+    if(ficha.stock_actual==null)return;
+    consumo[fichaId]=(consumo[fichaId]||0)+cantidad;
+  }
   encargos.forEach(enc=>{
     const items=db.prepare('SELECT cantidad,ficha_id FROM enc_items WHERE encargo_id=? AND ficha_id IS NOT NULL').all(enc.id);
-    items.forEach(it=>{
-      consumo[it.ficha_id]=(consumo[it.ficha_id]||0)+toNum(it.cantidad);
-    });
+    items.forEach(it=>acumular(it.ficha_id,toNum(it.cantidad)));
   });
   const resultado=[];
   Object.entries(consumo).forEach(([fichaId,cantidad])=>{
-    const ficha=db.prepare('SELECT stock_actual FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
-    if(!ficha||ficha.stock_actual==null)return;
     db.prepare('UPDATE fichas_producto SET stock_actual=stock_actual-? WHERE id=?').run(cantidad,fichaId);
     resultado.push({ficha_id:fichaId,cantidad});
   });
