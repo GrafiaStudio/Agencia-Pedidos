@@ -369,8 +369,33 @@ function saveEncargos(pid,encargos,wsId){
       .run(eid,pid,enc.numero||i+1,enc.categoria||'',enc.subcategoria||'',enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i,wsId);
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
-      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',j,wsId);
+      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,j,wsId);
     });
+  });
+}
+function descontarStock(pid,wsId){
+  const encargos=db.prepare('SELECT id FROM encargos WHERE pedido_id=?').all(pid);
+  const consumo={};
+  encargos.forEach(enc=>{
+    const items=db.prepare('SELECT cantidad,ficha_id FROM enc_items WHERE encargo_id=? AND ficha_id IS NOT NULL').all(enc.id);
+    items.forEach(it=>{
+      consumo[it.ficha_id]=(consumo[it.ficha_id]||0)+toNum(it.cantidad);
+    });
+  });
+  const resultado=[];
+  Object.entries(consumo).forEach(([fichaId,cantidad])=>{
+    const ficha=db.prepare('SELECT stock_actual FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
+    if(!ficha||ficha.stock_actual==null)return;
+    db.prepare('UPDATE fichas_producto SET stock_actual=stock_actual-? WHERE id=?').run(cantidad,fichaId);
+    resultado.push({ficha_id:fichaId,cantidad});
+  });
+  return resultado;
+}
+function restaurarStock(stockConsumidoJSON,wsId){
+  let lista=[];
+  try{lista=JSON.parse(stockConsumidoJSON||'[]')}catch(e){lista=[]}
+  lista.forEach(item=>{
+    db.prepare('UPDATE fichas_producto SET stock_actual=stock_actual+? WHERE id=? AND workspace_id=?').run(item.cantidad,item.ficha_id,wsId);
   });
 }
 
@@ -545,6 +570,10 @@ app.post('/api/pedidos',(req,res)=>{
     saveEncargos(id,b.encargos,req.wsId);
     (b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),id,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(req.wsId),pg.tipo||'efectivo',pg.nota||'',req.wsId));
     (b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,cantidad,valor_unitario,valor_unitario_calc,monto,monto_calc,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?)').run(uid(),id,c.encargo_id||'',c.descripcion||'',c.cantidad||'',c.valor_unitario||'',normCalc(c.valor_unitario),c.monto||'',normCalc(c.monto),req.wsId));
+    if(!b.es_cotizacion){
+      const consumo=descontarStock(id,req.wsId);
+      db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),id);
+    }
     addHist(id,'Pedido creado',req.wsId);
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
   }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
@@ -566,13 +595,25 @@ app.put('/api/pedidos/:id',(req,res)=>{
     if(b.encargos!==undefined)saveEncargos(pid,b.encargos,req.wsId);
     if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(req.wsId),pg.tipo||'efectivo',pg.nota||'',req.wsId));}
     if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,cantidad,valor_unitario,valor_unitario_calc,monto,monto_calc,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.cantidad||'',c.valor_unitario||'',normCalc(c.valor_unitario),c.monto||'',normCalc(c.monto),req.wsId));}
+    let stockConsumidoActual=p.stock_consumido;
+    if(!b.es_cotizacion&&p.es_cotizacion&&!stockConsumidoActual){
+      const consumo=descontarStock(pid,req.wsId);
+      stockConsumidoActual=JSON.stringify(consumo);
+      db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(stockConsumidoActual,pid);
+    }
+    if(b.cancelado&&!p.cancelado&&stockConsumidoActual){
+      restaurarStock(stockConsumidoActual,req.wsId);
+      db.prepare('UPDATE pedidos SET stock_consumido=NULL WHERE id=?').run(pid);
+    }
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
   }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}
 });
 
 app.delete('/api/pedidos/:id',(req,res)=>{
-  const r=db.prepare('DELETE FROM pedidos WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
-  if(r.changes===0)return res.status(404).json({error:'No encontrado'});
+  const p=db.prepare('SELECT stock_consumido FROM pedidos WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!p)return res.status(404).json({error:'No encontrado'});
+  if(p.stock_consumido)restaurarStock(p.stock_consumido,req.wsId);
+  db.prepare('DELETE FROM pedidos WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   res.json({ok:true});
 });
 
