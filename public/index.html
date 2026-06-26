@@ -805,9 +805,33 @@ async function api(m,p,b){
 }
 
 /* ══ HELPERS ══ */
-function hoy(){return new Date().toISOString().split('T')[0]}
-function fd(s){if(!s)return'—';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`}
-function fCOP(n){const v=parseInt(String(n||0).replace(/\D/g,''))||0;return'$'+v.toLocaleString('es-CO')}
+function hoy(){
+  try{return new Date().toLocaleDateString('en-CA',{timeZone:CFG.zona_horaria})}
+  catch(e){return new Date().toISOString().split('T')[0]}
+}
+function sumarDias(s,n){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+function fd(s){
+  if(!s)return'—';
+  const[y,m,d]=s.split('-');
+  if(CFG.formato_fecha==='MM/DD/AAAA')return`${m}/${d}/${y}`;
+  if(CFG.formato_fecha==='AAAA-MM-DD')return`${y}-${m}-${d}`;
+  return`${d}/${m}/${y}`;
+}
+function fmtMiles(v,sep){
+  const s=String(Math.abs(Math.round(v)));
+  let out='';
+  for(let i=0;i<s.length;i++){
+    if(i>0&&(s.length-i)%3===0)out+=sep;
+    out+=s[i];
+  }
+  return(v<0?'-':'')+out;
+}
+function fCOP(n){
+  const v=parseInt(String(n||0).replace(/\D/g,''))||0;
+  const miles=fmtMiles(v,CFG.separador_miles);
+  const dec=CFG.decimales?(CFG.separador_miles==='.'?',00':'.00'):'';
+  return CFG.moneda_prefijo+miles+dec;
+}
 function ini(n){return n.split(' ').slice(0,2).map(x=>x[0]||'').join('').toUpperCase()}
 
 /* ══ CONFIGURACIÓN DEL NEGOCIO ══ */
@@ -998,14 +1022,19 @@ function valorOficialModal(){
 
 /* Fecha alerta html */
 function faHTML(p){
-  if(!p.fecha_entrega||p.entregado||p.cancelado)return'';
+  if(!CFG.alertas_entrega||!p.fecha_entrega||p.entregado||p.cancelado)return'';
   const hoyD=new Date();hoyD.setHours(0,0,0,0);
   const entD=new Date(p.fecha_entrega+'T00:00:00');
   const d=Math.round((entD-hoyD)/86400000);
   if(d<0)return`<span class="fa-red">⚠ Vencido ${Math.abs(d)}d</span>`;
   if(d===0)return`<span class="fa-red">⚠ Vence hoy</span>`;
   if(d===1)return`<span class="fa-amb">⏰ Mañana</span>`;
+  if(d>1&&d<=CFG.dias_anticipacion_entrega)return`<span class="fa-amb">⏰ En ${d}d</span>`;
   return`<span class="fa-ok"><i class="ti ti-calendar-due" style="font-size:10px;vertical-align:-1px"></i> ${fd(p.fecha_entrega)}</span>`;
+}
+function validezCotHTML(p){
+  if(!p.es_cotizacion||!p.fecha_pedido)return'';
+  return` · Válida hasta ${fd(sumarDias(p.fecha_pedido,CFG.dias_validez_cotizacion))}`;
 }
 function pagoHTML(p){
   const val=p.valor_total||0;
@@ -1121,7 +1150,7 @@ function renderLista(){
             <span>· ${fd(p.fecha_pedido)}</span>
             ${isUrg?'<span class="b-urg">⚡ URGENTE</span>':''}
             ${isPend?'<span class="b-pend">⏳ Pendiente</span>':''}
-            ${isCot?'<span class="b-cot">📋 COTIZACIÓN</span>':''}
+            ${isCot?`<span class="b-cot">📋 COTIZACIÓN${validezCotHTML(p)}</span>`:''}
           </div>
           <div class="pc-name">${p.nombre}</div>
           <div class="pc-sub">${p.tel||''}${(p.encargos||[]).length>1?` · ${(p.encargos||[]).length} encargos`:''}</div>
@@ -1432,11 +1461,9 @@ function renderPagos(){
         <div><label>Fecha</label><input type="date" value="${pg.fecha}" oninput="setPagVal('${pg.id}','fecha',this.value)"></div>
         <div><label>Forma</label>
           <select onchange="setPagVal('${pg.id}','tipo',this.value)">
-            <option value="efectivo"${pg.tipo==='efectivo'?' selected':''}>Efectivo</option>
-            <option value="transferencia"${pg.tipo==='transferencia'?' selected':''}>Transferencia</option>
-            <option value="nequi"${pg.tipo==='nequi'?' selected':''}>Nequi</option>
-            <option value="daviplata"${pg.tipo==='daviplata'?' selected':''}>Daviplata</option>
-            <option value="otro"${pg.tipo==='otro'?' selected':''}>Otro</option>
+            ${METODOS_PAGO_CATALOGO.filter(m=>CFG.metodos_pago.includes(m.key)||m.key===pg.tipo).map(m=>
+              `<option value="${m.key}"${pg.tipo===m.key?' selected':''}>${m.label}</option>`
+            ).join('')}
           </select>
         </div>
       </div>
@@ -1536,6 +1563,7 @@ function resetForm(){
   fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;fValorFinalRaw='';
   ['f-nom','f-tel','f-fecha','f-notas','f-valor-final'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
   ['ck-urg','ck-ent','ck-can','ck-pnd','ck-cot'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
+  document.getElementById('ck-cot').checked=!!CFG.estado_default_cotizacion;
   document.getElementById('ac-drop').style.display='none';
   document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: $0';
   document.getElementById('valor-ajustado').style.display='none';
@@ -1586,7 +1614,7 @@ async function abrirEditar(id){
   document.getElementById('ck-pnd').checked=!!p.pendiente_pago;
   document.getElementById('ck-cot').checked=!!p.es_cotizacion;
   document.getElementById('m-tit').textContent=p.nombre;
-  document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido);
+  document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido)+validezCotHTML(p);
   document.getElementById('btn-del').style.display='flex';
   renderEncs();renderPagos();renderCostos();renderArchivos();renderHist(p.historial);
   actualizarValorTotal();actualizarProgreso();
