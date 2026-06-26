@@ -360,6 +360,14 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .helptab{padding:6px 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--white);color:var(--slate);font-size:10px;font-weight:700;cursor:pointer;transition:all .13s}
 .helptab.active{border-color:var(--navy);background:var(--navy);color:white}
 .help-panel{display:none}.help-panel.active{display:block}
+.man-step{border:1.5px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:10px}
+.man-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;background:var(--line-lt);transition:background .12s;user-select:none}
+.man-head:hover{background:#e8edf2}
+.man-head-l{font-size:10px;font-weight:800;color:var(--slate);text-transform:uppercase;letter-spacing:.06em}
+.man-chevron{color:var(--muted);font-size:14px;transition:transform .2s}
+.man-chevron.open{transform:rotate(180deg)}
+.man-body{display:none;padding:14px;border-top:1.5px solid var(--line);font-size:11.5px;color:var(--slate);line-height:1.6}
+.man-body.open{display:block}
 .cfg-mp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 .cfg-logo-prev{max-width:160px;max-height:80px;border-radius:var(--r-sm);border:1.5px solid var(--line);display:none;margin-bottom:8px}
 
@@ -634,7 +642,48 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <button class="helptab" onclick="showHelpTab('soporte')">Soporte</button>
       </div>
 
-      <div id="help-manual" class="help-panel active"></div>
+      <div id="help-manual" class="help-panel active">
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">1. Crear tu primer pedido</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Ve a <b>Pedidos → Nuevo pedido</b>. Escribe el nombre y teléfono del cliente — si ya existe, la app lo reconoce solo. Agrega al menos un Encargo con sus ítems (cantidad, detalle, valor unitario) y guarda.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">2. Encargos y costos</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body"><b>Encargos</b> es lo que le cobras al cliente: categoría, subcategoría, estado y los ítems con su cantidad y valor. <b>Costos</b> es lo que te cuesta a ti producirlo (insumos, mano de obra) — no se le muestra al cliente y se resta de la ganancia en Registros.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">3. Registrar pagos</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En la sección Pagos de cada pedido, registra cada abono con su fecha y forma de pago. El saldo pendiente se calcula solo a partir del valor total del pedido.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">4. Cómo usar los estados</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Cada Encargo avanza por: Nuevo → Diseño → Aprobación → Producción → Listo. El pedido completo, por separado, se puede marcar como Urgente, Entregado, Cancelado o Pendiente de pago — son independientes del estado del encargo.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">5. Cotizaciones</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Marca "Es cotización" en un pedido que todavía no es un compromiso real con el cliente. Mientras esté marcada, no descuenta inventario ni cuenta como venta. Cuando el cliente confirme, desmarca la casilla y guarda — ahí se vuelve un pedido real.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">6. Fichas de producto</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En <b>Productos</b>, crea una ficha por cada producto o servicio: nombre, categoría, tipo de precio (Unitario, Escalonado por cantidad, o Promocional con fechas de vigencia), insumos opcionales y margen.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">7. Autocompletado en el pedido</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Al escribir el Detalle de un ítem (en Encargos o en Costos), aparecen sugerencias de tus fichas e insumos ya guardados. Selecciona una y el precio se llena solo.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">8. Inventario (stock)</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En la ficha de cada producto puedes configurar "Stock actual" y "Stock mínimo". Al confirmar un pedido real (no cotización) que use ese producto, el stock baja solo. Si cancelas o eliminas ese pedido, el stock se restaura.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">9. Documentos y WhatsApp</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Desde el pedido puedes generar un PDF (Cotización, Orden de Pedido o Comprobante de Venta, según el estado) y enviarlo al cliente por WhatsApp con un mensaje ya armado.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">10. Exportar datos y configurar el negocio</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">"Exportar CSV" en el menú lateral descarga tus pedidos para abrirlos en Excel. "Configuración" guarda los datos de tu negocio, preferencias de moneda y fecha, métodos de pago e IVA.</div>
+        </div>
+      </div>
       <div id="help-quienes" class="help-panel"></div>
       <div id="help-info" class="help-panel"></div>
       <div id="help-terminos" class="help-panel"></div>
@@ -1127,6 +1176,12 @@ function showHelpTab(tab){
   if(tab==='quienes')pintarAyudaQuienesSomos();
   if(tab==='info')cargarAppInfo();
   if(tab==='soporte')pintarAyudaSoporte();
+}
+function toggleManual(head){
+  const body=head.nextElementSibling;
+  const chev=head.querySelector('.man-chevron');
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
 }
 
 /* Calcular progreso encargos: cada etapa del proceso pesa un % del avance */
