@@ -809,6 +809,123 @@ function hoy(){return new Date().toISOString().split('T')[0]}
 function fd(s){if(!s)return'—';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`}
 function fCOP(n){const v=parseInt(String(n||0).replace(/\D/g,''))||0;return'$'+v.toLocaleString('es-CO')}
 function ini(n){return n.split(' ').slice(0,2).map(x=>x[0]||'').join('').toUpperCase()}
+
+/* ══ CONFIGURACIÓN DEL NEGOCIO ══ */
+const METODOS_PAGO_CATALOGO=[
+  {key:'efectivo',label:'Efectivo'},
+  {key:'transferencia',label:'Transferencia'},
+  {key:'nequi',label:'Nequi'},
+  {key:'daviplata',label:'Daviplata'},
+  {key:'contraentrega',label:'Contraentrega'},
+  {key:'otro',label:'Otro'}
+];
+const CFG_DEFAULTS={
+  nombre_negocio:'',logo_ruta:'',direccion:'',telefono:'',email:'',nit:'',
+  moneda_prefijo:'$',decimales:0,separador_miles:'.',formato_fecha:'DD/MM/AAAA',
+  zona_horaria:'America/Bogota',dias_validez_cotizacion:15,estado_default_cotizacion:0,
+  metodos_pago:['efectivo','transferencia','nequi','daviplata','otro'],
+  alertas_entrega:1,dias_anticipacion_entrega:3
+};
+let CFG={...CFG_DEFAULTS};
+
+async function cargarConfiguracion(){
+  try{
+    CFG=Object.assign({},CFG_DEFAULTS,await api('GET','/configuracion'));
+  }catch(e){
+    CFG=Object.assign({},CFG_DEFAULTS);
+    console.warn('Configuración:',e.message);
+  }
+  aplicarPerfilNegocio();
+}
+
+function aplicarPerfilNegocio(){
+  if(CFG.logo_ruta)document.getElementById('sbLogoImg').src=CFG.logo_ruta;
+  const elN=document.getElementById('sbBizName');
+  if(CFG.nombre_negocio){elN.textContent=CFG.nombre_negocio;elN.style.display='block'}
+  else{elN.style.display='none'}
+}
+
+function pintarZonasHorarias(){
+  const sel=document.getElementById('cfg-zona-horaria');
+  if(sel.options.length)return;
+  const zonas=typeof Intl.supportedValuesOf==='function'?Intl.supportedValuesOf('timeZone'):['America/Bogota'];
+  sel.innerHTML=zonas.map(z=>`<option value="${z}">${z}</option>`).join('');
+}
+
+function pintarConfiguracion(){
+  document.getElementById('cfg-nombre').value=CFG.nombre_negocio||'';
+  document.getElementById('cfg-direccion').value=CFG.direccion||'';
+  document.getElementById('cfg-telefono').value=CFG.telefono||'';
+  document.getElementById('cfg-email').value=CFG.email||'';
+  document.getElementById('cfg-nit').value=CFG.nit||'';
+  const prev=document.getElementById('cfg-logo-preview');
+  if(CFG.logo_ruta){prev.src=CFG.logo_ruta;prev.style.display='block'}
+  else{prev.style.display='none'}
+  document.getElementById('cfg-moneda-prefijo').value=CFG.moneda_prefijo;
+  document.getElementById('cfg-decimales').checked=!!CFG.decimales;
+  document.getElementById('cfg-separador').value=CFG.separador_miles;
+  document.getElementById('cfg-formato-fecha').value=CFG.formato_fecha;
+  pintarZonasHorarias();
+  document.getElementById('cfg-zona-horaria').value=CFG.zona_horaria;
+  document.getElementById('cfg-dias-validez').value=CFG.dias_validez_cotizacion;
+  document.getElementById('cfg-estado-default-cot').checked=!!CFG.estado_default_cotizacion;
+  METODOS_PAGO_CATALOGO.forEach(m=>{
+    const el=document.getElementById('cfg-mp-'+m.key);
+    if(el)el.checked=CFG.metodos_pago.includes(m.key);
+  });
+  document.getElementById('cfg-alertas-entrega').checked=!!CFG.alertas_entrega;
+  document.getElementById('cfg-dias-anticipacion').value=CFG.dias_anticipacion_entrega;
+}
+
+function showCfgTab(tab){
+  document.querySelectorAll('.cfg-panel').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.cfgtab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('cfg-'+tab).classList.add('active');
+  ['perfil','preferencias','pedidos','notificaciones'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.cfgtab')[i].classList.add('active')});
+}
+
+async function guardarConfiguracion(){
+  const metodos=METODOS_PAGO_CATALOGO.map(m=>m.key).filter(k=>document.getElementById('cfg-mp-'+k)?.checked);
+  const payload={
+    nombre_negocio:document.getElementById('cfg-nombre').value.trim(),
+    direccion:document.getElementById('cfg-direccion').value.trim(),
+    telefono:document.getElementById('cfg-telefono').value.trim(),
+    email:document.getElementById('cfg-email').value.trim(),
+    nit:document.getElementById('cfg-nit').value.trim(),
+    moneda_prefijo:document.getElementById('cfg-moneda-prefijo').value.trim()||'$',
+    decimales:document.getElementById('cfg-decimales').checked?1:0,
+    separador_miles:document.getElementById('cfg-separador').value,
+    formato_fecha:document.getElementById('cfg-formato-fecha').value,
+    zona_horaria:document.getElementById('cfg-zona-horaria').value,
+    dias_validez_cotizacion:parseInt(document.getElementById('cfg-dias-validez').value,10)||15,
+    estado_default_cotizacion:document.getElementById('cfg-estado-default-cot').checked?1:0,
+    metodos_pago:metodos,
+    alertas_entrega:document.getElementById('cfg-alertas-entrega').checked?1:0,
+    dias_anticipacion_entrega:parseInt(document.getElementById('cfg-dias-anticipacion').value,10)||3
+  };
+  try{
+    CFG=Object.assign({},CFG_DEFAULTS,await api('PUT','/configuracion',payload));
+    aplicarPerfilNegocio();
+    toast('Configuración guardada');
+  }catch(e){toast(e.message,false)}
+}
+
+async function subirLogoCfg(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const formData=new FormData();
+  formData.append('logo',file);
+  const tk=getToken();
+  const r=await fetch('/api/configuracion/logo',{method:'POST',body:formData,headers:tk?{'Authorization':'Bearer '+tk}:{}});
+  if(r.status===401){clearToken();showPinScreen('Sesión expirada, ingresa el PIN de nuevo');return}
+  const data=await r.json();
+  if(!r.ok){toast(data.error||'Error al subir el logo',false);return}
+  CFG.logo_ruta=data.logo_ruta;
+  document.getElementById('cfg-logo-preview').src=data.logo_ruta;
+  document.getElementById('cfg-logo-preview').style.display='block';
+  aplicarPerfilNegocio();
+  toast('Logo actualizado');
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
 function toast(msg,ok=true){
   const t=document.getElementById('toast');
@@ -905,13 +1022,13 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros'};
+  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración'};
   document.getElementById('tb-title').textContent=titles[v]||'';
-  const nIdx={pedidos:0,clientes:1,registros:2};
-  document.querySelectorAll('.nav-item')[nIdx[v]]?.classList.add('active');
+  document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
   document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3}[v]||0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
+  if(v==='configuracion')pintarConfiguracion();
 }
 
 /* ══ STATS ══ */
@@ -1700,6 +1817,7 @@ async function init(){
   document.getElementById('stats').innerHTML=`
     <div class="sc-mini dark"><div class="ico"><i class="ti ti-clipboard-list"></i></div><div><div class="num">—</div><div class="lbl">Pedidos activos</div></div></div>
     <div class="sc-mini light"><div class="ico"><i class="ti ti-package"></i></div><div><div class="num">—</div><div class="lbl">Listos para entregar</div></div></div>`;
+  try{await cargarConfiguracion()}catch(e){console.warn('Configuración:',e.message)}
   try{await cargarStats()}catch(e){console.warn('Stats:',e.message)}
   try{await cargarPedidos()}catch(e){
     console.warn('Pedidos:',e.message);
