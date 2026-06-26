@@ -721,10 +721,22 @@ app.post('/api/configuracion/logo',upload.single('logo'),(req,res)=>{
 
 // ── PRODUCTOS (fichas de producto) ──
 app.get('/api/productos',(req,res)=>{
-  const{q}=req.query; let sql='SELECT * FROM fichas_producto WHERE workspace_id=?'; const params=[req.wsId];
+  const{q,activo}=req.query; let sql='SELECT * FROM fichas_producto WHERE workspace_id=?'; const params=[req.wsId];
   if(q){sql+=' AND nombre LIKE ?';params.push(`%${q}%`)}
+  if(activo==='1'){sql+=' AND activo=1'}
   sql+=' ORDER BY nombre';
   res.json(db.prepare(sql).all(...params).map(fichaCompleta));
+});
+
+app.get('/api/productos/insumos',(req,res)=>{
+  const{q}=req.query;
+  let sql=`SELECT i.nombre_insumo,i.proveedor,i.costo_unitario_calc,i.es_variable
+    FROM ficha_insumos i JOIN fichas_producto f ON f.id=i.ficha_id
+    WHERE f.workspace_id=?`;
+  const params=[req.wsId];
+  if(q){sql+=' AND i.nombre_insumo LIKE ?';params.push(`%${q}%`)}
+  sql+=' ORDER BY i.nombre_insumo LIMIT 8';
+  res.json(db.prepare(sql).all(...params).map(r=>({...r,es_variable:!!r.es_variable})));
 });
 
 app.get('/api/productos/:id',(req,res)=>{
