@@ -521,6 +521,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <div class="search-b" style="flex:1;max-width:300px"><i class="ti ti-search"></i>
           <input type="text" id="prod-s" placeholder="Buscar producto…" oninput="cargarProductos(this.value)" style="max-width:100%">
         </div>
+        <button class="btn-new" onclick="abrirNuevoProducto()"><span class="tri"></span> Nuevo producto</button>
       </div>
       <div class="cli-grid" id="lista-prod"></div>
     </div>
@@ -728,6 +729,86 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <select id="exp-est"><option value="todos">Todos</option><option value="activo">Activos</option><option value="entregado">Entregados</option><option value="cancelado">Cancelados</option></select>
     </div>
     <button class="btn-pri" style="width:100%;justify-content:center" onclick="exportar()"><i class="ti ti-file-spreadsheet"></i>Descargar CSV</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL PRODUCTO -->
+<div class="overlay" id="ovProd">
+<div class="modal">
+  <div class="mhead">
+    <div class="mhead-l"><div class="mtitle" id="prod-tit">Nuevo producto</div></div>
+    <button class="mclose" onclick="cerrarProducto()"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="mbody">
+
+    <div class="fr2 fg">
+      <div><label>Nombre del producto</label><input type="text" id="prod-nombre" placeholder="Ej: Retablo 10x15cm"></div>
+      <div><label>Tipo de precio</label>
+        <select id="prod-tipo-precio" onchange="showTipoPrecioSec(this.value)">
+          <option value="unitario">Unitario</option>
+          <option value="escalonado">Escalonado</option>
+          <option value="promocional">Promocional</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="msec"><span class="tri"></span>Categoría</div>
+    <div class="cat-row" id="prod-cat-row" style="margin-bottom:0"></div>
+
+    <div class="ck-box" style="display:inline-flex;margin:12px 0"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div>
+
+    <div class="msec"><span class="tri"></span>Insumos (opcional)</div>
+    <table class="items-table" id="prod-insumos-tabla">
+      <thead><tr><th>Nombre</th><th>Proveedor</th><th style="width:55px">Cant.</th><th style="width:70px">Unidad</th><th style="width:90px">Costo unit.</th><th style="width:80px">Subtotal</th><th style="width:55px">Variable</th><th style="width:26px"></th></tr></thead>
+      <tbody id="prod-insumos-body"></tbody>
+    </table>
+    <button class="btn-add-row" onclick="addInsumo()"><i class="ti ti-plus"></i>Agregar insumo</button>
+    <div style="font-size:11px;color:var(--muted);margin:8px 0" id="prod-costo-total-cap">Costo total: $0</div>
+
+    <div class="msec"><span class="tri"></span>Margen y precio</div>
+    <div class="fr3 fg">
+      <div><label>Margen</label>
+        <select id="prod-margen-tipo" onchange="onMargenTipoChange()">
+          <option value="fijo">Sin margen (precio directo)</option>
+          <option value="multiplicador">Multiplicador (×)</option>
+          <option value="porcentaje">Porcentaje (%)</option>
+        </select>
+      </div>
+      <div id="prod-margen-valor-wrap" style="display:none"><label>Valor del margen</label><input type="text" id="prod-margen-valor" placeholder="Ej: 2" oninput="recalcPrecioSugerido()"></div>
+      <div>
+        <label>Precio base</label>
+        <input type="text" id="prod-precio-base" placeholder="= sugerido" oninput="fProdPrecioBaseRaw=this.value" onfocus="focusProdPrecioBase(this)" onblur="blurProdPrecioBase(this)" style="font-size:14px;font-weight:800;color:var(--navy)">
+        <div id="prod-precio-sugerido-cap" style="font-size:10px;color:var(--muted);font-weight:600;margin-top:4px;display:none">Precio sugerido: $0</div>
+      </div>
+    </div>
+
+    <div id="prod-sec-escalonado" style="display:none">
+      <div class="msec"><span class="tri"></span>Rangos de precio</div>
+      <table class="items-table" id="prod-rangos-tabla">
+        <thead><tr><th style="width:80px">Desde</th><th style="width:80px">Hasta</th><th>Precio por unidad</th><th style="width:26px"></th></tr></thead>
+        <tbody id="prod-rangos-body"></tbody>
+      </table>
+      <button class="btn-add-row" onclick="addRango()"><i class="ti ti-plus"></i>Agregar rango</button>
+    </div>
+
+    <div id="prod-sec-promocional" style="display:none">
+      <div class="msec"><span class="tri"></span>Vigencia de la promoción</div>
+      <div class="fr3 fg">
+        <div><label>Fecha de inicio</label><input type="date" id="prod-fecha-inicio"></div>
+        <div><label>Fecha de fin</label><input type="date" id="prod-fecha-fin"></div>
+        <div><label>Cantidad mínima</label><input type="text" id="prod-cantidad-minima" placeholder="Ej: 10"></div>
+      </div>
+      <div class="fg"><label>Descripción</label><input type="text" id="prod-descripcion" placeholder="Ej: Promo vasos Colombia"></div>
+    </div>
+
+  </div>
+  <div class="mfoot">
+    <button class="btn-danger" id="prod-btn-del" style="display:none" onclick="eliminarProducto()"><i class="ti ti-trash"></i>Eliminar</button>
+    <div style="display:flex;gap:7px;margin-left:auto">
+      <button class="btn-ghost" onclick="cerrarProducto()">Cancelar</button>
+      <button class="btn-pri" onclick="guardarProducto()"><i class="ti ti-device-floppy"></i>Guardar</button>
+    </div>
   </div>
 </div>
 </div>
@@ -1541,6 +1622,58 @@ function renderRangos(){
       <td style="width:26px"><button class="item-del" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
 }
+function resetProdForm(){
+  fProdInsumos=[];fProdRangos=[];fProdPrecioBaseRaw='';prodCatSel='';
+  document.getElementById('prod-nombre').value='';
+  document.getElementById('prod-tipo-precio').value='unitario';
+  document.getElementById('prod-margen-tipo').value='fijo';
+  document.getElementById('prod-margen-valor').value='';
+  document.getElementById('prod-precio-base').value='';
+  document.getElementById('prod-activo').checked=true;
+  document.getElementById('prod-fecha-inicio').value='';
+  document.getElementById('prod-fecha-fin').value='';
+  document.getElementById('prod-cantidad-minima').value='';
+  document.getElementById('prod-descripcion').value='';
+  renderProdCatRow();
+  renderInsumos();
+  renderRangos();
+  onMargenTipoChange();
+  showTipoPrecioSec('unitario');
+}
+function abrirNuevoProducto(){
+  editProdId=null;resetProdForm();
+  document.getElementById('prod-tit').textContent='Nuevo producto';
+  document.getElementById('prod-btn-del').style.display='none';
+  document.getElementById('ovProd').classList.add('open');
+  setTimeout(()=>document.getElementById('prod-nombre').focus(),180);
+}
+async function abrirEditarProducto(id){
+  const p=await api('GET',`/productos/${id}`);
+  editProdId=id;
+  fProdInsumos=JSON.parse(JSON.stringify(p.insumos||[]));
+  fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
+  prodCatSel=p.categoria_id||'';
+  fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
+  document.getElementById('prod-nombre').value=p.nombre;
+  document.getElementById('prod-tipo-precio').value=p.tipo_precio;
+  document.getElementById('prod-margen-tipo').value=p.margen_tipo;
+  document.getElementById('prod-margen-valor').value=p.margen_valor||'';
+  document.getElementById('prod-precio-base').value=displayMoneyVal(fProdPrecioBaseRaw);
+  document.getElementById('prod-activo').checked=!!p.activo;
+  document.getElementById('prod-fecha-inicio').value=p.fecha_inicio||'';
+  document.getElementById('prod-fecha-fin').value=p.fecha_fin||'';
+  document.getElementById('prod-cantidad-minima').value=p.cantidad_minima||'';
+  document.getElementById('prod-descripcion').value=p.descripcion||'';
+  document.getElementById('prod-tit').textContent=p.nombre;
+  document.getElementById('prod-btn-del').style.display='inline-flex';
+  renderProdCatRow();
+  renderInsumos();
+  renderRangos();
+  onMargenTipoChange();
+  showTipoPrecioSec(p.tipo_precio);
+  document.getElementById('ovProd').classList.add('open');
+}
+function cerrarProducto(){document.getElementById('ovProd').classList.remove('open')}
 function focusValorFinal(el){
   el.value=fValorFinalRaw||'';
   const vfPrevEl=document.getElementById('vf-prev');
@@ -2016,9 +2149,9 @@ function buildRegPanel(tab){
 }
 
 /* ══ OVERLAYS CLOSE ══ */
-['ovP','ovCli','ovExp'].forEach(id=>{
+['ovP','ovCli','ovExp','ovProd'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){
-    if(e.target===this){if(id==='ovP')cerrar();else if(id==='ovCli')cerrarCli();else cerrarExp()}
+    if(e.target===this){if(id==='ovP')cerrar();else if(id==='ovCli')cerrarCli();else if(id==='ovExp')cerrarExp();else cerrarProducto()}
   });
 });
 
