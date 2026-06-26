@@ -17,6 +17,7 @@
 - Toda request del frontend pasa por `api()` ya existente. Nunca interpolar comillas simples crudas en `onclick`/`oninput`.
 - Sin framework de tests — `node -c`, `curl`, y pruebas de lógica pura con Node (el agente no tiene navegador, así que la generación real del PDF la valida el usuario).
 - `git push origin main` ya no requiere confirmación previa (autorización del usuario, 2026-06-25) — sigue yendo al final, después de toda la verificación.
+- Cualquier `<script src>` de un CDN externo (a diferencia de un `<link>` de CSS) lleva `integrity` (SRI, sha384) calculado directamente del archivo descargado — no un hash reportado por un tercero — y `crossorigin="anonymous"`. JS de terceros sin pin ejecuta con acceso total a la página; CSS no tiene el mismo nivel de riesgo, por eso Google Fonts/Tabler Icons (ya existentes) no lo necesitan pero esto sí.
 
 ---
 
@@ -437,8 +438,8 @@ por:
 ```html
 <div class="toast" id="toast"><i class="ti ti-check"></i><span id="toast-msg"></span></div>
 
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@5.0.8/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@5.0.8/dist/jspdf.plugin.autotable.min.js" integrity="sha384-5jk55M0XWoAw7LyhlXJe19ErOr3doBAPzxw9vahPFbvolqWa2yDk4fhHa2zuYeOa" crossorigin="anonymous"></script>
 <script>
 ```
 
