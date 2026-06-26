@@ -1482,6 +1482,21 @@ function generarPdfPedido(){
     doc.setFontSize(12);doc.text(`Total: ${fCOP(p.valor_total||0)}`,196,finalY,{align:'right'});
   }
   finalY+=10;
+  if((p.pagos||[]).length){
+    doc.autoTable({
+      startY:finalY,
+      head:[['Fecha','Forma de pago','Monto']],
+      body:p.pagos.map(pg=>[fd(pg.fecha),METODOS_PAGO_CATALOGO.find(x=>x.key===pg.tipo)?.label||pg.tipo,fCOP(parseInt(String(pg.monto_calc||0).replace(/\D/g,''))||0)]),
+      styles:{fontSize:9}
+    });
+    finalY=doc.lastAutoTable.finalY+6;
+    const totalPagado=p.pagos.reduce((a,x)=>a+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0);
+    const saldo=Math.max(0,(p.valor_total||0)-totalPagado);
+    doc.setFontSize(10);
+    doc.text(`Pagado: ${fCOP(totalPagado)}`,196,finalY,{align:'right'});finalY+=5;
+    doc.setFontSize(11);doc.text(`Saldo pendiente: ${fCOP(saldo)}`,196,finalY,{align:'right'});
+    finalY+=10;
+  }
   doc.setFontSize(9);
   if(CFG.metodos_pago&&CFG.metodos_pago.length){
     const labels=CFG.metodos_pago.map(m=>METODOS_PAGO_CATALOGO.find(x=>x.key===m)?.label||m).join(', ');
