@@ -906,8 +906,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     </div>
 
     <div class="msec"><span class="tri"></span>Insumos (opcional)</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Ejemplo: si esta camisa usa 2 metros de tela a $5.000 el metro, escribe Cantidad: 2, Unidad: metros, Costo por unidad: $5.000 — el Subtotal se calcula solo.</div>
     <table class="items-table" id="prod-insumos-tabla">
-      <thead><tr><th>Nombre</th><th>Proveedor</th><th style="width:55px">Cant.</th><th style="width:70px">Unidad</th><th style="width:90px">Costo unit.</th><th style="width:80px">Subtotal</th><th style="width:55px">Variable</th><th style="width:26px"></th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Proveedor</th><th style="width:55px">Cantidad</th><th style="width:110px">Unidad</th><th style="width:100px">Costo por unidad</th><th style="width:80px">Subtotal</th><th style="width:55px">Variable</th><th style="width:26px"></th></tr></thead>
       <tbody id="prod-insumos-body"></tbody>
     </table>
     <button class="btn-add-row" onclick="addInsumo()"><i class="ti ti-plus"></i>Agregar insumo</button>
@@ -2110,8 +2111,16 @@ function renderProdCatRow(){
 }
 function setProdCat(catId){prodCatSel=catId;renderProdCatRow()}
 
+const UNIDADES_MEDIDA=['metros','centímetros','gramos','kilogramos','litros','mililitros','unidades','pliegos','hojas'];
 function addInsumo(){fProdInsumos.push({id:uid(),nombre_insumo:'',proveedor:'',costo_unitario:'',cantidad_usada:'',unidad_medida:'',es_variable:false});renderInsumos()}
 function remInsumo(id){fProdInsumos=fProdInsumos.filter(x=>x.id!==id);renderInsumos()}
+function setUnidadInsumo(id,v){
+  const it=fProdInsumos.find(x=>x.id===id);
+  if(!it)return;
+  if(v==='__otra__'){it._otraUnidad=true;it.unidad_medida=''}
+  else{it._otraUnidad=false;it.unidad_medida=v}
+  renderInsumos();
+}
 function setInsumo(id,k,v){
   const it=fProdInsumos.find(x=>x.id===id);
   if(it)it[k]=v;
@@ -2146,11 +2155,18 @@ function renderInsumos(){
     const cant=parseInt(String(it.cantidad_usada||0).replace(/\D/g,''))||0;
     const unit=evalExpr(it.costo_unitario)||0;
     const subtotal=cant*unit;
+    const esConocida=UNIDADES_MEDIDA.includes(it.unidad_medida);
+    const mostrarOtra=it._otraUnidad||(!!it.unidad_medida&&!esConocida);
+    const campoUnidad=`<select class="item-inp" onchange="setUnidadInsumo('${it.id}',this.value)">
+      <option value=""${!it.unidad_medida&&!mostrarOtra?' selected':''}>Elegir…</option>
+      ${UNIDADES_MEDIDA.map(u=>`<option value="${u}"${it.unidad_medida===u?' selected':''}>${u}</option>`).join('')}
+      <option value="__otra__"${mostrarOtra?' selected':''}>Otra…</option>
+    </select>${mostrarOtra?`<input class="item-inp" type="text" style="margin-top:4px" value="${it.unidad_medida||''}" placeholder="Escribe la unidad" oninput="setInsumo('${it.id}','unidad_medida',this.value)">`:''}`;
     return`<tr>
       <td><input class="item-inp" type="text" value="${it.nombre_insumo||''}" placeholder="Ej: Madera" oninput="setInsumo('${it.id}','nombre_insumo',this.value)"></td>
       <td><input class="item-inp" type="text" value="${it.proveedor||''}" placeholder="Opcional" oninput="setInsumo('${it.id}','proveedor',this.value)"></td>
       <td><input class="item-inp" type="text" value="${it.cantidad_usada||''}" placeholder="1" oninput="setInsumo('${it.id}','cantidad_usada',this.value)"></td>
-      <td><input class="item-inp" type="text" value="${it.unidad_medida||''}" placeholder="unidad" oninput="setInsumo('${it.id}','unidad_medida',this.value)"></td>
+      <td>${campoUnidad}</td>
       <td><input class="item-inp" type="text" value="${displayMoneyVal(it.costo_unitario)}" placeholder="$ 0" oninput="setInsumo('${it.id}','costo_unitario',this.value);previewInsumoUnit('${it.id}',this.value)" onfocus="focusInsumoUnit(this,'${it.id}')" onblur="blurInsumoUnit(this,'${it.id}')"><div id="insprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);display:none"></div></td>
       <td id="inssub-${it.id}" style="text-align:right;font-weight:700;color:var(--navy);white-space:nowrap">${fCOP(subtotal)}</td>
       <td style="text-align:center"><input type="checkbox" ${it.es_variable?'checked':''} onchange="setInsumo('${it.id}','es_variable',this.checked)"></td>
