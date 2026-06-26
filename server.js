@@ -778,7 +778,7 @@ app.get('/api/app-info',(req,res)=>{
 });
 
 // ── ETIQUETAS DEL NEGOCIO (categorías y subcategorías personalizables) ──
-const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate'];
+const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate','red','pink','blue','yellow','brown','indigo'];
 const ETIQUETAS_DEFAULT=[
   {id:'estampados', nombre:'Estampados', color:'purple', subs:['Camisetas','Vasos','Gorras','Accesorios','Sublimación','DTF']},
   {id:'publicidad', nombre:'Publicidad', color:'amber',  subs:['Volantes','Tarjetas','Avisos','Pendones','Material POP','Etiquetas']},

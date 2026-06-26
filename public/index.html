@@ -153,6 +153,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .tc-teal{background:var(--teal-lt);color:var(--teal-dk)}
 .tc-green{background:var(--green-lt);color:#1A6B45}
 .tc-slate{background:var(--line-lt);color:var(--slate)}
+.tc-red{background:var(--red-lt);color:#C13338}
+.tc-pink{background:#FCE4F1;color:#C2185B}
+.tc-blue{background:#E3EEFC;color:#1957B0}
+.tc-yellow{background:#FEF6D8;color:#8A6D00}
+.tc-brown{background:#F2E8E0;color:#6B4226}
+.tc-indigo{background:#E6E9FB;color:#3949AB}
 
 /* Fecha alerta */
 .fa-red{color:var(--red);font-size:10px;font-weight:700}
@@ -975,7 +981,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@5.0.8/dist/jspdf.plugin.autotable.min.js" integrity="sha384-5jk55M0XWoAw7LyhlXJe19ErOr3doBAPzxw9vahPFbvolqWa2yDk4fhHa2zuYeOa" crossorigin="anonymous"></script>
 <script>
 /* ══ CONSTANTES ══ */
-const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate'];
+const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate','red','pink','blue','yellow','brown','indigo'];
 let CATS=[];
 async function cargarEtiquetas(){
   try{
@@ -1173,7 +1179,7 @@ function abrirNuevaEtiqueta(){
   renderEtiquetas();
 }
 function buscarEtq(id){return id==='_nueva'?etqNuevaTmp:CATS.find(x=>x.id===id)}
-function setEtiquetaColor(id,color){const c=buscarEtq(id);if(c){c.color=color;c.tc='tc-'+color;renderEtiquetas()}}
+function setEtiquetaColor(id,color){const c=buscarEtq(id);if(c){c.color=color;c.tc='tc-'+color;etqColorAbierto=null;renderEtiquetas()}}
 function setEtiquetaNombre(id,v){const c=buscarEtq(id);if(c)c.label=v}
 function setEtiquetaSubs(id,v){const c=buscarEtq(id);if(c)c._subsRaw=v}
 function subsDesdeTexto(c){return(c._subsRaw!=null?c._subsRaw:(c.subs||[]).join(', ')).split(',').map(s=>s.trim()).filter(Boolean)}
@@ -1201,11 +1207,18 @@ async function eliminarEtiqueta(id){
     renderEtiquetas();
   }catch(e){toast('Error: '+e.message,false)}
 }
+let etqColorAbierto=null;
+function toggleColorPicker(id){etqColorAbierto=etqColorAbierto===id?null:id;renderEtiquetas()}
 function renderEtiquetas(){
   const filas=etqNuevaTmp?[...CATS,etqNuevaTmp]:CATS;
   document.getElementById('etiquetas-lista').innerHTML=filas.map(c=>`
     <div class="etq-row" style="display:flex;align-items:center;gap:8px;padding:10px;border:1.5px solid var(--line);border-radius:var(--r);margin-bottom:8px;flex-wrap:wrap">
-      <div style="display:flex;gap:4px" title="Color de la etiqueta">${PALETA_ETIQUETAS.map(p=>`<span onclick="setEtiquetaColor('${c.id}','${p}')" title="Elegir este color" style="width:16px;height:16px;border-radius:50%;cursor:pointer;display:inline-block;border:2px solid ${c.color===p?'var(--navy)':'transparent'}" class="tc-${p}"></span>`).join('')}</div>
+      <div class="etq-color-wrap" style="position:relative">
+        <button type="button" class="tc-${c.color}" onclick="toggleColorPicker('${c.id}')" title="Cambiar color" style="width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px"><i class="ti ti-palette"></i></button>
+        <div style="display:${etqColorAbierto===c.id?'grid':'none'};position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:var(--white);border:1.5px solid var(--line);border-radius:var(--r-sm);box-shadow:var(--sh-lg);padding:8px;grid-template-columns:repeat(4,1fr);gap:6px;width:122px">
+          ${PALETA_ETIQUETAS.map(p=>`<span onclick="setEtiquetaColor('${c.id}','${p}')" title="${p}" class="tc-${p}" style="width:22px;height:22px;border-radius:50%;cursor:pointer;display:inline-block;border:2px solid ${c.color===p?'var(--navy)':'transparent'}"></span>`).join('')}
+        </div>
+      </div>
       <input class="item-inp" style="flex:1;min-width:120px" type="text" value="${c.label}" placeholder="Etiqueta (ej: Estampados)" oninput="setEtiquetaNombre('${c.id}',this.value)">
       <input class="item-inp" style="flex:2;min-width:160px" type="text" value="${c._subsRaw!=null?c._subsRaw:(c.subs||[]).join(', ')}" placeholder="Subetiquetas separadas por coma" oninput="setEtiquetaSubs('${c.id}',this.value)">
       <button class="btn-add-row" style="padding:6px 10px" onclick="guardarEtiqueta('${c.id}')"><i class="ti ti-check"></i></button>
@@ -1724,6 +1737,9 @@ function selCli(i){
 document.addEventListener('click',e=>{
   if(!e.target.closest('.ac-wrap'))
     document.querySelectorAll('.ac-drop').forEach(d=>d.style.display='none');
+});
+document.addEventListener('click',e=>{
+  if(etqColorAbierto&&!e.target.closest('.etq-color-wrap')){etqColorAbierto=null;renderEtiquetas()}
 });
 
 /* ══ ENCARGOS ══ */
