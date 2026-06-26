@@ -1892,6 +1892,33 @@ function previewCosto(id,v){
   el.style.display=show?'block':'none';
   if(show)el.innerHTML=previewExpr(v);
 }
+let _acCostoResults={};
+async function acCosto(id,q){
+  const dr=document.getElementById('cost-ac-drop-'+id);
+  if(!dr)return;
+  if(!q||q.trim().length<2){dr.style.display='none';return}
+  const lista=await api('GET',`/productos/insumos?q=${encodeURIComponent(q.trim())}`);
+  if(!lista.length){dr.style.display='none';return}
+  _acCostoResults[id]=lista;
+  dr.innerHTML=lista.map((ins,i)=>`
+    <div class="ac-item" onclick="selCosto('${id}',${i})">
+      <div class="ac-name">${ins.nombre_insumo}${ins.es_variable?' <span class="b-pend" style="margin-left:4px">Variable</span>':''}</div>
+      <div class="ac-sub">${ins.proveedor?ins.proveedor+' &middot; ':''}${fCOP(ins.costo_unitario_calc)}</div>
+    </div>`).join('');
+  dr.style.display='block';
+}
+function selCosto(id,idx){
+  const ins=(_acCostoResults[id]||[])[idx];
+  if(!ins)return;
+  const c=fCostos.find(x=>x.id===id);
+  if(!c)return;
+  c.descripcion=ins.nombre_insumo;
+  c.valor_unitario=String(ins.costo_unitario_calc||0);
+  recalcCostoTotal(id);
+  const dr=document.getElementById('cost-ac-drop-'+id);
+  if(dr)dr.style.display='none';
+  renderCostos();
+}
 function recalcCostoTotal(id){
   const c=fCostos.find(x=>x.id===id);
   if(!c||!c.cantidad)return;
@@ -1934,7 +1961,7 @@ function blurCostoVal(el,id){
 function renderCostos(){
   document.getElementById('costos-lista').innerHTML=fCostos.map(c=>`
     <div class="costo-item">
-      <input type="text" value="${c.descripcion||''}" placeholder="Descripción del costo…" oninput="setCostoVal('${c.id}','descripcion',this.value)">
+      <div class="ac-wrap" style="flex:1"><input type="text" value="${c.descripcion||''}" placeholder="Descripción del costo…" oninput="setCostoVal('${c.id}','descripcion',this.value);acCosto('${c.id}',this.value)"><div class="ac-drop" id="cost-ac-drop-${c.id}"></div></div>
       <input type="text" value="${c.cantidad||''}" placeholder="Cant." style="max-width:55px;width:100%" oninput="setCostoVal('${c.id}','cantidad',this.value)">
       <div style="max-width:95px">
         <input type="text" value="${displayMoneyVal(c.valor_unitario)}" placeholder="V. unit." style="max-width:95px;width:100%" oninput="setCostoVal('${c.id}','valor_unitario',this.value);previewCostoUnit('${c.id}',this.value)" onfocus="focusCostoUnit(this,'${c.id}')" onblur="blurCostoUnit(this,'${c.id}')">
