@@ -2501,7 +2501,7 @@ function blurCostoVal(el,id){
 function renderCostos(){
   document.getElementById('costos-lista').innerHTML=fCostos.map(c=>`
     <div class="costo-item">
-      <div class="ac-wrap" style="flex:1"><input type="text" value="${c.descripcion||''}" placeholder="Descripción del costo…" oninput="setCostoVal('${c.id}','descripcion',this.value);acCosto('${c.id}',this.value)"><div class="ac-drop" id="cost-ac-drop-${c.id}"></div></div>
+      <div class="ac-wrap" style="flex:1"><input type="text" value="${c.descripcion||''}" placeholder="Descripción del costo…" oninput="setCostoVal('${c.id}','descripcion',this.value);acCosto('${c.id}',this.value)"><div class="ac-drop" id="cost-ac-drop-${c.id}"></div>${c._auto?'<div style="font-size:8px;font-weight:700;color:var(--teal-dk);margin-top:2px">Automático (insumos)</div>':''}</div>
       <input type="text" value="${c.cantidad||''}" placeholder="Cant." style="max-width:55px;width:100%" oninput="setCostoVal('${c.id}','cantidad',this.value)">
       <div style="max-width:95px">
         <input type="text" value="${displayMoneyVal(c.valor_unitario)}" placeholder="V. unit." style="max-width:95px;width:100%" oninput="setCostoVal('${c.id}','valor_unitario',this.value);previewCostoUnit('${c.id}',this.value)" onfocus="focusCostoUnit(this,'${c.id}')" onblur="blurCostoUnit(this,'${c.id}')">
