@@ -774,6 +774,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <div class="ck-box" style="display:inline-flex;margin:12px 0"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div>
 
+    <div class="msec"><span class="tri"></span>Inventario (opcional)</div>
+    <div class="fr2 fg">
+      <div><label>Stock actual</label><input type="number" id="prod-stock-actual" min="0" placeholder="Sin seguimiento"></div>
+      <div><label>Stock mínimo (alerta)</label><input type="number" id="prod-stock-minimo" min="0" placeholder="Opcional"></div>
+    </div>
+
     <div class="msec"><span class="tri"></span>Insumos (opcional)</div>
     <table class="items-table" id="prod-insumos-tabla">
       <thead><tr><th>Nombre</th><th>Proveedor</th><th style="width:55px">Cant.</th><th style="width:70px">Unidad</th><th style="width:90px">Costo unit.</th><th style="width:80px">Subtotal</th><th style="width:55px">Variable</th><th style="width:26px"></th></tr></thead>
@@ -1419,7 +1425,7 @@ async function cargarProductos(q=''){
     return`<div class="prod-card" onclick="abrirEditarProducto('${p.id}')">
       <div style="flex:1;min-width:0">
         <div class="cli-name">${p.nombre}</div>
-        <div class="cli-sub">${cat?`<span class="ttag ${cat.tc}">${cat.label}</span> `:''}<span class="b-tipo">${TIPO_LABEL[p.tipo_precio]||p.tipo_precio}</span> ${!p.activo?'<span class="b-canc">Inactivo</span>':''}</div>
+        <div class="cli-sub">${cat?`<span class="ttag ${cat.tc}">${cat.label}</span> `:''}<span class="b-tipo">${TIPO_LABEL[p.tipo_precio]||p.tipo_precio}</span> ${!p.activo?'<span class="b-canc">Inactivo</span>':''} ${(p.stock_actual!=null&&p.stock_minimo!=null&&p.stock_actual<=p.stock_minimo)?'<span class="b-pend">Stock bajo</span>':''}</div>
       </div>
       <div style="font-weight:800;color:var(--navy);flex-shrink:0">${fCOP(p.precio_oficial)}</div>
     </div>`;
@@ -1812,6 +1818,8 @@ function resetProdForm(){
   document.getElementById('prod-margen-valor').value='';
   document.getElementById('prod-precio-base').value='';
   document.getElementById('prod-activo').checked=true;
+  document.getElementById('prod-stock-actual').value='';
+  document.getElementById('prod-stock-minimo').value='';
   document.getElementById('prod-fecha-inicio').value='';
   document.getElementById('prod-fecha-fin').value='';
   document.getElementById('prod-cantidad-minima').value='';
@@ -1842,6 +1850,8 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-margen-valor').value=p.margen_valor||'';
   document.getElementById('prod-precio-base').value=displayMoneyVal(fProdPrecioBaseRaw);
   document.getElementById('prod-activo').checked=!!p.activo;
+  document.getElementById('prod-stock-actual').value=p.stock_actual??'';
+  document.getElementById('prod-stock-minimo').value=p.stock_minimo??'';
   document.getElementById('prod-fecha-inicio').value=p.fecha_inicio||'';
   document.getElementById('prod-fecha-fin').value=p.fecha_fin||'';
   document.getElementById('prod-cantidad-minima').value=p.cantidad_minima||'';
@@ -1876,6 +1886,8 @@ async function guardarProducto(){
     margen_valor:document.getElementById('prod-margen-valor').value.trim(),
     precio_base:(fProdPrecioBaseRaw||'').trim(),
     activo:document.getElementById('prod-activo').checked,
+    stock_actual:document.getElementById('prod-stock-actual').value===''?null:parseInt(document.getElementById('prod-stock-actual').value,10),
+    stock_minimo:document.getElementById('prod-stock-minimo').value===''?null:parseInt(document.getElementById('prod-stock-minimo').value,10),
     insumos:fProdInsumos,
     rangos:tipoPrecio==='escalonado'?fProdRangos.map(r=>({desde:parseInt(r.desde,10)||0,hasta:(r.hasta===''||r.hasta==null)?null:parseInt(r.hasta,10),precio:evalExpr(r.precio)||0})):[],
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
