@@ -711,11 +711,11 @@ app.get('/api/clientes/:id',(req,res)=>{
   const peds=db.prepare('SELECT id,ref,entregado,cancelado,urgente,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega FROM pedidos WHERE cliente_id=? ORDER BY creado DESC').all(c.id);
   c.pedidos=peds.map(p=>{
     p.es_cotizacion=!!p.es_cotizacion;
-    const encs=db.prepare('SELECT id,categoria,subcategoria,valor,valor_calc FROM encargos WHERE pedido_id=? ORDER BY orden').all(p.id);
-    encs.forEach(e=>{e.items=db.prepare('SELECT cantidad,valor_unitario,valor_unitario_calc FROM enc_items WHERE encargo_id=?').all(e.id)});
+    const encs=db.prepare('SELECT id,categoria,subcategoria,categorias,subcategorias,valor,valor_calc FROM encargos WHERE pedido_id=? ORDER BY orden').all(p.id);
+    encs.forEach(e=>{e.items=db.prepare('SELECT cantidad,valor_unitario,valor_unitario_calc FROM enc_items WHERE encargo_id=?').all(e.id);resolverCategoriasEncargo(e)});
     p.valor_sugerido=calcValorSugerido(encs);
     p.valor_total=valorOficialPedido(p,p.valor_sugerido);
-    p.encargosResumen=encs.map(e=>({categoria:e.categoria,subcategoria:e.subcategoria}));
+    p.encargosResumen=encs.map(e=>({categorias:e.categorias,subcategorias:e.subcategorias}));
     return p;
   });
   res.json(c);
@@ -749,7 +749,7 @@ app.get('/api/export/csv',(req,res)=>{
   const pedidos=db.prepare(sql+' ORDER BY creado DESC').all(...params).map(pedidoCompleto);
   const rows=[['Ref','Cliente','Tel','Estado','Urgente','Encargos','Valor Total','Pagado','Saldo','F.Pedido','F.Entrega','Notas']];
   pedidos.forEach(p=>{
-    const encRes=(p.encargos||[]).map(e=>`[${e.categoria||''}] ${(e.items||[]).map(i=>`${i.cantidad} ${i.detalle}`).join(', ')}`).join(' | ');
+    const encRes=(p.encargos||[]).map(e=>`[${(e.categorias||[]).join(', ')}] ${(e.items||[]).map(i=>`${i.cantidad} ${i.detalle}`).join(', ')}`).join(' | ');
     const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0);
     const val=p.valor_total||0;
     const estado=p.entregado?'Entregado':p.cancelado?'Cancelado':p.urgente?'Urgente':'Activo';
