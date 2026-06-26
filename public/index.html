@@ -1579,6 +1579,7 @@ function selItem(encId,itemId,idx){
   if(!it)return;
   it.detalle=p.nombre;
   it._fichaSel=p;
+  it.ficha_id=p.id;
   if(p.tipo_precio==='escalonado'){
     it._autoPrecio=true;
     const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
