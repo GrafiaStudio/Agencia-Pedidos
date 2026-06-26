@@ -1593,7 +1593,7 @@ function renderLista(){
     const val=p.valor_total||0;
     const eg=estadoGeneral(p);
     const egCol=EG_COL[eg]||'#8A9EAD';
-    const cats=[...new Set((p.encargos||[]).map(e=>e.categoria).filter(Boolean))];
+    const cats=[...new Set((p.encargos||[]).flatMap(e=>e.categorias||[]))];
     const tags=cats.map(c=>{const cat=CATS.find(x=>x.id===c);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
     const isDone=p.entregado,isCan=p.cancelado,isCot=p.es_cotizacion,isUrg=p.urgente&&!isDone&&!isCan,isPend=p.pendiente_pago&&!isDone&&!isCan;
     const encSummary=buildEncSummary(p.encargos||[]);
@@ -1685,8 +1685,9 @@ async function verCli(id){
     <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px">Historial</div>
     ${(c.pedidos||[]).length?(c.pedidos||[]).map(p=>{
       const resumen=(p.encargosResumen||[]).map(e=>{
-        const cat=CATS.find(x=>x.id===e.categoria);
-        return[cat?cat.label:e.categoria,e.subcategoria].filter(Boolean).join(' - ');
+        const catLabels=(e.categorias||[]).map(id=>CATS.find(c=>c.id===id)?.label||id).join(', ');
+        const subLabels=(e.subcategorias||[]).join(', ');
+        return[catLabels,subLabels].filter(Boolean).join(' - ');
       }).filter(Boolean).join(', ');
       return`
       <div class="his-item" onclick="cerrarCli();abrirEditar('${p.id}')">
