@@ -1377,8 +1377,8 @@ function selCli(i){
   editCliId=c.id;
 }
 document.addEventListener('click',e=>{
-  if(!e.target.closest('#f-nom')&&!e.target.closest('#ac-drop'))
-    document.getElementById('ac-drop').style.display='none';
+  if(!e.target.closest('.ac-wrap'))
+    document.querySelectorAll('.ac-drop').forEach(d=>d.style.display='none');
 });
 
 /* ══ ENCARGOS ══ */
@@ -1403,7 +1403,76 @@ function setEncVal(id,k,v){
 function setEncEst(id,v){const e=fEnc.find(x=>x.id===id);if(e)e.estado=v;actualizarProgreso()}
 function addItem(encId){const e=fEnc.find(x=>x.id===encId);if(e)e.items.push({id:uid(),cantidad:'',detalle:'',valor_unitario:''});renderEncItems(encId)}
 function remItem(encId,itemId){const e=fEnc.find(x=>x.id===encId);if(e)e.items=e.items.filter(i=>i.id!==itemId);renderEncItems(encId);actualizarValorTotal()}
-function setItem(encId,itemId,k,v){const e=fEnc.find(x=>x.id===encId);if(e){const it=e.items.find(i=>i.id===itemId);if(it)it[k]=v}if(k==='cantidad'||k==='valor_unitario')actualizarValorTotal()}
+function setItem(encId,itemId,k,v){
+  const e=fEnc.find(x=>x.id===encId);
+  const it=e&&e.items.find(i=>i.id===itemId);
+  if(it){
+    it[k]=v;
+    if(k==='valor_unitario')it._autoPrecio=false;
+    if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='escalonado'){
+      const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
+      const precio=detectarPrecioEscalonado(it._fichaSel.rangos,cantNum);
+      if(precio!=null){
+        it.valor_unitario=String(precio);
+        const elU=document.getElementById('itval-'+itemId);
+        if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+      }
+    }
+  }
+  if(k==='cantidad'||k==='valor_unitario')actualizarValorTotal();
+}
+let _acItemResults={};
+function detectarPrecioEscalonado(rangos,cantidad){
+  for(const r of(rangos||[])){
+    if(cantidad>=r.desde&&(r.hasta==null||cantidad<=r.hasta))return r.precio;
+  }
+  return null;
+}
+async function acItem(encId,itemId,q){
+  const dr=document.getElementById('it-ac-drop-'+itemId);
+  if(!dr)return;
+  if(!q||q.trim().length<2){dr.style.display='none';return}
+  const lista=await api('GET',`/productos?q=${encodeURIComponent(q.trim())}&activo=1`);
+  const hoyStr=hoy();
+  const vigentes=lista.filter(p=>{
+    if(p.tipo_precio!=='promocional')return true;
+    if(p.fecha_inicio&&hoyStr<p.fecha_inicio)return false;
+    if(p.fecha_fin&&hoyStr>p.fecha_fin)return false;
+    return true;
+  });
+  if(!vigentes.length){dr.style.display='none';return}
+  _acItemResults[itemId]=vigentes.slice(0,6);
+  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',promocional:'ti-discount-2'};
+  dr.innerHTML=_acItemResults[itemId].map((p,i)=>{
+    const precioTxt=p.tipo_precio==='escalonado'?'según cantidad':fCOP(p.precio_oficial);
+    return`<div class="ac-item" onclick="selItem('${encId}','${itemId}',${i})">
+      <div class="ac-name"><i class="ti ${ICONOS[p.tipo_precio]||'ti-tag'}" style="margin-right:5px"></i>${p.nombre}</div>
+      <div class="ac-sub">${precioTxt}</div>
+    </div>`;
+  }).join('');
+  dr.style.display='block';
+}
+function selItem(encId,itemId,idx){
+  const p=(_acItemResults[itemId]||[])[idx];
+  if(!p)return;
+  const e=fEnc.find(x=>x.id===encId);
+  const it=e&&e.items.find(i=>i.id===itemId);
+  if(!it)return;
+  it.detalle=p.nombre;
+  it._fichaSel=p;
+  if(p.tipo_precio==='escalonado'){
+    it._autoPrecio=true;
+    const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+    it.valor_unitario=cantNum>0?String(detectarPrecioEscalonado(p.rangos,cantNum)||''):'';
+  }else{
+    it._autoPrecio=false;
+    it.valor_unitario=String(p.precio_oficial);
+  }
+  const dr=document.getElementById('it-ac-drop-'+itemId);
+  if(dr)dr.style.display='none';
+  renderEncItems(encId);
+  actualizarValorTotal();
+}
 
 function renderEncs(){
   const el=document.getElementById('enc-lista');
@@ -1453,8 +1522,8 @@ function renderItemsHTML(enc){
   return(enc.items||[]).map((it,j)=>`
     <tr>
       <td style="width:70px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"></td>
-      <td><textarea class="item-ta" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this)">${it.detalle||''}</textarea></td>
-      <td style="width:100px"><input class="item-inp" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
+      <td><div class="ac-wrap"><textarea class="item-ta" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div></td>
+      <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
 }
