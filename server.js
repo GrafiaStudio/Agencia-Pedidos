@@ -519,17 +519,23 @@ function validarFicha(b,wsId,fid){
       if(!Number.isFinite(r.precio)||r.precio<0)errores.push(`Rango #${i+1}: precio no es válido`);
     });
   }
-  if(b.tipo_precio==='combo'){
-    if(!Array.isArray(b.componentes)||!b.componentes.length)errores.push('Combo necesita al menos un componente');
-    else b.componentes.forEach((c,i)=>{
-      if(!c.componente_ficha_id)errores.push(`Componente #${i+1}: selecciona un producto`);
-      else{
-        if(fid&&c.componente_ficha_id===fid)errores.push(`Componente #${i+1}: un combo no puede tenerse a sí mismo como componente`);
+  if(b.tipo_precio==='combo'||b.tipo_precio==='promocional'){
+    if(b.combo_precio_modo!==undefined&&!['global','individual'].includes(b.combo_precio_modo))errores.push('Modo de precio no válido');
+    const modoIndividual=b.combo_precio_modo==='individual';
+    if(b.tipo_precio==='combo'&&(!Array.isArray(b.componentes)||!b.componentes.length))errores.push('Combo necesita al menos un componente');
+    (b.componentes||[]).forEach((c,i)=>{
+      const esLibre=!c.componente_ficha_id;
+      if(esLibre){
+        if(b.tipo_precio==='combo')errores.push(`Componente #${i+1}: Combo solo admite productos reales, no ítems libres`);
+        else if(!String(c.componente_nombre||'').trim())errores.push(`Componente #${i+1}: escribe un nombre para este ítem libre`);
+      }else{
+        if(fid&&c.componente_ficha_id===fid)errores.push(`Componente #${i+1}: no puede tenerse a sí mismo como componente`);
         const comp=db.prepare('SELECT tipo_precio FROM fichas_producto WHERE id=? AND workspace_id=?').get(c.componente_ficha_id,wsId);
         if(!comp)errores.push(`Componente #${i+1}: el producto seleccionado no existe`);
-        else if(comp.tipo_precio==='combo')errores.push(`Componente #${i+1}: un combo no puede tener otro combo como componente`);
+        else if(comp.tipo_precio==='combo'||comp.tipo_precio==='promocional')errores.push(`Componente #${i+1}: no puede ser otro combo o promoción`);
       }
       if(!Number.isInteger(c.cantidad_consumida)||c.cantidad_consumida<=0)errores.push(`Componente #${i+1}: la cantidad debe ser un número entero mayor a 0`);
+      if(modoIndividual&&(!definido(c.precio_unitario)||evalExpr(c.precio_unitario)===null))errores.push(`Componente #${i+1}: necesita un precio válido (modo "por producto")`);
     });
   }
   if(b.tipo_precio==='regla'){
