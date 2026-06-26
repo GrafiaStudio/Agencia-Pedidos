@@ -102,6 +102,8 @@ try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE encargos ADD COLUMN valor_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN suministrado INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE encargos ADD COLUMN categorias TEXT DEFAULT '[]'"); } catch(e){}
+try { db.exec("ALTER TABLE encargos ADD COLUMN subcategorias TEXT DEFAULT '[]'"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE pagos ADD COLUMN monto_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN monto_calc TEXT"); } catch(e){}
@@ -358,10 +360,18 @@ function valorOficialPedido(p,valorSugerido){
   return definido(p.valor_final)?toNum(p.valor_final_calc):valorSugerido;
 }
 
+function resolverCategoriasEncargo(enc){
+  let cats=[]; try{cats=JSON.parse(enc.categorias||'[]')}catch(e){cats=[]}
+  if(!cats.length&&enc.categoria)cats=[enc.categoria];
+  let subs=[]; try{subs=JSON.parse(enc.subcategorias||'[]')}catch(e){subs=[]}
+  if(!subs.length&&enc.subcategoria)subs=[enc.subcategoria];
+  enc.categorias=cats;
+  enc.subcategorias=subs;
+}
 function pedidoCompleto(p){
   if(!p)return null;
   const encargos=db.prepare('SELECT * FROM encargos WHERE pedido_id=? ORDER BY orden').all(p.id);
-  encargos.forEach(enc=>{enc.items=db.prepare('SELECT * FROM enc_items WHERE encargo_id=? ORDER BY orden').all(enc.id)});
+  encargos.forEach(enc=>{enc.items=db.prepare('SELECT * FROM enc_items WHERE encargo_id=? ORDER BY orden').all(enc.id);resolverCategoriasEncargo(enc)});
   p.encargos=encargos;
   p.pagos   =db.prepare('SELECT * FROM pagos WHERE pedido_id=? ORDER BY creado').all(p.id);
   p.costos  =db.prepare('SELECT * FROM costos WHERE pedido_id=? ORDER BY creado').all(p.id);
@@ -385,8 +395,8 @@ function saveEncargos(pid,encargos,wsId){
   db.prepare('DELETE FROM encargos WHERE pedido_id=? AND workspace_id=?').run(pid,wsId);
   (encargos||[]).forEach((enc,i)=>{
     const eid=enc.id||uid();
-    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,estado,valor,valor_calc,anotacion,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-      .run(eid,pid,enc.numero||i+1,enc.categoria||'',enc.subcategoria||'',enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i,wsId);
+    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,categorias,subcategorias,estado,valor,valor_calc,anotacion,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(eid,pid,enc.numero||i+1,'','',JSON.stringify(enc.categorias||[]),JSON.stringify(enc.subcategorias||[]),enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i,wsId);
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
       db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,suministrado,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,it.suministrado?1:0,j,wsId);
