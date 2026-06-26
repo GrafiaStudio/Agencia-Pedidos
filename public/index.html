@@ -1712,6 +1712,15 @@ function setItem(encId,itemId,k,v){
         if(elU)elU.value=displayMoneyVal(it.valor_unitario);
       }
     }
+    if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='regla'){
+      const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
+      if(cantNum>0){
+        const precio=calcularPrecioRegla(it._fichaSel.regla_lleva,it._fichaSel.regla_paga,it._fichaSel.precio_oficial,cantNum);
+        it.valor_unitario=String(precio);
+        const elU=document.getElementById('itval-'+itemId);
+        if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+      }
+    }
     if(k==='cantidad'){
       const stockEl=document.getElementById('itstock-'+itemId);
       if(stockEl){
@@ -1735,6 +1744,13 @@ function detectarPrecioEscalonado(rangos,cantidad){
   }
   return null;
 }
+function calcularPrecioRegla(lleva,paga,precioUnitario,cantidad){
+  if(!lleva||!paga||cantidad<lleva)return precioUnitario;
+  const grupos=Math.floor(cantidad/lleva);
+  const resto=cantidad%lleva;
+  const unidadesPagadas=grupos*paga+resto;
+  return Math.round((unidadesPagadas*precioUnitario)/cantidad);
+}
 async function acItem(encId,itemId,q){
   const dr=document.getElementById('it-ac-drop-'+itemId);
   if(!dr)return;
@@ -1749,9 +1765,9 @@ async function acItem(encId,itemId,q){
   });
   if(!vigentes.length){dr.style.display='none';return}
   _acItemResults[itemId]=vigentes.slice(0,6);
-  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',combo:'ti-package',promocional:'ti-discount-2'};
+  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',regla:'ti-discount',combo:'ti-package',promocional:'ti-discount-2'};
   dr.innerHTML=_acItemResults[itemId].map((p,i)=>{
-    const precioTxt=p.tipo_precio==='escalonado'?'según cantidad':fCOP(p.precio_oficial);
+    const precioTxt=(p.tipo_precio==='escalonado'||p.tipo_precio==='regla')?'según cantidad':fCOP(p.precio_oficial);
     const stockTxt=p.stock_actual!=null?` · Stock: ${p.stock_actual}`:'';
     return`<div class="ac-item" onclick="selItem('${encId}','${itemId}',${i})">
       <div class="ac-name"><i class="ti ${ICONOS[p.tipo_precio]||'ti-tag'}" style="margin-right:5px"></i>${p.nombre}</div>
@@ -1773,6 +1789,10 @@ function selItem(encId,itemId,idx){
     it._autoPrecio=true;
     const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
     it.valor_unitario=cantNum>0?String(detectarPrecioEscalonado(p.rangos,cantNum)||''):'';
+  }else if(p.tipo_precio==='regla'){
+    it._autoPrecio=true;
+    const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+    it.valor_unitario=cantNum>0?String(calcularPrecioRegla(p.regla_lleva,p.regla_paga,p.precio_oficial,cantNum)):'';
   }else{
     it._autoPrecio=false;
     it.valor_unitario=String(p.precio_oficial);
