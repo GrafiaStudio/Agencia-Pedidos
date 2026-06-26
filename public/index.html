@@ -1438,10 +1438,25 @@ function tipoDocumento(p){
   if(p.entregado&&val>0&&pag>=val)return'COMPROBANTE DE VENTA';
   return'ORDEN DE PEDIDO';
 }
-function lineasDocumento(p){
+function lineasDocumento(p,fichasPorId){
+  fichasPorId=fichasPorId||{};
   return(p.encargos||[]).map(enc=>{
-    const desc=(enc.items||[]).map(it=>`${(it.cantidad||'').trim()} ${(it.detalle||'').trim()}`.trim()).filter(Boolean).join('; ')||'(sin detalle)';
-    return{descripcion:desc,monto:calcValorEncargoEfectivo(enc)};
+    const partes=(enc.items||[]).map(it=>{
+      const base=`${(it.cantidad||'').trim()} ${(it.detalle||'').trim()}`.trim();
+      const ficha=it.ficha_id?fichasPorId[it.ficha_id]:null;
+      if(!ficha||(ficha.tipo_precio!=='combo'&&ficha.tipo_precio!=='promocional')||!(ficha.componentes||[]).length)return base;
+      const cantItem=parseInt(String(it.cantidad||0).replace(/\D/g,''))||1;
+      const titulo=ficha.tipo_precio==='promocional'?`Promoción: ${ficha.nombre}`:ficha.nombre;
+      const sub=ficha.componentes.map(c=>{
+        const nombreComp=c.componente_ficha_id?(fichasPorId[c.componente_ficha_id]?.nombre||'(producto)'):(c.componente_nombre||'(ítem libre)');
+        const cantTotal=cantItem*c.cantidad_consumida;
+        const precioUnit=parseInt(String(c.precio_unitario_calc||0).replace(/\D/g,''))||0;
+        const precioTxt=ficha.combo_precio_modo==='individual'?` — ${fCOP(precioUnit)} c/u`:'';
+        return `   • ${cantTotal} ${nombreComp}${precioTxt}`;
+      }).join('\n');
+      return `${(it.cantidad||'').trim()} ${titulo}\n${sub}`;
+    }).filter(Boolean);
+    return{descripcion:partes.join('\n')||'(sin detalle)',monto:calcValorEncargoEfectivo(enc)};
   });
 }
 function calcularIVA(total,porcentaje){
@@ -1460,11 +1475,17 @@ function mensajeWhatsApp(p,tipo){
   }
   return msg;
 }
-function generarPdfPedido(){
+async function generarPdfPedido(){
   const p=window._pedidoActualDoc;
   if(!p)return;
   const tipo=tipoDocumento(p);
   if(!tipo){toast('No se puede generar un documento de un pedido cancelado',false);return}
+  const fichaIds=[...new Set((p.encargos||[]).flatMap(e=>(e.items||[]).map(it=>it.ficha_id).filter(Boolean)))];
+  const fichasPorId={};
+  if(fichaIds.length){
+    const fichas=await Promise.all(fichaIds.map(fid=>api('GET',`/productos/${fid}`).catch(()=>null)));
+    fichas.forEach(f=>{if(f)fichasPorId[f.id]=f});
+  }
   const{jsPDF}=window.jspdf;
   const doc=new jsPDF({format:'letter'});
   let y=18;
@@ -1483,7 +1504,7 @@ function generarPdfPedido(){
   doc.autoTable({
     startY:y,
     head:[['Descripción','Valor']],
-    body:lineasDocumento(p).map(l=>[l.descripcion,fCOP(l.monto)]),
+    body:lineasDocumento(p,fichasPorId).map(l=>[l.descripcion,fCOP(l.monto)]),
     styles:{fontSize:9}
   });
   let finalY=doc.lastAutoTable.finalY+8;
