@@ -394,6 +394,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .mob-inner{display:flex;justify-content:space-around}
 .mob-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 12px;cursor:pointer;background:none;border:none;color:var(--muted);font-size:8px;font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:.04em}
 .mob-btn i{font-size:19px}.mob-btn.active{color:var(--teal)}
+.mas-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 12px;border-radius:var(--r-sm);border:none;background:var(--line-lt);color:var(--slate);font-size:11.5px;font-weight:700;cursor:pointer;margin-bottom:6px;transition:background .12s}
+.mas-item:hover{background:#e8edf2}
+.mas-item i{font-size:16px;color:var(--muted);margin-right:2px}
 
 @media(max-width:768px){
   .sidebar{display:none}.main{margin-left:0;padding-bottom:64px}
@@ -716,7 +719,22 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   <button class="mob-btn" onclick="abrirNuevo()"><i class="ti ti-plus"></i>Nuevo</button>
   <button class="mob-btn" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
   <button class="mob-btn" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
+  <button class="mob-btn" onclick="abrirMas()"><i class="ti ti-dots"></i>Más</button>
 </div></nav>
+
+<!-- MODAL MÁS (destinos sin botón propio en la barra móvil) -->
+<div class="overlay" id="ovMas">
+<div class="modal" style="max-width:340px">
+  <div class="mhead"><div class="mhead-l"><div class="mtitle">Más</div></div><button class="mclose" onclick="cerrarMas()"><i class="ti ti-x"></i></button></div>
+  <div class="mbody">
+    <button class="mas-item" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
+    <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
+    <button class="mas-item" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
+    <button class="mas-item" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
+    <button class="mas-item" onclick="cerrarMas();cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
+  </div>
+</div>
+</div>
 
 <!-- ══════ MODAL PEDIDO ══════ -->
 <div class="overlay" id="ovP">
@@ -1406,7 +1424,7 @@ function showView(v){
   const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',ayuda:'Ayuda y About'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
-  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3}[v]||0]?.classList.add('active');
+  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,productos:4,ayuda:4,configuracion:4}[v]??0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
@@ -2421,6 +2439,9 @@ async function eliminarPed(){
 }
 
 /* ══ EXPORT ══ */
+function abrirMas(){document.getElementById('ovMas').classList.add('open')}
+function cerrarMas(){document.getElementById('ovMas').classList.remove('open')}
+function irDesdeMas(v){cerrarMas();showView(v)}
 function abrirExp(){document.getElementById('ovExp').classList.add('open')}
 function cerrarExp(){document.getElementById('ovExp').classList.remove('open')}
 async function exportar(){
