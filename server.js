@@ -719,5 +719,62 @@ app.post('/api/configuracion/logo',upload.single('logo'),(req,res)=>{
   }catch(e){logError('POST /api/configuracion/logo',e);res.status(500).json({error:e.message})}
 });
 
+// ── PRODUCTOS (fichas de producto) ──
+app.get('/api/productos',(req,res)=>{
+  const{q}=req.query; let sql='SELECT * FROM fichas_producto WHERE workspace_id=?'; const params=[req.wsId];
+  if(q){sql+=' AND nombre LIKE ?';params.push(`%${q}%`)}
+  sql+=' ORDER BY nombre';
+  res.json(db.prepare(sql).all(...params).map(fichaCompleta));
+});
+
+app.get('/api/productos/:id',(req,res)=>{
+  const f=db.prepare('SELECT * FROM fichas_producto WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!f)return res.status(404).json({error:'No encontrado'});
+  res.json(fichaCompleta(f));
+});
+
+function guardarInsumos(fichaId,insumos,wsId){
+  db.prepare('DELETE FROM ficha_insumos WHERE ficha_id=?').run(fichaId);
+  (insumos||[]).forEach((it,i)=>{
+    db.prepare('INSERT INTO ficha_insumos(id,ficha_id,nombre_insumo,proveedor,costo_unitario,costo_unitario_calc,cantidad_usada,unidad_medida,es_variable,orden)VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .run(uid(),fichaId,it.nombre_insumo||'',it.proveedor||'',it.costo_unitario||'',normCalc(it.costo_unitario),it.cantidad_usada||'',it.unidad_medida||'',it.es_variable?1:0,i);
+  });
+}
+
+app.post('/api/productos',(req,res)=>{
+  try{
+    const b=req.body;
+    if(!b.nombre)return res.status(400).json({error:'Nombre requerido'});
+    const errores=validarFicha(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    const id=uid();
+    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,req.wsId,b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1);
+    guardarInsumos(id,b.insumos,req.wsId);
+    res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(id)));
+  }catch(e){logError('POST /api/productos',e);res.status(500).json({error:e.message})}
+});
+
+app.put('/api/productos/:id',(req,res)=>{
+  try{
+    const b=req.body; const fid=req.params.id;
+    const f=db.prepare('SELECT * FROM fichas_producto WHERE id=? AND workspace_id=?').get(fid,req.wsId);
+    if(!f)return res.status(404).json({error:'No encontrado'});
+    const errores=validarFicha(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    db.prepare(`UPDATE fichas_producto SET nombre=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=? WHERE id=? AND workspace_id=?`)
+      .run(b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,fid,req.wsId);
+    if(b.insumos!==undefined)guardarInsumos(fid,b.insumos,req.wsId);
+    res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(fid)));
+  }catch(e){logError('PUT /api/productos/:id',e);res.status(500).json({error:e.message})}
+});
+
+app.delete('/api/productos/:id',(req,res)=>{
+  const r=db.prepare('DELETE FROM fichas_producto WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'No encontrado'});
+  res.json({ok:true});
+});
+
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 app.listen(PORT,()=>console.log(`✅ GRAFÍA Studio en http://localhost:${PORT}`));
