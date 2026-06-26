@@ -195,6 +195,15 @@ db.exec(`CREATE TABLE IF NOT EXISTS combo_composicion(
   orden INTEGER DEFAULT 0,
   workspace_id TEXT
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  color TEXT DEFAULT 'slate',
+  subs TEXT DEFAULT '[]',
+  activo INTEGER DEFAULT 1,
+  orden INTEGER DEFAULT 0
+)`);
 
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
 const SEPARADORES_MILES=['.',','];
@@ -767,6 +776,38 @@ app.get('/api/app-info',(req,res)=>{
   res.json({...APP_INFO,version:require('./package.json').version});
 });
 
+// ── ETIQUETAS DEL NEGOCIO (categorías y subcategorías personalizables) ──
+const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate'];
+const ETIQUETAS_DEFAULT=[
+  {id:'estampados', nombre:'Estampados', color:'purple', subs:['Camisetas','Vasos','Gorras','Accesorios','Sublimación','DTF']},
+  {id:'publicidad', nombre:'Publicidad', color:'amber',  subs:['Volantes','Tarjetas','Avisos','Pendones','Material POP','Etiquetas']},
+  {id:'diseno',     nombre:'Diseño',     color:'orange', subs:['Diseño digital','Diseño publicitario','Branding','Edición']},
+  {id:'papeleria',  nombre:'Papelería',  color:'teal',   subs:['Documentos','Impresiones','Fotocopias']},
+  {id:'artesanias', nombre:'Artesanías', color:'green',  subs:['Resina','Llaveros','Regalos','Otros']},
+  {id:'servicios',  nombre:'Servicios',  color:'slate',  subs:['Consultas','Trabajo en PC','Asesorías']},
+];
+function sembrarEtiquetas(wsId){
+  ETIQUETAS_DEFAULT.forEach((e,i)=>{
+    db.prepare('INSERT INTO etiquetas_negocio(id,workspace_id,nombre,color,subs,activo,orden)VALUES(?,?,?,?,?,1,?)')
+      .run(e.id,wsId,e.nombre,e.color,JSON.stringify(e.subs),i);
+  });
+}
+function getEtiquetas(wsId){
+  let filas=db.prepare('SELECT * FROM etiquetas_negocio WHERE workspace_id=? ORDER BY orden').all(wsId);
+  if(!filas.length){
+    sembrarEtiquetas(wsId);
+    filas=db.prepare('SELECT * FROM etiquetas_negocio WHERE workspace_id=? ORDER BY orden').all(wsId);
+  }
+  return filas.map(f=>({id:f.id,label:f.nombre,color:f.color,tc:'tc-'+f.color,subs:JSON.parse(f.subs||'[]'),activo:!!f.activo}));
+}
+function validarEtiqueta(b){
+  const errores=[];
+  if(!String(b.nombre||'').trim())errores.push('El nombre de la etiqueta no puede estar vacío');
+  if(b.color!==undefined&&!PALETA_ETIQUETAS.includes(b.color))errores.push('Color no válido');
+  if(b.subs!==undefined&&(!Array.isArray(b.subs)||b.subs.some(s=>!String(s||'').trim())))errores.push('Las subcategorías no pueden estar vacías');
+  return errores;
+}
+
 // ── CONFIGURACIÓN DEL NEGOCIO ──
 app.get('/api/configuracion',(req,res)=>{
   res.json(getConfiguracion(req.wsId));
@@ -829,6 +870,40 @@ app.post('/api/configuracion/logo',upload.single('logo'),(req,res)=>{
       ON CONFLICT(workspace_id) DO UPDATE SET logo_ruta=excluded.logo_ruta`).run(req.wsId,ruta);
     res.json({logo_ruta:ruta});
   }catch(e){logError('POST /api/configuracion/logo',e);res.status(500).json({error:e.message})}
+});
+
+// ── ETIQUETAS DEL NEGOCIO ──
+app.get('/api/etiquetas',(req,res)=>{
+  res.json(getEtiquetas(req.wsId));
+});
+app.post('/api/etiquetas',(req,res)=>{
+  try{
+    const b=req.body;
+    const errores=validarEtiqueta(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    const id=uid();
+    const max=db.prepare('SELECT MAX(orden) AS m FROM etiquetas_negocio WHERE workspace_id=?').get(req.wsId).m;
+    db.prepare('INSERT INTO etiquetas_negocio(id,workspace_id,nombre,color,subs,activo,orden)VALUES(?,?,?,?,?,1,?)')
+      .run(id,req.wsId,b.nombre.trim(),b.color||'slate',JSON.stringify((b.subs||[]).map(s=>String(s).trim())),(max??-1)+1);
+    res.json(getEtiquetas(req.wsId).find(e=>e.id===id));
+  }catch(e){logError('POST /api/etiquetas',e);res.status(500).json({error:e.message})}
+});
+app.put('/api/etiquetas/:id',(req,res)=>{
+  try{
+    const b=req.body; const eid=req.params.id;
+    const f=db.prepare('SELECT * FROM etiquetas_negocio WHERE id=? AND workspace_id=?').get(eid,req.wsId);
+    if(!f)return res.status(404).json({error:'No encontrada'});
+    const errores=validarEtiqueta(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    db.prepare('UPDATE etiquetas_negocio SET nombre=?,color=?,subs=?,activo=? WHERE id=? AND workspace_id=?')
+      .run(b.nombre.trim(),b.color||'slate',JSON.stringify((b.subs||[]).map(s=>String(s).trim())),b.activo===false?0:1,eid,req.wsId);
+    res.json(getEtiquetas(req.wsId).find(e=>e.id===eid));
+  }catch(e){logError('PUT /api/etiquetas/:id',e);res.status(500).json({error:e.message})}
+});
+app.delete('/api/etiquetas/:id',(req,res)=>{
+  const r=db.prepare('DELETE FROM etiquetas_negocio WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'No encontrada'});
+  res.json({ok:true});
 });
 
 // ── PRODUCTOS (fichas de producto) ──
