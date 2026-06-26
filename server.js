@@ -509,8 +509,7 @@ function validarFicha(b,wsId,fid){
     if(definido(it.costo_unitario)&&evalExpr(it.costo_unitario)===null)errores.push(`Costo unitario del insumo #${i+1} no es una expresión válida`);
   });
   if(b.tipo_precio==='escalonado'){
-    if(!Array.isArray(b.rangos)||!b.rangos.length)errores.push('Escalonado necesita al menos un rango de precio');
-    else(b.rangos||[]).forEach((r,i)=>{
+    (b.rangos||[]).forEach((r,i)=>{
       if(!Number.isFinite(r.desde)||r.desde<0)errores.push(`Rango #${i+1}: "Desde" no es válido`);
       if(r.hasta!=null&&(!Number.isFinite(r.hasta)||r.hasta<r.desde))errores.push(`Rango #${i+1}: "Hasta" no es válido`);
       if(!Number.isFinite(r.precio)||r.precio<0)errores.push(`Rango #${i+1}: precio no es válido`);
