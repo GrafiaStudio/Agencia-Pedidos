@@ -1429,6 +1429,118 @@ function blurItemVal(el,encId,itemId){
   const elp=document.getElementById('itprev-'+itemId);
   if(elp)elp.style.display='none';
 }
+
+/* ══ FICHA DE PRODUCTO: widgets ══ */
+let fProdInsumos=[],fProdRangos=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='';
+
+function renderProdCatRow(){
+  document.getElementById('prod-cat-row').innerHTML=CATS.map(c=>`<button type="button" class="cat-btn${prodCatSel===c.id?' sel':''}" onclick="setProdCat('${c.id}')">${c.label}</button>`).join('');
+}
+function setProdCat(catId){prodCatSel=catId;renderProdCatRow()}
+
+function addInsumo(){fProdInsumos.push({id:uid(),nombre_insumo:'',proveedor:'',costo_unitario:'',cantidad_usada:'',unidad_medida:'',es_variable:false});renderInsumos()}
+function remInsumo(id){fProdInsumos=fProdInsumos.filter(x=>x.id!==id);renderInsumos()}
+function setInsumo(id,k,v){
+  const it=fProdInsumos.find(x=>x.id===id);
+  if(it)it[k]=v;
+  if(k==='cantidad_usada'||k==='costo_unitario'){
+    const cant=parseInt(String(it.cantidad_usada||0).replace(/\D/g,''))||0;
+    const unit=evalExpr(it.costo_unitario)||0;
+    const subEl=document.getElementById('inssub-'+id);
+    if(subEl)subEl.textContent=fCOP(cant*unit);
+    recalcPrecioSugerido();
+  }
+}
+function previewInsumoUnit(id,v){
+  const el=document.getElementById('insprev-'+id);
+  if(!el)return;
+  const show=esExpresion(v);
+  el.style.display=show?'block':'none';
+  if(show)el.innerHTML=previewExpr(v);
+}
+function focusInsumoUnit(el,id){
+  const it=fProdInsumos.find(x=>x.id===id);
+  el.value=(it&&it.costo_unitario)||'';
+  previewInsumoUnit(id,el.value);
+}
+function blurInsumoUnit(el,id){
+  const it=fProdInsumos.find(x=>x.id===id);
+  el.value=displayMoneyVal(it&&it.costo_unitario);
+  const elp=document.getElementById('insprev-'+id);
+  if(elp)elp.style.display='none';
+}
+function renderInsumos(){
+  document.getElementById('prod-insumos-body').innerHTML=fProdInsumos.map(it=>{
+    const cant=parseInt(String(it.cantidad_usada||0).replace(/\D/g,''))||0;
+    const unit=evalExpr(it.costo_unitario)||0;
+    const subtotal=cant*unit;
+    return`<tr>
+      <td><input class="item-inp" type="text" value="${it.nombre_insumo||''}" placeholder="Ej: Madera" oninput="setInsumo('${it.id}','nombre_insumo',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${it.proveedor||''}" placeholder="Opcional" oninput="setInsumo('${it.id}','proveedor',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${it.cantidad_usada||''}" placeholder="1" oninput="setInsumo('${it.id}','cantidad_usada',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${it.unidad_medida||''}" placeholder="unidad" oninput="setInsumo('${it.id}','unidad_medida',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${displayMoneyVal(it.costo_unitario)}" placeholder="$ 0" oninput="setInsumo('${it.id}','costo_unitario',this.value);previewInsumoUnit('${it.id}',this.value)" onfocus="focusInsumoUnit(this,'${it.id}')" onblur="blurInsumoUnit(this,'${it.id}')"><div id="insprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);display:none"></div></td>
+      <td id="inssub-${it.id}" style="text-align:right;font-weight:700;color:var(--navy);white-space:nowrap">${fCOP(subtotal)}</td>
+      <td style="text-align:center"><input type="checkbox" ${it.es_variable?'checked':''} onchange="setInsumo('${it.id}','es_variable',this.checked)"></td>
+      <td style="width:26px"><button class="item-del" onclick="remInsumo('${it.id}')"><i class="ti ti-x"></i></button></td>
+    </tr>`;
+  }).join('');
+  recalcPrecioSugerido();
+}
+
+function calcCostoTotalInsumosFront(){
+  return fProdInsumos.reduce((a,it)=>{
+    const cant=parseInt(String(it.cantidad_usada||0).replace(/\D/g,''))||0;
+    const unit=evalExpr(it.costo_unitario)||0;
+    return a+cant*unit;
+  },0);
+}
+function recalcPrecioSugerido(){
+  const costoTotal=calcCostoTotalInsumosFront();
+  const capCosto=document.getElementById('prod-costo-total-cap');
+  if(capCosto)capCosto.textContent='Costo total: '+fCOP(costoTotal);
+  const tipo=document.getElementById('prod-margen-tipo').value;
+  const margenValor=parseFloat(document.getElementById('prod-margen-valor').value);
+  let sugerido=null;
+  if(tipo==='multiplicador'&&isFinite(margenValor))sugerido=Math.round(costoTotal*margenValor);
+  else if(tipo==='porcentaje'&&isFinite(margenValor))sugerido=Math.round(costoTotal+costoTotal*(margenValor/100));
+  const cap=document.getElementById('prod-precio-sugerido-cap');
+  if(!cap)return;
+  if(sugerido!=null){cap.style.display='block';cap.textContent='Precio sugerido: '+fCOP(sugerido)}
+  else{cap.style.display='none'}
+}
+function onMargenTipoChange(){
+  const tipo=document.getElementById('prod-margen-tipo').value;
+  document.getElementById('prod-margen-valor-wrap').style.display=tipo==='fijo'?'none':'block';
+  recalcPrecioSugerido();
+}
+function focusProdPrecioBase(el){el.value=fProdPrecioBaseRaw||''}
+function blurProdPrecioBase(el){el.value=displayMoneyVal(fProdPrecioBaseRaw)}
+
+function showTipoPrecioSec(tipo){
+  document.getElementById('prod-sec-escalonado').style.display=tipo==='escalonado'?'block':'none';
+  document.getElementById('prod-sec-promocional').style.display=tipo==='promocional'?'block':'none';
+}
+function addRango(){fProdRangos.push({id:uid(),desde:'',hasta:'',precio:''});renderRangos()}
+function remRango(id){fProdRangos=fProdRangos.filter(x=>x.id!==id);renderRangos()}
+function setRango(id,k,v){const r=fProdRangos.find(x=>x.id===id);if(r)r[k]=v}
+function focusRangoPrecio(el,id){
+  const r=fProdRangos.find(x=>x.id===id);
+  el.value=(r&&r.precio)||'';
+}
+function blurRangoPrecio(el,id){
+  const r=fProdRangos.find(x=>x.id===id);
+  el.value=displayMoneyVal(r&&r.precio);
+}
+function renderRangos(){
+  document.getElementById('prod-rangos-body').innerHTML=fProdRangos.map(r=>`
+    <tr>
+      <td><input class="item-inp" type="text" value="${r.desde||''}" placeholder="1" oninput="setRango('${r.id}','desde',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${r.hasta||''}" placeholder="Sin límite" oninput="setRango('${r.id}','hasta',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${displayMoneyVal(r.precio)}" placeholder="$ 0" oninput="setRango('${r.id}','precio',this.value)" onfocus="focusRangoPrecio(this,'${r.id}')" onblur="blurRangoPrecio(this,'${r.id}')"></td>
+      <td style="width:26px"><button class="item-del" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button></td>
+    </tr>`).join('');
+}
 function focusValorFinal(el){
   el.value=fValorFinalRaw||'';
   const vfPrevEl=document.getElementById('vf-prev');
