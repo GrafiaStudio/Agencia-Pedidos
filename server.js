@@ -569,5 +569,64 @@ app.get('/api/registros/utilidades',(req,res)=>{
   res.json(rows);
 });
 
+// ── CONFIGURACIÓN DEL NEGOCIO ──
+app.get('/api/configuracion',(req,res)=>{
+  res.json(getConfiguracion(req.wsId));
+});
+
+app.put('/api/configuracion',(req,res)=>{
+  try{
+    const b=req.body||{};
+    const errores=[];
+    if(b.formato_fecha!==undefined&&!FORMATOS_FECHA.includes(b.formato_fecha))errores.push('Formato de fecha no válido');
+    if(b.separador_miles!==undefined&&!SEPARADORES_MILES.includes(b.separador_miles))errores.push('Separador de miles no válido');
+    if(b.zona_horaria!==undefined&&!ZONAS_HORARIAS.has(b.zona_horaria))errores.push('Zona horaria no válida');
+    if(b.metodos_pago!==undefined&&(!Array.isArray(b.metodos_pago)||b.metodos_pago.some(m=>!METODOS_PAGO_VALIDOS.includes(m))))errores.push('Métodos de pago no válidos');
+    if(b.dias_validez_cotizacion!==undefined&&(!Number.isInteger(b.dias_validez_cotizacion)||b.dias_validez_cotizacion<0))errores.push('Días de validez de cotización no válido');
+    if(b.dias_anticipacion_entrega!==undefined&&(!Number.isInteger(b.dias_anticipacion_entrega)||b.dias_anticipacion_entrega<0))errores.push('Días de anticipación no válido');
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    const actual=getConfiguracion(req.wsId);
+    const nuevo={...actual,...b};
+    db.prepare(`INSERT INTO configuracion_negocio
+        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,alertas_entrega,dias_anticipacion_entrega)
+      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@alertas_entrega,@dias_anticipacion_entrega)
+      ON CONFLICT(workspace_id) DO UPDATE SET
+        nombre_negocio=excluded.nombre_negocio,direccion=excluded.direccion,telefono=excluded.telefono,
+        email=excluded.email,nit=excluded.nit,moneda_prefijo=excluded.moneda_prefijo,decimales=excluded.decimales,
+        separador_miles=excluded.separador_miles,formato_fecha=excluded.formato_fecha,zona_horaria=excluded.zona_horaria,
+        dias_validez_cotizacion=excluded.dias_validez_cotizacion,estado_default_cotizacion=excluded.estado_default_cotizacion,
+        metodos_pago=excluded.metodos_pago,alertas_entrega=excluded.alertas_entrega,dias_anticipacion_entrega=excluded.dias_anticipacion_entrega`)
+      .run({
+        workspace_id:req.wsId,
+        nombre_negocio:nuevo.nombre_negocio||'',
+        direccion:nuevo.direccion||'',
+        telefono:nuevo.telefono||'',
+        email:nuevo.email||'',
+        nit:nuevo.nit||'',
+        moneda_prefijo:nuevo.moneda_prefijo||'$',
+        decimales:nuevo.decimales?1:0,
+        separador_miles:nuevo.separador_miles||'.',
+        formato_fecha:nuevo.formato_fecha||'DD/MM/AAAA',
+        zona_horaria:nuevo.zona_horaria||'America/Bogota',
+        dias_validez_cotizacion:Number.isInteger(nuevo.dias_validez_cotizacion)?nuevo.dias_validez_cotizacion:15,
+        estado_default_cotizacion:nuevo.estado_default_cotizacion?1:0,
+        metodos_pago:JSON.stringify(Array.isArray(nuevo.metodos_pago)?nuevo.metodos_pago:CFG_DEFAULTS.metodos_pago),
+        alertas_entrega:nuevo.alertas_entrega?1:0,
+        dias_anticipacion_entrega:Number.isInteger(nuevo.dias_anticipacion_entrega)?nuevo.dias_anticipacion_entrega:3
+      });
+    res.json(getConfiguracion(req.wsId));
+  }catch(e){logError('PUT /api/configuracion',e);res.status(500).json({error:e.message})}
+});
+
+app.post('/api/configuracion/logo',upload.single('logo'),(req,res)=>{
+  try{
+    if(!req.file)return res.status(400).json({error:'No se recibió ningún archivo'});
+    const ruta='/uploads/'+req.file.filename;
+    db.prepare(`INSERT INTO configuracion_negocio(workspace_id,logo_ruta) VALUES(?,?)
+      ON CONFLICT(workspace_id) DO UPDATE SET logo_ruta=excluded.logo_ruta`).run(req.wsId,ruta);
+    res.json({logo_ruta:ruta});
+  }catch(e){logError('POST /api/configuracion/logo',e);res.status(500).json({error:e.message})}
+});
+
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 app.listen(PORT,()=>console.log(`✅ GRAFÍA Studio en http://localhost:${PORT}`));
