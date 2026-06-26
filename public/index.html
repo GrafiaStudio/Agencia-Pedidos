@@ -1674,6 +1674,51 @@ async function abrirEditarProducto(id){
   document.getElementById('ovProd').classList.add('open');
 }
 function cerrarProducto(){document.getElementById('ovProd').classList.remove('open')}
+function validarProductoBody(b){
+  if(definidoFE(b.precio_base)&&evalExpr(b.precio_base)===null)return'El Precio base no es una expresión válida';
+  for(let i=0;i<(b.insumos||[]).length;i++){
+    if(definidoFE(b.insumos[i].costo_unitario)&&evalExpr(b.insumos[i].costo_unitario)===null)return`Costo unitario del insumo #${i+1} no es una expresión válida`;
+  }
+  if(b.tipo_precio==='escalonado'&&(!b.rangos||!b.rangos.length))return'Escalonado necesita al menos un rango de precio';
+  return null;
+}
+async function guardarProducto(){
+  const nombre=document.getElementById('prod-nombre').value.trim();
+  if(!nombre){document.getElementById('prod-nombre').focus();toast('Ingresa el nombre del producto',false);return}
+  const tipoPrecio=document.getElementById('prod-tipo-precio').value;
+  const body={
+    nombre,
+    categoria_id:prodCatSel,
+    tipo_precio:tipoPrecio,
+    margen_tipo:document.getElementById('prod-margen-tipo').value,
+    margen_valor:document.getElementById('prod-margen-valor').value.trim(),
+    precio_base:(fProdPrecioBaseRaw||'').trim(),
+    activo:document.getElementById('prod-activo').checked,
+    insumos:fProdInsumos,
+    rangos:tipoPrecio==='escalonado'?fProdRangos.map(r=>({desde:parseInt(r.desde,10)||0,hasta:(r.hasta===''||r.hasta==null)?null:parseInt(r.hasta,10),precio:evalExpr(r.precio)||0})):[],
+    fecha_inicio:document.getElementById('prod-fecha-inicio').value,
+    fecha_fin:document.getElementById('prod-fecha-fin').value,
+    cantidad_minima:document.getElementById('prod-cantidad-minima').value.trim(),
+    descripcion:document.getElementById('prod-descripcion').value.trim()
+  };
+  const errExpr=validarProductoBody(body);
+  if(errExpr){toast(errExpr,false);return}
+  try{
+    if(editProdId){await api('PUT',`/productos/${editProdId}`,body);toast('Producto actualizado ✓')}
+    else{await api('POST','/productos',body);toast('Producto creado ✓')}
+    cerrarProducto();
+    await cargarProductos();
+  }catch(e){toast('Error: '+e.message,false)}
+}
+async function eliminarProducto(){
+  if(!editProdId||!confirm('¿Eliminar este producto?'))return;
+  try{
+    await api('DELETE',`/productos/${editProdId}`);
+    toast('Producto eliminado');
+    cerrarProducto();
+    await cargarProductos();
+  }catch(e){toast('Error: '+e.message,false)}
+}
 function focusValorFinal(el){
   el.value=fValorFinalRaw||'';
   const vfPrevEl=document.getElementById('vf-prev');
