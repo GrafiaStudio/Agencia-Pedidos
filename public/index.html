@@ -2288,10 +2288,12 @@ function validarProductoBody(b){
   for(let i=0;i<(b.insumos||[]).length;i++){
     if(definidoFE(b.insumos[i].costo_unitario)&&evalExpr(b.insumos[i].costo_unitario)===null)return`Costo unitario del insumo #${i+1} no es una expresión válida`;
   }
-  if(b.tipo_precio==='combo'){
-    if(!b.componentes||!b.componentes.length)return'Combo necesita al menos un componente';
-    for(let i=0;i<b.componentes.length;i++){
-      if(!b.componentes[i].componente_ficha_id)return`Componente #${i+1}: selecciona un producto`;
+  if(b.tipo_precio==='combo'||b.tipo_precio==='promocional'){
+    if(b.tipo_precio==='combo'&&(!b.componentes||!b.componentes.length))return'Combo necesita al menos un componente';
+    for(let i=0;i<(b.componentes||[]).length;i++){
+      const c=b.componentes[i];
+      if(!c.componente_ficha_id&&!c.componente_nombre)return`Componente #${i+1}: selecciona un producto o escribe un nombre`;
+      if(b.combo_precio_modo==='individual'&&definidoFE(c.precio_unitario)&&evalExpr(c.precio_unitario)===null)return`Componente #${i+1}: el precio no es una expresión válida`;
     }
   }
   return null;
@@ -2313,7 +2315,8 @@ async function guardarProducto(){
     regla_lleva:document.getElementById('prod-regla-lleva').value===''?null:parseInt(document.getElementById('prod-regla-lleva').value,10),
     regla_paga:document.getElementById('prod-regla-paga').value===''?null:parseInt(document.getElementById('prod-regla-paga').value,10),
     insumos:fProdInsumos,
-    componentes:tipoPrecio==='combo'?fProdComponentes.map(c=>({componente_ficha_id:c.componente_ficha_id,cantidad_consumida:parseInt(c.cantidad_consumida,10)||0})):[],
+    combo_precio_modo:fProdComboModo,
+    componentes:(tipoPrecio==='combo'||tipoPrecio==='promocional')?fProdComponentes.map(c=>({componente_ficha_id:c.componente_ficha_id||'',componente_nombre:(c.componente_nombre||'').trim(),cantidad_consumida:parseInt(c.cantidad_consumida,10)||0,precio_unitario:(c.precio_unitario||'').toString().trim()})):[],
     rangos:tipoPrecio==='escalonado'?fProdRangos.map(r=>({desde:parseInt(r.desde,10)||0,hasta:(r.hasta===''||r.hasta==null)?null:parseInt(r.hasta,10),precio:evalExpr(r.precio)||0})):[],
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
     fecha_fin:document.getElementById('prod-fecha-fin').value,
