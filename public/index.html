@@ -953,12 +953,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     </div>
 
     <div id="prod-sec-combo" style="display:none">
-      <div class="msec"><span class="tri"></span>Composición del combo</div>
+      <div class="msec"><span class="tri"></span>Modo de precio</div>
+      <div class="fr2 fg" style="margin-bottom:12px">
+        <div class="ck-box" style="display:inline-flex"><input type="radio" name="combo-modo" id="combo-modo-global" checked onchange="setComboModo('global')"><label for="combo-modo-global">Un precio total para todo el paquete</label></div>
+        <div class="ck-box" style="display:inline-flex"><input type="radio" name="combo-modo" id="combo-modo-individual" onchange="setComboModo('individual')"><label for="combo-modo-individual">Un precio por cada producto (se suman)</label></div>
+      </div>
+      <div class="msec"><span class="tri"></span>Composición</div>
       <table class="items-table" id="prod-combo-tabla">
-        <thead><tr><th>Producto componente</th><th style="width:90px">Cantidad</th><th style="width:26px"></th></tr></thead>
+        <thead><tr><th>Producto componente</th><th style="width:90px">Cantidad</th><th id="prod-combo-th-precio" style="width:100px;display:none">Precio c/u</th><th style="width:26px"></th></tr></thead>
         <tbody id="prod-combo-body"></tbody>
       </table>
-      <button class="btn-add-row" onclick="addComponente()"><i class="ti ti-plus"></i>Agregar componente</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-add-row" onclick="addComponente()"><i class="ti ti-plus"></i>Agregar componente</button>
+        <button class="btn-add-row" id="prod-btn-item-libre" style="display:none" onclick="addComponenteLibre()"><i class="ti ti-plus"></i>Agregar ítem libre</button>
+      </div>
     </div>
 
     <div id="prod-sec-promocional" style="display:none">
@@ -2027,22 +2035,36 @@ function blurItemVal(el,encId,itemId){
 /* ══ FICHA DE PRODUCTO: widgets ══ */
 let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='';
 let _acComboResults={};
-function addComponente(){fProdComponentes.push({id:uid(),componente_ficha_id:'',componente_nombre:'',cantidad_consumida:''});renderComponentes()}
+let fProdComboModo='global';
+function setComboModo(modo){
+  fProdComboModo=modo;
+  document.getElementById('prod-combo-th-precio').style.display=modo==='individual'?'table-cell':'none';
+  renderComponentes();
+}
+function addComponente(){fProdComponentes.push({id:uid(),componente_ficha_id:'',componente_nombre:'',cantidad_consumida:'',precio_unitario:''});renderComponentes()}
+function addComponenteLibre(){fProdComponentes.push({id:uid(),componente_ficha_id:'',componente_nombre:'',cantidad_consumida:'',precio_unitario:'',_libre:true});renderComponentes()}
 function remComponente(id){fProdComponentes=fProdComponentes.filter(x=>x.id!==id);renderComponentes()}
 function setComponente(id,k,v){const it=fProdComponentes.find(x=>x.id===id);if(it)it[k]=v}
 function renderComponentes(){
-  document.getElementById('prod-combo-body').innerHTML=fProdComponentes.map(it=>`<tr>
-    <td><div class="ac-wrap"><input class="item-inp" type="text" value="${it.componente_nombre||''}" placeholder="Buscar producto…" oninput="setComponente('${it.id}','componente_nombre',this.value);acCombo('${it.id}',this.value)"><div class="ac-drop" id="combo-ac-drop-${it.id}"></div></div></td>
+  const mostrarPrecio=fProdComboModo==='individual';
+  document.getElementById('prod-combo-body').innerHTML=fProdComponentes.map(it=>{
+    const campoNombre=it._libre
+      ?`<input class="item-inp" type="text" value="${it.componente_nombre||''}" placeholder="Nombre del ítem libre" oninput="setComponente('${it.id}','componente_nombre',this.value)">`
+      :`<div class="ac-wrap"><input class="item-inp" type="text" value="${it.componente_nombre||''}" placeholder="Buscar producto…" oninput="setComponente('${it.id}','componente_nombre',this.value);acCombo('${it.id}',this.value)"><div class="ac-drop" id="combo-ac-drop-${it.id}"></div></div>`;
+    return`<tr>
+    <td>${campoNombre}</td>
     <td><input class="item-inp" type="text" value="${it.cantidad_consumida||''}" placeholder="Ej: 6" oninput="setComponente('${it.id}','cantidad_consumida',this.value)"></td>
+    <td style="width:100px;display:${mostrarPrecio?'table-cell':'none'}"><input class="item-inp" type="text" value="${displayMoneyVal(it.precio_unitario)}" placeholder="$ 0" oninput="setComponente('${it.id}','precio_unitario',this.value)"></td>
     <td style="width:26px"><button class="item-del" onclick="remComponente('${it.id}')"><i class="ti ti-x"></i></button></td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 async function acCombo(rowId,q){
   const dr=document.getElementById('combo-ac-drop-'+rowId);
   if(!dr)return;
   if(!q||q.trim().length<2){dr.style.display='none';return}
   const lista=await api('GET',`/productos?q=${encodeURIComponent(q.trim())}&activo=1`);
-  const validos=lista.filter(p=>p.tipo_precio!=='combo'&&p.id!==editProdId);
+  const validos=lista.filter(p=>p.tipo_precio!=='combo'&&p.tipo_precio!=='promocional'&&p.id!==editProdId);
   if(!validos.length){dr.style.display='none';return}
   _acComboResults[rowId]=validos.slice(0,6);
   dr.innerHTML=_acComboResults[rowId].map((p,i)=>`<div class="ac-item" onclick="selCombo('${rowId}',${i})">
