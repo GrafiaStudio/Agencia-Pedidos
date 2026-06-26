@@ -870,6 +870,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <select id="prod-tipo-precio" onchange="showTipoPrecioSec(this.value)">
           <option value="unitario">Unitario</option>
           <option value="escalonado">Escalonado</option>
+          <option value="combo">Combo</option>
           <option value="promocional">Promocional</option>
         </select>
       </div>
@@ -918,6 +919,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <tbody id="prod-rangos-body"></tbody>
       </table>
       <button class="btn-add-row" onclick="addRango()"><i class="ti ti-plus"></i>Agregar rango</button>
+    </div>
+
+    <div id="prod-sec-combo" style="display:none">
+      <div class="msec"><span class="tri"></span>Composición del combo</div>
+      <table class="items-table" id="prod-combo-tabla">
+        <thead><tr><th>Producto componente</th><th style="width:90px">Cantidad</th><th style="width:26px"></th></tr></thead>
+        <tbody id="prod-combo-body"></tbody>
+      </table>
+      <button class="btn-add-row" onclick="addComponente()"><i class="ti ti-plus"></i>Agregar componente</button>
     </div>
 
     <div id="prod-sec-promocional" style="display:none">
@@ -1875,7 +1885,42 @@ function blurItemVal(el,encId,itemId){
 }
 
 /* ══ FICHA DE PRODUCTO: widgets ══ */
-let fProdInsumos=[],fProdRangos=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='';
+let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='';
+let _acComboResults={};
+function addComponente(){fProdComponentes.push({id:uid(),componente_ficha_id:'',componente_nombre:'',cantidad_consumida:''});renderComponentes()}
+function remComponente(id){fProdComponentes=fProdComponentes.filter(x=>x.id!==id);renderComponentes()}
+function setComponente(id,k,v){const it=fProdComponentes.find(x=>x.id===id);if(it)it[k]=v}
+function renderComponentes(){
+  document.getElementById('prod-combo-body').innerHTML=fProdComponentes.map(it=>`<tr>
+    <td><div class="ac-wrap"><input class="item-inp" type="text" value="${it.componente_nombre||''}" placeholder="Buscar producto…" oninput="setComponente('${it.id}','componente_nombre',this.value);acCombo('${it.id}',this.value)"><div class="ac-drop" id="combo-ac-drop-${it.id}"></div></div></td>
+    <td><input class="item-inp" type="text" value="${it.cantidad_consumida||''}" placeholder="Ej: 6" oninput="setComponente('${it.id}','cantidad_consumida',this.value)"></td>
+    <td style="width:26px"><button class="item-del" onclick="remComponente('${it.id}')"><i class="ti ti-x"></i></button></td>
+  </tr>`).join('');
+}
+async function acCombo(rowId,q){
+  const dr=document.getElementById('combo-ac-drop-'+rowId);
+  if(!dr)return;
+  if(!q||q.trim().length<2){dr.style.display='none';return}
+  const lista=await api('GET',`/productos?q=${encodeURIComponent(q.trim())}&activo=1`);
+  const validos=lista.filter(p=>p.tipo_precio!=='combo'&&p.id!==editProdId);
+  if(!validos.length){dr.style.display='none';return}
+  _acComboResults[rowId]=validos.slice(0,6);
+  dr.innerHTML=_acComboResults[rowId].map((p,i)=>`<div class="ac-item" onclick="selCombo('${rowId}',${i})">
+    <div class="ac-name">${p.nombre}</div>
+  </div>`).join('');
+  dr.style.display='block';
+}
+function selCombo(rowId,idx){
+  const p=(_acComboResults[rowId]||[])[idx];
+  if(!p)return;
+  const it=fProdComponentes.find(x=>x.id===rowId);
+  if(!it)return;
+  it.componente_ficha_id=p.id;
+  it.componente_nombre=p.nombre;
+  const dr=document.getElementById('combo-ac-drop-'+rowId);
+  if(dr)dr.style.display='none';
+  renderComponentes();
+}
 
 function renderProdCatRow(){
   document.getElementById('prod-cat-row').innerHTML=CATS.map(c=>`<button type="button" class="cat-btn${prodCatSel===c.id?' sel':''}" onclick="setProdCat('${c.id}')">${c.label}</button>`).join('');
@@ -1963,6 +2008,7 @@ function blurProdPrecioBase(el){el.value=displayMoneyVal(fProdPrecioBaseRaw)}
 
 function showTipoPrecioSec(tipo){
   document.getElementById('prod-sec-escalonado').style.display=tipo==='escalonado'?'block':'none';
+  document.getElementById('prod-sec-combo').style.display=tipo==='combo'?'block':'none';
   document.getElementById('prod-sec-promocional').style.display=tipo==='promocional'?'block':'none';
 }
 function addRango(){fProdRangos.push({id:uid(),desde:'',hasta:'',precio:''});renderRangos()}
@@ -1986,7 +2032,7 @@ function renderRangos(){
     </tr>`).join('');
 }
 function resetProdForm(){
-  fProdInsumos=[];fProdRangos=[];fProdPrecioBaseRaw='';prodCatSel='';
+  fProdInsumos=[];fProdRangos=[];fProdComponentes=[];fProdPrecioBaseRaw='';prodCatSel='';
   document.getElementById('prod-nombre').value='';
   document.getElementById('prod-tipo-precio').value='unitario';
   document.getElementById('prod-margen-tipo').value='fijo';
@@ -2002,6 +2048,7 @@ function resetProdForm(){
   renderProdCatRow();
   renderInsumos();
   renderRangos();
+  renderComponentes();
   onMargenTipoChange();
   showTipoPrecioSec('unitario');
 }
@@ -2016,6 +2063,7 @@ async function abrirEditarProducto(id){
   const p=await api('GET',`/productos/${id}`);
   editProdId=id;
   fProdInsumos=JSON.parse(JSON.stringify(p.insumos||[]));
+  fProdComponentes=(p.componentes||[]).map(c=>({id:uid(),componente_ficha_id:c.componente_ficha_id,componente_nombre:c.componente_nombre||'',cantidad_consumida:String(c.cantidad_consumida)}));
   fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
@@ -2036,6 +2084,7 @@ async function abrirEditarProducto(id){
   renderProdCatRow();
   renderInsumos();
   renderRangos();
+  renderComponentes();
   onMargenTipoChange();
   showTipoPrecioSec(p.tipo_precio);
   document.getElementById('ovProd').classList.add('open');
@@ -2047,6 +2096,12 @@ function validarProductoBody(b){
     if(definidoFE(b.insumos[i].costo_unitario)&&evalExpr(b.insumos[i].costo_unitario)===null)return`Costo unitario del insumo #${i+1} no es una expresión válida`;
   }
   if(b.tipo_precio==='escalonado'&&(!b.rangos||!b.rangos.length))return'Escalonado necesita al menos un rango de precio';
+  if(b.tipo_precio==='combo'){
+    if(!b.componentes||!b.componentes.length)return'Combo necesita al menos un componente';
+    for(let i=0;i<b.componentes.length;i++){
+      if(!b.componentes[i].componente_ficha_id)return`Componente #${i+1}: selecciona un producto`;
+    }
+  }
   return null;
 }
 async function guardarProducto(){
@@ -2064,6 +2119,7 @@ async function guardarProducto(){
     stock_actual:document.getElementById('prod-stock-actual').value===''?null:parseInt(document.getElementById('prod-stock-actual').value,10),
     stock_minimo:document.getElementById('prod-stock-minimo').value===''?null:parseInt(document.getElementById('prod-stock-minimo').value,10),
     insumos:fProdInsumos,
+    componentes:tipoPrecio==='combo'?fProdComponentes.map(c=>({componente_ficha_id:c.componente_ficha_id,cantidad_consumida:parseInt(c.cantidad_consumida,10)||0})):[],
     rangos:tipoPrecio==='escalonado'?fProdRangos.map(r=>({desde:parseInt(r.desde,10)||0,hasta:(r.hasta===''||r.hasta==null)?null:parseInt(r.hasta,10),precio:evalExpr(r.precio)||0})):[],
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
     fecha_fin:document.getElementById('prod-fecha-fin').value,
