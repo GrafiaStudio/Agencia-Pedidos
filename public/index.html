@@ -1880,7 +1880,7 @@ function renderEncs(){
       </div>
       <div class="enc-body">
         <table class="items-table" id="it-${enc.id}">
-          <thead><tr><th style="width:70px">Cant.</th><th>Detalle / Especificación</th><th style="width:100px">V. Unitario</th><th style="width:30px"></th></tr></thead>
+          <thead><tr><th style="width:70px">Cant.</th><th>Detalle / Especificación</th><th style="width:100px">V. Unitario</th><th style="width:34px" title="Suministrado">✓</th><th style="width:30px"></th></tr></thead>
           <tbody>${renderItemsHTML(enc)}</tbody>
         </table>
         <button class="btn-add-row" style="margin:4px 0 10px" onclick="addItem('${enc.id}')"><i class="ti ti-plus"></i>Agregar fila</button>
@@ -1903,10 +1903,11 @@ function renderItemsHTML(enc){
     const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
     const stockWarn=(stockDisp!=null&&cantNum>stockDisp)?`Stock insuficiente (quedan ${stockDisp})`:'';
     return`
-    <tr>
+    <tr${it.suministrado?' style="opacity:.55"':''}>
       <td style="width:70px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"><div id="itstock-${it.id}" style="font-size:8px;font-weight:700;color:var(--red);margin-top:2px;display:${stockWarn?'block':'none'}">${stockWarn}</div></td>
       <td><div class="ac-wrap"><textarea class="item-ta" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div></td>
       <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
+      <td style="width:34px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
