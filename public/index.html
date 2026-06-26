@@ -1537,6 +1537,19 @@ function setItem(encId,itemId,k,v){
         if(elU)elU.value=displayMoneyVal(it.valor_unitario);
       }
     }
+    if(k==='cantidad'){
+      const stockEl=document.getElementById('itstock-'+itemId);
+      if(stockEl){
+        const stockDisp=(it._fichaSel&&it._fichaSel.stock_actual!=null)?it._fichaSel.stock_actual:null;
+        const cantNum2=parseInt(String(v||0).replace(/\D/g,''))||0;
+        if(stockDisp!=null&&cantNum2>stockDisp){
+          stockEl.textContent=`Stock insuficiente (quedan ${stockDisp})`;
+          stockEl.style.display='block';
+        }else{
+          stockEl.style.display='none';
+        }
+      }
+    }
   }
   if(k==='cantidad'||k==='valor_unitario')actualizarValorTotal();
 }
@@ -1564,9 +1577,10 @@ async function acItem(encId,itemId,q){
   const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',promocional:'ti-discount-2'};
   dr.innerHTML=_acItemResults[itemId].map((p,i)=>{
     const precioTxt=p.tipo_precio==='escalonado'?'según cantidad':fCOP(p.precio_oficial);
+    const stockTxt=p.stock_actual!=null?` · Stock: ${p.stock_actual}`:'';
     return`<div class="ac-item" onclick="selItem('${encId}','${itemId}',${i})">
       <div class="ac-name"><i class="ti ${ICONOS[p.tipo_precio]||'ti-tag'}" style="margin-right:5px"></i>${p.nombre}</div>
-      <div class="ac-sub">${precioTxt}</div>
+      <div class="ac-sub">${precioTxt}${stockTxt}</div>
     </div>`;
   }).join('');
   dr.style.display='block';
@@ -1639,13 +1653,18 @@ function renderEncs(){
   setTimeout(()=>document.querySelectorAll('.item-ta').forEach(t=>autoTA(t)),0);
 }
 function renderItemsHTML(enc){
-  return(enc.items||[]).map((it,j)=>`
+  return(enc.items||[]).map((it,j)=>{
+    const stockDisp=(it._fichaSel&&it._fichaSel.stock_actual!=null)?it._fichaSel.stock_actual:null;
+    const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+    const stockWarn=(stockDisp!=null&&cantNum>stockDisp)?`Stock insuficiente (quedan ${stockDisp})`:'';
+    return`
     <tr>
-      <td style="width:70px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"></td>
+      <td style="width:70px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"><div id="itstock-${it.id}" style="font-size:8px;font-weight:700;color:var(--red);margin-top:2px;display:${stockWarn?'block':'none'}">${stockWarn}</div></td>
       <td><div class="ac-wrap"><textarea class="item-ta" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div></td>
       <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 function autoTA(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'}
 function renderEncSubcats(id){
