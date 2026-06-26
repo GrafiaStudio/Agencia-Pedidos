@@ -120,6 +120,66 @@ seedWs.run('main','GRAFÍA Studio',APP_PIN,'real');
   .forEach(([id,pin])=>{ try{ seedWs.run(id,`Workspace de prueba ${id.split('-')[1]}`,pin,'prueba'); }
   catch(e){ console.error('Seed workspace falló:',id,e.message); } });
 
+// ── CONFIGURACIÓN DEL NEGOCIO (una fila por workspace) ──
+db.exec(`CREATE TABLE IF NOT EXISTS configuracion_negocio(
+  workspace_id TEXT PRIMARY KEY,
+  nombre_negocio TEXT DEFAULT '',
+  logo_ruta TEXT DEFAULT '',
+  direccion TEXT DEFAULT '',
+  telefono TEXT DEFAULT '',
+  email TEXT DEFAULT '',
+  nit TEXT DEFAULT '',
+  moneda_prefijo TEXT DEFAULT '$',
+  decimales INTEGER DEFAULT 0,
+  separador_miles TEXT DEFAULT '.',
+  formato_fecha TEXT DEFAULT 'DD/MM/AAAA',
+  zona_horaria TEXT DEFAULT 'America/Bogota',
+  dias_validez_cotizacion INTEGER DEFAULT 15,
+  estado_default_cotizacion INTEGER DEFAULT 0,
+  metodos_pago TEXT DEFAULT '["efectivo","transferencia","nequi","daviplata","otro"]',
+  alertas_entrega INTEGER DEFAULT 1,
+  dias_anticipacion_entrega INTEGER DEFAULT 3
+)`);
+
+const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
+const SEPARADORES_MILES=['.',','];
+const METODOS_PAGO_VALIDOS=['efectivo','transferencia','nequi','daviplata','contraentrega','otro'];
+const ZONAS_HORARIAS=typeof Intl.supportedValuesOf==='function'
+  ?new Set(Intl.supportedValuesOf('timeZone'))
+  :new Set(['America/Bogota']);
+const CFG_DEFAULTS={
+  nombre_negocio:'',logo_ruta:'',direccion:'',telefono:'',email:'',nit:'',
+  moneda_prefijo:'$',decimales:0,separador_miles:'.',formato_fecha:'DD/MM/AAAA',
+  zona_horaria:'America/Bogota',dias_validez_cotizacion:15,estado_default_cotizacion:0,
+  metodos_pago:['efectivo','transferencia','nequi','daviplata','otro'],
+  alertas_entrega:1,dias_anticipacion_entrega:3
+};
+function getConfiguracion(wsId){
+  const row=db.prepare('SELECT * FROM configuracion_negocio WHERE workspace_id=?').get(wsId);
+  if(!row)return{...CFG_DEFAULTS};
+  let metodos;
+  try{const a=JSON.parse(row.metodos_pago);metodos=Array.isArray(a)?a:CFG_DEFAULTS.metodos_pago}
+  catch(e){metodos=CFG_DEFAULTS.metodos_pago}
+  return{
+    nombre_negocio:row.nombre_negocio||'',
+    logo_ruta:row.logo_ruta||'',
+    direccion:row.direccion||'',
+    telefono:row.telefono||'',
+    email:row.email||'',
+    nit:row.nit||'',
+    moneda_prefijo:row.moneda_prefijo||CFG_DEFAULTS.moneda_prefijo,
+    decimales:row.decimales?1:0,
+    separador_miles:row.separador_miles||CFG_DEFAULTS.separador_miles,
+    formato_fecha:row.formato_fecha||CFG_DEFAULTS.formato_fecha,
+    zona_horaria:row.zona_horaria||CFG_DEFAULTS.zona_horaria,
+    dias_validez_cotizacion:row.dias_validez_cotizacion??CFG_DEFAULTS.dias_validez_cotizacion,
+    estado_default_cotizacion:row.estado_default_cotizacion?1:0,
+    metodos_pago:metodos,
+    alertas_entrega:row.alertas_entrega?1:0,
+    dias_anticipacion_entrega:row.dias_anticipacion_entrega??CFG_DEFAULTS.dias_anticipacion_entrega
+  };
+}
+
 ['clientes','pedidos','encargos','enc_items','pagos','costos','historial','archivos'].forEach(t=>{
   try { db.exec(`ALTER TABLE ${t} ADD COLUMN workspace_id TEXT`); } catch(e){}
 });
@@ -175,7 +235,11 @@ const storage=multer.diskStorage({
 const upload=multer({storage,limits:{fileSize:8*1024*1024}});
 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
-function hoy(){return new Date().toISOString().split('T')[0]}
+function hoy(wsId){
+  const tz=wsId?getConfiguracion(wsId).zona_horaria:CFG_DEFAULTS.zona_horaria;
+  try{return new Date().toLocaleDateString('en-CA',{timeZone:tz})}
+  catch(e){return new Date().toISOString().split('T')[0]}
+}
 function ahora(){return new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}
 function nextRef(){
   const row=db.prepare('SELECT valor FROM counter WHERE id=1').get();
@@ -245,7 +309,7 @@ function pedidoCompleto(p){
 }
 
 function addHist(pid,txt,wsId){
-  db.prepare('INSERT INTO historial(id,pedido_id,texto,fecha,hora,workspace_id)VALUES(?,?,?,?,?,?)').run(uid(),pid,txt,hoy(),ahora(),wsId);
+  db.prepare('INSERT INTO historial(id,pedido_id,texto,fecha,hora,workspace_id)VALUES(?,?,?,?,?,?)').run(uid(),pid,txt,hoy(wsId),ahora(),wsId);
 }
 
 function saveEncargos(pid,encargos,wsId){
@@ -370,9 +434,9 @@ app.post('/api/pedidos',(req,res)=>{
     const cid=asegurarCliente(b.nombre,b.tel,b.cliente_id||null,req.wsId);
     db.prepare(`INSERT INTO pedidos(id,ref,cliente_id,nombre,tel,urgente,entregado,cancelado,pendiente_pago,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega,notas,workspace_id)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,ref,cid,b.nombre.trim(),b.tel||'',b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,normVF(b.valor_final),normCalc(b.valor_final),hoy(),b.fecha_entrega||'',b.notas||'',req.wsId);
+      .run(id,ref,cid,b.nombre.trim(),b.tel||'',b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,normVF(b.valor_final),normCalc(b.valor_final),hoy(req.wsId),b.fecha_entrega||'',b.notas||'',req.wsId);
     saveEncargos(id,b.encargos,req.wsId);
-    (b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),id,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||'',req.wsId));
+    (b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),id,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(req.wsId),pg.tipo||'efectivo',pg.nota||'',req.wsId));
     (b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc,workspace_id)VALUES(?,?,?,?,?,?,?)').run(uid(),id,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto),req.wsId));
     addHist(id,'Pedido creado',req.wsId);
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
@@ -393,7 +457,7 @@ app.put('/api/pedidos/:id',(req,res)=>{
     db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=? AND workspace_id=?`)
       .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid,req.wsId);
     if(b.encargos!==undefined)saveEncargos(pid,b.encargos,req.wsId);
-    if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(),pg.tipo||'efectivo',pg.nota||'',req.wsId));}
+    if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(req.wsId),pg.tipo||'efectivo',pg.nota||'',req.wsId));}
     if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,monto,monto_calc,workspace_id)VALUES(?,?,?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.monto||'',normCalc(c.monto),req.wsId));}
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
   }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}
