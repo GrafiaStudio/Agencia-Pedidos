@@ -2600,6 +2600,14 @@ async function abrirEditar(id){
   fPag=JSON.parse(JSON.stringify(p.pagos||[]));
   fArch=JSON.parse(JSON.stringify(p.archivos||[]));
   fCostos=JSON.parse(JSON.stringify(p.costos||[]));
+  const fichaIds=[...new Set(fEnc.flatMap(e=>e.items.map(it=>it.ficha_id).filter(Boolean)))];
+  if(fichaIds.length){
+    const fichas=await Promise.all(fichaIds.map(fid=>api('GET',`/productos/${fid}`).catch(()=>null)));
+    const fichasPorId={};
+    fichas.forEach(f=>{if(f)fichasPorId[f.id]=f});
+    fEnc.forEach(e=>e.items.forEach(it=>{if(it.ficha_id&&fichasPorId[it.ficha_id])it._fichaSel=fichasPorId[it.ficha_id]}));
+    recalcularCostosAutomaticos();
+  }
   document.getElementById('f-nom').value=p.nombre;
   document.getElementById('f-tel').value=p.tel||'';
   document.getElementById('f-fecha').value=p.fecha_entrega||'';
