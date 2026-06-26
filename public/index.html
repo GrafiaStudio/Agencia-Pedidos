@@ -147,12 +147,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 /* Tags de categoría */
 .tags{display:flex;gap:3px;flex-wrap:wrap;margin:4px 0 2px}
 .ttag{font-size:8px;font-weight:800;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em}
-.tc-estampados{background:var(--purple-lt);color:#4A3CB8}
-.tc-publicidad{background:var(--amber-lt);color:#9B6500}
-.tc-diseno{background:var(--orange-lt);color:#C24A1A}
-.tc-papeleria{background:var(--teal-lt);color:var(--teal-dk)}
-.tc-artesanias{background:var(--green-lt);color:#1A6B45}
-.tc-servicios{background:var(--line-lt);color:var(--slate)}
+.tc-purple{background:var(--purple-lt);color:#4A3CB8}
+.tc-amber{background:var(--amber-lt);color:#9B6500}
+.tc-orange{background:var(--orange-lt);color:#C24A1A}
+.tc-teal{background:var(--teal-lt);color:var(--teal-dk)}
+.tc-green{background:var(--green-lt);color:#1A6B45}
+.tc-slate{background:var(--line-lt);color:var(--slate)}
 
 /* Fecha alerta */
 .fa-red{color:var(--red);font-size:10px;font-weight:700}
@@ -967,20 +967,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@5.0.8/dist/jspdf.plugin.autotable.min.js" integrity="sha384-5jk55M0XWoAw7LyhlXJe19ErOr3doBAPzxw9vahPFbvolqWa2yDk4fhHa2zuYeOa" crossorigin="anonymous"></script>
 <script>
 /* ══ CONSTANTES ══ */
-const CATS=[
-  {id:'estampados', label:'Estampados', tc:'tc-estampados',
-   subs:['Camisetas','Vasos','Gorras','Accesorios','Sublimación','DTF']},
-  {id:'publicidad', label:'Publicidad', tc:'tc-publicidad',
-   subs:['Volantes','Tarjetas','Avisos','Pendones','Material POP','Etiquetas']},
-  {id:'diseno',     label:'Diseño',    tc:'tc-diseno',
-   subs:['Diseño digital','Diseño publicitario','Branding','Edición']},
-  {id:'papeleria',  label:'Papelería', tc:'tc-papeleria',
-   subs:['Documentos','Impresiones','Fotocopias']},
-  {id:'artesanias', label:'Artesanías',tc:'tc-artesanias',
-   subs:['Resina','Llaveros','Regalos','Otros']},
-  {id:'servicios',  label:'Servicios', tc:'tc-servicios',
-   subs:['Consultas','Trabajo en PC','Asesorías']},
-];
+const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate'];
+let CATS=[];
+async function cargarEtiquetas(){
+  try{
+    CATS=await api('GET','/etiquetas');
+  }catch(e){
+    console.warn('Etiquetas:',e.message);
+  }
+}
 const ENC_ESTS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 const EST_CLS={Nuevo:'es-nuevo',Diseño:'es-diseno','En diseño':'es-diseno',Aprobación:'es-aprobacion',Producción:'es-produccion','En producción':'es-produccion',Listo:'es-listo',Entregado:'es-entregado',Cancelado:'es-cancelado'};
 const ECOL_MAP={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb'};
@@ -2703,6 +2698,7 @@ async function init(){
     <div class="sc-mini dark"><div class="ico"><i class="ti ti-clipboard-list"></i></div><div><div class="num">—</div><div class="lbl">Pedidos activos</div></div></div>
     <div class="sc-mini light"><div class="ico"><i class="ti ti-package"></i></div><div><div class="num">—</div><div class="lbl">Listos para entregar</div></div></div>`;
   try{await cargarConfiguracion()}catch(e){console.warn('Configuración:',e.message)}
+  try{await cargarEtiquetas()}catch(e){console.warn('Etiquetas:',e.message)}
   try{await cargarStats()}catch(e){console.warn('Stats:',e.message)}
   try{await cargarPedidos()}catch(e){
     console.warn('Pedidos:',e.message);
