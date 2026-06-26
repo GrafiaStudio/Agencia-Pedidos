@@ -1803,7 +1803,7 @@ function setEncVal(id,k,v){
 }
 function setEncEst(id,v){const e=fEnc.find(x=>x.id===id);if(e)e.estado=v;actualizarProgreso()}
 function addItem(encId){const e=fEnc.find(x=>x.id===encId);if(e)e.items.push({id:uid(),cantidad:'',detalle:'',valor_unitario:''});renderEncItems(encId)}
-function remItem(encId,itemId){const e=fEnc.find(x=>x.id===encId);if(e)e.items=e.items.filter(i=>i.id!==itemId);renderEncItems(encId);actualizarValorTotal()}
+function remItem(encId,itemId){const e=fEnc.find(x=>x.id===encId);if(e)e.items=e.items.filter(i=>i.id!==itemId);renderEncItems(encId);actualizarValorTotal();recalcularCostosAutomaticos()}
 function setItem(encId,itemId,k,v){
   const e=fEnc.find(x=>x.id===encId);
   const it=e&&e.items.find(i=>i.id===itemId);
@@ -1838,6 +1838,7 @@ function setItem(encId,itemId,k,v){
           stockEl.style.display='none';
         }
       }
+      recalcularCostosAutomaticos();
     }
   }
   if(k==='cantidad'||k==='valor_unitario')actualizarValorTotal();
@@ -1908,6 +1909,7 @@ function selItem(encId,itemId,idx){
   if(dr)dr.style.display='none';
   renderEncItems(encId);
   actualizarValorTotal();
+  recalcularCostosAutomaticos();
 }
 
 function renderEncs(){
