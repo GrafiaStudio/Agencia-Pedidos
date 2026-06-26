@@ -144,6 +144,38 @@ db.exec(`CREATE TABLE IF NOT EXISTS configuracion_negocio(
   dias_anticipacion_entrega INTEGER DEFAULT 3
 )`);
 
+// ── FICHAS DE PRODUCTO (Fase 2A+2B del documento maestro, sin combos) ──
+db.exec(`CREATE TABLE IF NOT EXISTS fichas_producto(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT,
+  nombre TEXT NOT NULL,
+  categoria_id TEXT DEFAULT '',
+  tipo_precio TEXT NOT NULL DEFAULT 'unitario',
+  margen_tipo TEXT NOT NULL DEFAULT 'fijo',
+  margen_valor TEXT DEFAULT '',
+  precio_base TEXT DEFAULT '',
+  precio_base_calc TEXT,
+  rangos TEXT DEFAULT '[]',
+  fecha_inicio TEXT DEFAULT '',
+  fecha_fin TEXT DEFAULT '',
+  cantidad_minima TEXT DEFAULT '',
+  descripcion TEXT DEFAULT '',
+  activo INTEGER DEFAULT 1,
+  creado TEXT DEFAULT(datetime('now','localtime'))
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS ficha_insumos(
+  id TEXT PRIMARY KEY,
+  ficha_id TEXT REFERENCES fichas_producto(id) ON DELETE CASCADE,
+  nombre_insumo TEXT NOT NULL,
+  proveedor TEXT DEFAULT '',
+  costo_unitario TEXT DEFAULT '',
+  costo_unitario_calc TEXT,
+  cantidad_usada TEXT DEFAULT '',
+  unidad_medida TEXT DEFAULT '',
+  es_variable INTEGER DEFAULT 0,
+  orden INTEGER DEFAULT 0
+)`);
+
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
 const SEPARADORES_MILES=['.',','];
 const METODOS_PAGO_VALIDOS=['efectivo','transferencia','nequi','daviplata','contraentrega','otro'];
@@ -351,6 +383,61 @@ function logError(contexto,err){
     const linea=`[${new Date().toISOString()}] ${contexto}: ${err.message}\n`;
     fs.appendFileSync(LOG_FILE,linea);
   }catch(e){/* si falla el log a archivo, no bloquear la respuesta */}
+}
+
+// ── FICHAS DE PRODUCTO: helpers ──
+const TIPOS_PRECIO_VALIDOS=['unitario','escalonado','promocional'];
+const MARGEN_TIPOS_VALIDOS=['multiplicador','porcentaje','fijo'];
+
+function calcCostoTotalInsumos(insumos){
+  return(insumos||[]).reduce((a,it)=>{
+    const cant=toNum(it.cantidad_usada),unit=toNum(it.costo_unitario_calc);
+    return a+cant*unit;
+  },0);
+}
+function calcPrecioSugerido(ficha,costoTotal){
+  if(ficha.margen_tipo==='multiplicador'){
+    const m=parseFloat(ficha.margen_valor);
+    return isFinite(m)?Math.round(costoTotal*m):null;
+  }
+  if(ficha.margen_tipo==='porcentaje'){
+    const m=parseFloat(ficha.margen_valor);
+    return isFinite(m)?Math.round(costoTotal+costoTotal*(m/100)):null;
+  }
+  return null;
+}
+function precioOficialFicha(ficha,precioSugerido){
+  return definido(ficha.precio_base)?toNum(ficha.precio_base_calc):(precioSugerido||0);
+}
+function fichaCompleta(f){
+  if(!f)return null;
+  f.insumos=db.prepare('SELECT * FROM ficha_insumos WHERE ficha_id=? ORDER BY orden').all(f.id);
+  f.activo=!!f.activo;
+  try{f.rangos=JSON.parse(f.rangos||'[]')}catch(e){f.rangos=[]}
+  f.costo_total=calcCostoTotalInsumos(f.insumos);
+  f.precio_sugerido=calcPrecioSugerido(f,f.costo_total);
+  f.precio_oficial=precioOficialFicha(f,f.precio_sugerido);
+  return f;
+}
+function validarFicha(b){
+  const errores=[];
+  if(!String(b.nombre||'').trim())errores.push('El nombre del producto no puede estar vacío');
+  if(b.tipo_precio!==undefined&&!TIPOS_PRECIO_VALIDOS.includes(b.tipo_precio))errores.push('Tipo de precio no válido');
+  if(b.margen_tipo!==undefined&&!MARGEN_TIPOS_VALIDOS.includes(b.margen_tipo))errores.push('Tipo de margen no válido');
+  if(definido(b.margen_valor)&&!isFinite(parseFloat(b.margen_valor)))errores.push('El valor del margen no es un número válido');
+  if(definido(b.precio_base)&&evalExpr(b.precio_base)===null)errores.push('El Precio base no es una expresión válida');
+  (b.insumos||[]).forEach((it,i)=>{
+    if(definido(it.costo_unitario)&&evalExpr(it.costo_unitario)===null)errores.push(`Costo unitario del insumo #${i+1} no es una expresión válida`);
+  });
+  if(b.tipo_precio==='escalonado'){
+    if(!Array.isArray(b.rangos)||!b.rangos.length)errores.push('Escalonado necesita al menos un rango de precio');
+    else(b.rangos||[]).forEach((r,i)=>{
+      if(!Number.isFinite(r.desde)||r.desde<0)errores.push(`Rango #${i+1}: "Desde" no es válido`);
+      if(r.hasta!=null&&(!Number.isFinite(r.hasta)||r.hasta<r.desde))errores.push(`Rango #${i+1}: "Hasta" no es válido`);
+      if(!Number.isFinite(r.precio)||r.precio<0)errores.push(`Rango #${i+1}: precio no es válido`);
+    });
+  }
+  return errores;
 }
 
 // ── VALIDACIÓN DE PEDIDOS ──
