@@ -870,6 +870,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <select id="prod-tipo-precio" onchange="showTipoPrecioSec(this.value)">
           <option value="unitario">Unitario</option>
           <option value="escalonado">Escalonado</option>
+          <option value="regla">Lleva N, paga M</option>
           <option value="combo">Combo</option>
           <option value="promocional">Promocional</option>
         </select>
@@ -919,6 +920,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <tbody id="prod-rangos-body"></tbody>
       </table>
       <button class="btn-add-row" onclick="addRango()"><i class="ti ti-plus"></i>Agregar rango</button>
+    </div>
+
+    <div id="prod-sec-regla" style="display:none">
+      <div class="msec"><span class="tri"></span>Regla de la promoción</div>
+      <div class="fr2 fg">
+        <div><label>Lleva (unidades)</label><input type="number" id="prod-regla-lleva" min="1" placeholder="Ej: 3"></div>
+        <div><label>Paga (unidades)</label><input type="number" id="prod-regla-paga" min="1" placeholder="Ej: 2"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted)">El "Precio base" de arriba es el precio normal por unidad. Esta regla baja el promedio cuando la cantidad alcanza "Lleva".</div>
     </div>
 
     <div id="prod-sec-combo" style="display:none">
@@ -2008,6 +2018,7 @@ function blurProdPrecioBase(el){el.value=displayMoneyVal(fProdPrecioBaseRaw)}
 
 function showTipoPrecioSec(tipo){
   document.getElementById('prod-sec-escalonado').style.display=tipo==='escalonado'?'block':'none';
+  document.getElementById('prod-sec-regla').style.display=tipo==='regla'?'block':'none';
   document.getElementById('prod-sec-combo').style.display=tipo==='combo'?'block':'none';
   document.getElementById('prod-sec-promocional').style.display=tipo==='promocional'?'block':'none';
 }
@@ -2041,6 +2052,8 @@ function resetProdForm(){
   document.getElementById('prod-activo').checked=true;
   document.getElementById('prod-stock-actual').value='';
   document.getElementById('prod-stock-minimo').value='';
+  document.getElementById('prod-regla-lleva').value='';
+  document.getElementById('prod-regla-paga').value='';
   document.getElementById('prod-fecha-inicio').value='';
   document.getElementById('prod-fecha-fin').value='';
   document.getElementById('prod-cantidad-minima').value='';
@@ -2075,6 +2088,8 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-activo').checked=!!p.activo;
   document.getElementById('prod-stock-actual').value=p.stock_actual??'';
   document.getElementById('prod-stock-minimo').value=p.stock_minimo??'';
+  document.getElementById('prod-regla-lleva').value=p.regla_lleva??'';
+  document.getElementById('prod-regla-paga').value=p.regla_paga??'';
   document.getElementById('prod-fecha-inicio').value=p.fecha_inicio||'';
   document.getElementById('prod-fecha-fin').value=p.fecha_fin||'';
   document.getElementById('prod-cantidad-minima').value=p.cantidad_minima||'';
@@ -2118,6 +2133,8 @@ async function guardarProducto(){
     activo:document.getElementById('prod-activo').checked,
     stock_actual:document.getElementById('prod-stock-actual').value===''?null:parseInt(document.getElementById('prod-stock-actual').value,10),
     stock_minimo:document.getElementById('prod-stock-minimo').value===''?null:parseInt(document.getElementById('prod-stock-minimo').value,10),
+    regla_lleva:document.getElementById('prod-regla-lleva').value===''?null:parseInt(document.getElementById('prod-regla-lleva').value,10),
+    regla_paga:document.getElementById('prod-regla-paga').value===''?null:parseInt(document.getElementById('prod-regla-paga').value,10),
     insumos:fProdInsumos,
     componentes:tipoPrecio==='combo'?fProdComponentes.map(c=>({componente_ficha_id:c.componente_ficha_id,cantidad_consumida:parseInt(c.cantidad_consumida,10)||0})):[],
     rangos:tipoPrecio==='escalonado'?fProdRangos.map(r=>({desde:parseInt(r.desde,10)||0,hasta:(r.hasta===''||r.hasta==null)?null:parseInt(r.hasta,10),precio:evalExpr(r.precio)||0})):[],
