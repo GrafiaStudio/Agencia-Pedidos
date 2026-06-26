@@ -101,6 +101,7 @@ try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario TEXT DEFAULT '0'"
 try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE encargos ADD COLUMN valor_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE enc_items ADD COLUMN suministrado INTEGER DEFAULT 0"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE pagos ADD COLUMN monto_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN monto_calc TEXT"); } catch(e){}
@@ -388,7 +389,7 @@ function saveEncargos(pid,encargos,wsId){
       .run(eid,pid,enc.numero||i+1,enc.categoria||'',enc.subcategoria||'',enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i,wsId);
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
-      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,j,wsId);
+      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,suministrado,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,it.suministrado?1:0,j,wsId);
     });
   });
 }
