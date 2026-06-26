@@ -878,17 +878,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   </div>
   <div class="mbody">
 
+    <div id="prod-paso-tipo">
+      <div class="msec"><span class="tri"></span>¿Qué quieres crear?</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn-add-row" style="padding:14px 18px;font-size:11px" onclick="elegirCaminoProducto('simple')"><i class="ti ti-tag"></i>Producto simple</button>
+        <button class="btn-add-row" style="padding:14px 18px;font-size:11px" onclick="elegirCaminoProducto('combo')"><i class="ti ti-package"></i>Combo</button>
+        <button class="btn-add-row" style="padding:14px 18px;font-size:11px" onclick="elegirCaminoProducto('promocional')"><i class="ti ti-discount-2"></i>Promoción</button>
+      </div>
+    </div>
+
+    <div id="prod-paso-form" style="display:none">
+    <button class="btn-ghost" id="prod-btn-cambiar-tipo" style="margin-bottom:10px" onclick="document.getElementById('prod-paso-tipo').style.display='block';document.getElementById('prod-paso-form').style.display='none'"><i class="ti ti-arrow-left"></i>Cambiar tipo</button>
     <div class="fr2 fg">
       <div><label>Nombre del producto</label><input type="text" id="prod-nombre" placeholder="Ej: Retablo 10x15cm"></div>
-      <div><label>Tipo de precio</label>
-        <select id="prod-tipo-precio" onchange="showTipoPrecioSec(this.value)">
-          <option value="unitario">Unitario</option>
-          <option value="escalonado">Escalonado</option>
-          <option value="regla">Lleva N, paga M</option>
-          <option value="combo">Combo</option>
-          <option value="promocional">Promocional</option>
-        </select>
-      </div>
+      <div></div>
     </div>
 
     <div class="msec"><span class="tri"></span>Categoría</div>
@@ -928,12 +931,16 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     </div>
 
     <div id="prod-sec-escalonado" style="display:none">
-      <div class="msec"><span class="tri"></span>Rangos de precio</div>
-      <table class="items-table" id="prod-rangos-tabla">
-        <thead><tr><th style="width:80px">Desde</th><th style="width:80px">Hasta</th><th>Precio por unidad</th><th style="width:26px"></th></tr></thead>
-        <tbody id="prod-rangos-body"></tbody>
-      </table>
-      <button class="btn-add-row" onclick="addRango()"><i class="ti ti-plus"></i>Agregar rango</button>
+      <div class="ck-box" style="display:inline-flex;margin-bottom:10px"><input type="checkbox" id="prod-es-regla" onchange="onEsReglaChange()"><label for="prod-es-regla">Es una promoción "Lleva N, paga M"</label></div>
+      <div id="prod-sec-tramos">
+        <div class="msec"><span class="tri"></span>Tramos adicionales por cantidad (opcional)</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">El "Precio base" de arriba cubre cualquier cantidad. Agrega un tramo solo si quieres un precio distinto para un rango específico de cantidad.</div>
+        <table class="items-table" id="prod-rangos-tabla">
+          <thead><tr><th style="width:80px">Desde</th><th style="width:80px">Hasta</th><th>Precio por unidad</th><th style="width:26px"></th></tr></thead>
+          <tbody id="prod-rangos-body"></tbody>
+        </table>
+        <button class="btn-add-row" onclick="addRango()"><i class="ti ti-plus"></i>Agregar tramo</button>
+      </div>
     </div>
 
     <div id="prod-sec-regla" style="display:none">
@@ -964,6 +971,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div class="fg"><label>Descripción</label><input type="text" id="prod-descripcion" placeholder="Ej: Promo vasos Colombia"></div>
     </div>
 
+    </div>
   </div>
   <div class="mfoot">
     <button class="btn-danger" id="prod-btn-del" style="display:none" onclick="eliminarProducto()"><i class="ti ti-trash"></i>Eliminar</button>
@@ -2136,11 +2144,20 @@ function onMargenTipoChange(){
 function focusProdPrecioBase(el){el.value=fProdPrecioBaseRaw||''}
 function blurProdPrecioBase(el){el.value=displayMoneyVal(fProdPrecioBaseRaw)}
 
-function showTipoPrecioSec(tipo){
-  document.getElementById('prod-sec-escalonado').style.display=tipo==='escalonado'?'block':'none';
-  document.getElementById('prod-sec-regla').style.display=tipo==='regla'?'block':'none';
-  document.getElementById('prod-sec-combo').style.display=tipo==='combo'?'block':'none';
-  document.getElementById('prod-sec-promocional').style.display=tipo==='promocional'?'block':'none';
+let prodCaminoActual='simple';
+function elegirCaminoProducto(camino){
+  prodCaminoActual=camino;
+  document.getElementById('prod-paso-tipo').style.display='none';
+  document.getElementById('prod-paso-form').style.display='block';
+  document.getElementById('prod-sec-escalonado').style.display=camino==='simple'?'block':'none';
+  document.getElementById('prod-sec-combo').style.display=camino==='combo'?'block':'none';
+  document.getElementById('prod-sec-promocional').style.display=camino==='promocional'?'block':'none';
+  if(camino==='simple')onEsReglaChange();
+}
+function onEsReglaChange(){
+  const esRegla=document.getElementById('prod-es-regla').checked;
+  document.getElementById('prod-sec-tramos').style.display=esRegla?'none':'block';
+  document.getElementById('prod-sec-regla').style.display=esRegla?'block':'none';
 }
 function addRango(){fProdRangos.push({id:uid(),desde:'',hasta:'',precio:''});renderRangos()}
 function remRango(id){fProdRangos=fProdRangos.filter(x=>x.id!==id);renderRangos()}
