@@ -185,6 +185,14 @@ db.exec(`CREATE TABLE IF NOT EXISTS ficha_insumos(
   es_variable INTEGER DEFAULT 0,
   orden INTEGER DEFAULT 0
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS combo_composicion(
+  id TEXT PRIMARY KEY,
+  ficha_id TEXT REFERENCES fichas_producto(id) ON DELETE CASCADE,
+  componente_ficha_id TEXT NOT NULL,
+  cantidad_consumida INTEGER NOT NULL,
+  orden INTEGER DEFAULT 0,
+  workspace_id TEXT
+)`);
 
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
 const SEPARADORES_MILES=['.',','];
@@ -425,7 +433,7 @@ function logError(contexto,err){
 }
 
 // ── FICHAS DE PRODUCTO: helpers ──
-const TIPOS_PRECIO_VALIDOS=['unitario','escalonado','promocional'];
+const TIPOS_PRECIO_VALIDOS=['unitario','escalonado','promocional','combo'];
 const MARGEN_TIPOS_VALIDOS=['multiplicador','porcentaje','fijo'];
 
 function calcCostoTotalInsumos(insumos){
@@ -451,6 +459,7 @@ function precioOficialFicha(ficha,precioSugerido){
 function fichaCompleta(f){
   if(!f)return null;
   f.insumos=db.prepare('SELECT * FROM ficha_insumos WHERE ficha_id=? ORDER BY orden').all(f.id);
+  f.componentes=db.prepare('SELECT * FROM combo_composicion WHERE ficha_id=? ORDER BY orden').all(f.id);
   f.activo=!!f.activo;
   try{f.rangos=JSON.parse(f.rangos||'[]')}catch(e){f.rangos=[]}
   f.costo_total=calcCostoTotalInsumos(f.insumos);
@@ -458,7 +467,7 @@ function fichaCompleta(f){
   f.precio_oficial=precioOficialFicha(f,f.precio_sugerido);
   return f;
 }
-function validarFicha(b){
+function validarFicha(b,wsId,fid){
   const errores=[];
   if(!String(b.nombre||'').trim())errores.push('El nombre del producto no puede estar vacío');
   if(b.tipo_precio!==undefined&&!TIPOS_PRECIO_VALIDOS.includes(b.tipo_precio))errores.push('Tipo de precio no válido');
@@ -476,6 +485,19 @@ function validarFicha(b){
       if(!Number.isFinite(r.desde)||r.desde<0)errores.push(`Rango #${i+1}: "Desde" no es válido`);
       if(r.hasta!=null&&(!Number.isFinite(r.hasta)||r.hasta<r.desde))errores.push(`Rango #${i+1}: "Hasta" no es válido`);
       if(!Number.isFinite(r.precio)||r.precio<0)errores.push(`Rango #${i+1}: precio no es válido`);
+    });
+  }
+  if(b.tipo_precio==='combo'){
+    if(!Array.isArray(b.componentes)||!b.componentes.length)errores.push('Combo necesita al menos un componente');
+    else b.componentes.forEach((c,i)=>{
+      if(!c.componente_ficha_id)errores.push(`Componente #${i+1}: selecciona un producto`);
+      else{
+        if(fid&&c.componente_ficha_id===fid)errores.push(`Componente #${i+1}: un combo no puede tenerse a sí mismo como componente`);
+        const comp=db.prepare('SELECT tipo_precio FROM fichas_producto WHERE id=? AND workspace_id=?').get(c.componente_ficha_id,wsId);
+        if(!comp)errores.push(`Componente #${i+1}: el producto seleccionado no existe`);
+        else if(comp.tipo_precio==='combo')errores.push(`Componente #${i+1}: un combo no puede tener otro combo como componente`);
+      }
+      if(!Number.isInteger(c.cantidad_consumida)||c.cantidad_consumida<=0)errores.push(`Componente #${i+1}: la cantidad debe ser un número entero mayor a 0`);
     });
   }
   return errores;
@@ -828,18 +850,25 @@ function guardarInsumos(fichaId,insumos,wsId){
       .run(uid(),fichaId,it.nombre_insumo||'',it.proveedor||'',it.costo_unitario||'',normCalc(it.costo_unitario),it.cantidad_usada||'',it.unidad_medida||'',it.es_variable?1:0,i);
   });
 }
+function guardarComposicion(fichaId,componentes,wsId){
+  db.prepare('DELETE FROM combo_composicion WHERE ficha_id=?').run(fichaId);
+  (componentes||[]).forEach((c,i)=>{
+    db.prepare('INSERT INTO combo_composicion(id,ficha_id,componente_ficha_id,cantidad_consumida,orden,workspace_id)VALUES(?,?,?,?,?,?)').run(uid(),fichaId,c.componente_ficha_id,c.cantidad_consumida,i,wsId);
+  });
+}
 
 app.post('/api/productos',(req,res)=>{
   try{
     const b=req.body;
     if(!b.nombre)return res.status(400).json({error:'Nombre requerido'});
-    const errores=validarFicha(b);
+    const errores=validarFicha(b,req.wsId);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid();
     db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(id,req.wsId,b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null);
     guardarInsumos(id,b.insumos,req.wsId);
+    guardarComposicion(id,b.componentes,req.wsId);
     res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(id)));
   }catch(e){logError('POST /api/productos',e);res.status(500).json({error:e.message})}
 });
@@ -849,11 +878,12 @@ app.put('/api/productos/:id',(req,res)=>{
     const b=req.body; const fid=req.params.id;
     const f=db.prepare('SELECT * FROM fichas_producto WHERE id=? AND workspace_id=?').get(fid,req.wsId);
     if(!f)return res.status(404).json({error:'No encontrado'});
-    const errores=validarFicha(b);
+    const errores=validarFicha(b,req.wsId,fid);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     db.prepare(`UPDATE fichas_producto SET nombre=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=? WHERE id=? AND workspace_id=?`)
       .run(b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,fid,req.wsId);
     if(b.insumos!==undefined)guardarInsumos(fid,b.insumos,req.wsId);
+    if(b.componentes!==undefined)guardarComposicion(fid,b.componentes,req.wsId);
     res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(fid)));
   }catch(e){logError('PUT /api/productos/:id',e);res.status(500).json({error:e.message})}
 });
