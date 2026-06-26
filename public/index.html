@@ -1484,15 +1484,49 @@ function renderPagRes(){
 }
 
 /* ══ COSTOS ══ */
-function addCosto(){fCostos.push({id:uid(),descripcion:'',monto:''});renderCostos()}
+function addCosto(){fCostos.push({id:uid(),descripcion:'',cantidad:'',valor_unitario:'',monto:''});renderCostos()}
 function remCosto(id){fCostos=fCostos.filter(x=>x.id!==id);renderCostos()}
-function setCostoVal(id,k,v){const c=fCostos.find(x=>x.id===id);if(c)c[k]=v;renderCostosRes();if(k==='monto')previewCosto(id,v)}
+function setCostoVal(id,k,v){
+  const c=fCostos.find(x=>x.id===id);
+  if(c)c[k]=v;
+  if(k==='cantidad'||k==='valor_unitario')recalcCostoTotal(id);
+  renderCostosRes();
+  if(k==='monto')previewCosto(id,v);
+}
 function previewCosto(id,v){
   const el=document.getElementById('costprev-'+id);
   if(!el)return;
   const show=esExpresion(v);
   el.style.display=show?'block':'none';
   if(show)el.innerHTML=previewExpr(v);
+}
+function recalcCostoTotal(id){
+  const c=fCostos.find(x=>x.id===id);
+  if(!c||!c.cantidad)return;
+  const unit=evalExpr(c.valor_unitario);
+  if(unit==null)return;
+  const cant=parseInt(String(c.cantidad||0).replace(/\D/g,''))||0;
+  c.monto=String(cant*unit);
+  const montoEl=document.getElementById('costo-monto-'+id);
+  if(montoEl)montoEl.value=displayMoneyVal(c.monto);
+}
+function previewCostoUnit(id,v){
+  const el=document.getElementById('costunitprev-'+id);
+  if(!el)return;
+  const show=esExpresion(v);
+  el.style.display=show?'block':'none';
+  if(show)el.innerHTML=previewExpr(v);
+}
+function focusCostoUnit(el,id){
+  const c=fCostos.find(x=>x.id===id);
+  el.value=(c&&c.valor_unitario)||'';
+  previewCostoUnit(id,el.value);
+}
+function blurCostoUnit(el,id){
+  const c=fCostos.find(x=>x.id===id);
+  el.value=displayMoneyVal(c&&c.valor_unitario);
+  const elp=document.getElementById('costunitprev-'+id);
+  if(elp)elp.style.display='none';
 }
 function focusCostoVal(el,id){
   const c=fCostos.find(x=>x.id===id);
@@ -1509,8 +1543,13 @@ function renderCostos(){
   document.getElementById('costos-lista').innerHTML=fCostos.map(c=>`
     <div class="costo-item">
       <input type="text" value="${c.descripcion||''}" placeholder="Descripción del costo…" oninput="setCostoVal('${c.id}','descripcion',this.value)">
+      <input type="text" value="${c.cantidad||''}" placeholder="Cant." style="max-width:55px;width:100%" oninput="setCostoVal('${c.id}','cantidad',this.value)">
+      <div style="max-width:95px">
+        <input type="text" value="${displayMoneyVal(c.valor_unitario)}" placeholder="V. unit." style="max-width:95px;width:100%" oninput="setCostoVal('${c.id}','valor_unitario',this.value);previewCostoUnit('${c.id}',this.value)" onfocus="focusCostoUnit(this,'${c.id}')" onblur="blurCostoUnit(this,'${c.id}')">
+        <div id="costunitprev-${c.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);margin-top:2px;display:none"></div>
+      </div>
       <div style="max-width:110px">
-        <input type="text" value="${displayMoneyVal(c.monto)}" placeholder="$ 0" oninput="setCostoVal('${c.id}','monto',this.value)" onfocus="focusCostoVal(this,'${c.id}')" onblur="blurCostoVal(this,'${c.id}')" style="max-width:110px;width:100%">
+        <input type="text" id="costo-monto-${c.id}" value="${displayMoneyVal(c.monto)}" placeholder="$ 0" oninput="setCostoVal('${c.id}','monto',this.value)" onfocus="focusCostoVal(this,'${c.id}')" onblur="blurCostoVal(this,'${c.id}')" style="max-width:110px;width:100%">
         <div id="costprev-${c.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);margin-top:2px;display:none"></div>
       </div>
       <button class="costo-del" onclick="remCosto('${c.id}')"><i class="ti ti-x"></i></button>
