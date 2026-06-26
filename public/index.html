@@ -2181,8 +2181,9 @@ function renderRangos(){
 }
 function resetProdForm(){
   fProdInsumos=[];fProdRangos=[];fProdComponentes=[];fProdPrecioBaseRaw='';prodCatSel='';
+  prodCaminoActual='simple';
   document.getElementById('prod-nombre').value='';
-  document.getElementById('prod-tipo-precio').value='unitario';
+  document.getElementById('prod-es-regla').checked=false;
   document.getElementById('prod-margen-tipo').value='fijo';
   document.getElementById('prod-margen-valor').value='';
   document.getElementById('prod-precio-base').value='';
@@ -2200,14 +2201,19 @@ function resetProdForm(){
   renderRangos();
   renderComponentes();
   onMargenTipoChange();
-  showTipoPrecioSec('unitario');
+  document.getElementById('prod-paso-tipo').style.display='block';
+  document.getElementById('prod-paso-form').style.display='none';
+  document.getElementById('prod-sec-escalonado').style.display='none';
+  document.getElementById('prod-sec-regla').style.display='none';
+  document.getElementById('prod-sec-combo').style.display='none';
+  document.getElementById('prod-sec-promocional').style.display='none';
 }
 function abrirNuevoProducto(){
   editProdId=null;resetProdForm();
   document.getElementById('prod-tit').textContent='Nuevo producto';
   document.getElementById('prod-btn-del').style.display='none';
+  document.getElementById('prod-btn-cambiar-tipo').style.display='inline-flex';
   document.getElementById('ovProd').classList.add('open');
-  setTimeout(()=>document.getElementById('prod-nombre').focus(),180);
 }
 async function abrirEditarProducto(id){
   const p=await api('GET',`/productos/${id}`);
@@ -2218,7 +2224,6 @@ async function abrirEditarProducto(id){
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
   document.getElementById('prod-nombre').value=p.nombre;
-  document.getElementById('prod-tipo-precio').value=p.tipo_precio;
   document.getElementById('prod-margen-tipo').value=p.margen_tipo;
   document.getElementById('prod-margen-valor').value=p.margen_valor||'';
   document.getElementById('prod-precio-base').value=displayMoneyVal(fProdPrecioBaseRaw);
@@ -2233,12 +2238,15 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-descripcion').value=p.descripcion||'';
   document.getElementById('prod-tit').textContent=p.nombre;
   document.getElementById('prod-btn-del').style.display='inline-flex';
+  document.getElementById('prod-btn-cambiar-tipo').style.display='none';
   renderProdCatRow();
   renderInsumos();
   renderRangos();
   renderComponentes();
   onMargenTipoChange();
-  showTipoPrecioSec(p.tipo_precio);
+  const camino=(p.tipo_precio==='combo')?'combo':(p.tipo_precio==='promocional')?'promocional':'simple';
+  document.getElementById('prod-es-regla').checked=p.tipo_precio==='regla';
+  elegirCaminoProducto(camino);
   document.getElementById('ovProd').classList.add('open');
 }
 function cerrarProducto(){document.getElementById('ovProd').classList.remove('open')}
@@ -2247,7 +2255,6 @@ function validarProductoBody(b){
   for(let i=0;i<(b.insumos||[]).length;i++){
     if(definidoFE(b.insumos[i].costo_unitario)&&evalExpr(b.insumos[i].costo_unitario)===null)return`Costo unitario del insumo #${i+1} no es una expresión válida`;
   }
-  if(b.tipo_precio==='escalonado'&&(!b.rangos||!b.rangos.length))return'Escalonado necesita al menos un rango de precio';
   if(b.tipo_precio==='combo'){
     if(!b.componentes||!b.componentes.length)return'Combo necesita al menos un componente';
     for(let i=0;i<b.componentes.length;i++){
@@ -2259,7 +2266,7 @@ function validarProductoBody(b){
 async function guardarProducto(){
   const nombre=document.getElementById('prod-nombre').value.trim();
   if(!nombre){document.getElementById('prod-nombre').focus();toast('Ingresa el nombre del producto',false);return}
-  const tipoPrecio=document.getElementById('prod-tipo-precio').value;
+  const tipoPrecio=prodCaminoActual==='simple'?(document.getElementById('prod-es-regla').checked?'regla':'escalonado'):prodCaminoActual;
   const body={
     nombre,
     categoria_id:prodCatSel,
