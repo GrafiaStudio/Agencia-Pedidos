@@ -2174,8 +2174,9 @@ function elegirCaminoProducto(camino){
   document.getElementById('prod-paso-tipo').style.display='none';
   document.getElementById('prod-paso-form').style.display='block';
   document.getElementById('prod-sec-escalonado').style.display=camino==='simple'?'block':'none';
-  document.getElementById('prod-sec-combo').style.display=camino==='combo'?'block':'none';
+  document.getElementById('prod-sec-combo').style.display=(camino==='combo'||camino==='promocional')?'block':'none';
   document.getElementById('prod-sec-promocional').style.display=camino==='promocional'?'block':'none';
+  document.getElementById('prod-btn-item-libre').style.display=camino==='promocional'?'inline-flex':'none';
   if(camino==='simple')onEsReglaChange();
 }
 function onEsReglaChange(){
@@ -2205,9 +2206,13 @@ function renderRangos(){
 }
 function resetProdForm(){
   fProdInsumos=[];fProdRangos=[];fProdComponentes=[];fProdPrecioBaseRaw='';prodCatSel='';
+  fProdComboModo='global';
   prodCaminoActual='simple';
   document.getElementById('prod-nombre').value='';
   document.getElementById('prod-es-regla').checked=false;
+  document.getElementById('combo-modo-global').checked=true;
+  document.getElementById('combo-modo-individual').checked=false;
+  document.getElementById('prod-combo-th-precio').style.display='none';
   document.getElementById('prod-margen-tipo').value='fijo';
   document.getElementById('prod-margen-valor').value='';
   document.getElementById('prod-precio-base').value='';
@@ -2243,7 +2248,8 @@ async function abrirEditarProducto(id){
   const p=await api('GET',`/productos/${id}`);
   editProdId=id;
   fProdInsumos=JSON.parse(JSON.stringify(p.insumos||[]));
-  fProdComponentes=(p.componentes||[]).map(c=>({id:uid(),componente_ficha_id:c.componente_ficha_id,componente_nombre:c.componente_nombre||'',cantidad_consumida:String(c.cantidad_consumida)}));
+  fProdComboModo=p.combo_precio_modo||'global';
+  fProdComponentes=(p.componentes||[]).map(c=>({id:uid(),componente_ficha_id:c.componente_ficha_id||'',componente_nombre:c.componente_nombre||'',cantidad_consumida:String(c.cantidad_consumida),precio_unitario:c.precio_unitario||'',_libre:!c.componente_ficha_id}));
   fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
@@ -2263,6 +2269,9 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-tit').textContent=p.nombre;
   document.getElementById('prod-btn-del').style.display='inline-flex';
   document.getElementById('prod-btn-cambiar-tipo').style.display='none';
+  document.getElementById('combo-modo-global').checked=fProdComboModo==='global';
+  document.getElementById('combo-modo-individual').checked=fProdComboModo==='individual';
+  document.getElementById('prod-combo-th-precio').style.display=fProdComboModo==='individual'?'table-cell':'none';
   renderProdCatRow();
   renderInsumos();
   renderRangos();
