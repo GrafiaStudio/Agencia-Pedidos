@@ -489,7 +489,20 @@ function calcPrecioSugerido(ficha,costoTotal){
   }
   return null;
 }
+function detectarPrecioEscalonado(rangos,cantidad){
+  if(!rangos||!rangos.length)return null;
+  for(const r of rangos){
+    if(cantidad>=r.desde&&(r.hasta==null||cantidad<=r.hasta))return r.precio;
+  }
+  const ultimo=rangos[rangos.length-1];
+  if(ultimo.hasta!=null&&cantidad>ultimo.hasta)return ultimo.precio;
+  return null;
+}
 function precioOficialFicha(ficha,precioSugerido){
+  if(ficha.tipo_precio==='escalonado'&&Array.isArray(ficha.rangos)&&ficha.rangos.length){
+    const precioParaUno=detectarPrecioEscalonado(ficha.rangos,1);
+    if(precioParaUno!=null)return precioParaUno;
+  }
   return definido(ficha.precio_base)?toNum(ficha.precio_base_calc):(precioSugerido||0);
 }
 function fichaCompleta(f){

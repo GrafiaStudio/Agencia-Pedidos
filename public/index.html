@@ -928,6 +928,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <label>Precio base</label>
         <input type="text" id="prod-precio-base" placeholder="= sugerido" oninput="fProdPrecioBaseRaw=this.value" onfocus="focusProdPrecioBase(this)" onblur="blurProdPrecioBase(this)" style="font-size:14px;font-weight:800;color:var(--navy)">
         <div id="prod-precio-sugerido-cap" style="font-size:10px;color:var(--muted);font-weight:600;margin-top:4px;display:none">Precio sugerido: $0</div>
+        <div id="prod-precio-base-auto-cap" style="font-size:13px;font-weight:800;color:var(--navy);display:none"></div>
       </div>
     </div>
 
@@ -935,7 +936,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div class="ck-box" style="display:inline-flex;margin-bottom:10px"><input type="checkbox" id="prod-es-regla" onchange="onEsReglaChange()"><label for="prod-es-regla">Es una promoción "Lleva N, paga M"</label></div>
       <div id="prod-sec-tramos">
         <div class="msec"><span class="tri"></span>Tramos adicionales por cantidad (opcional)</div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">El "Precio base" de arriba cubre cualquier cantidad. Agrega un tramo solo si quieres un precio distinto para un rango específico de cantidad.</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Si agregas un tramo "Desde 1", ese pasa a ser tu precio por unidad — ya no necesitas llenar "Precio base" arriba. El último tramo aplica también a cualquier cantidad mayor (ej: si tu último tramo es "Desde 24" a $21.000, pedir 50 también cuesta $21.000 c/u).</div>
         <table class="items-table" id="prod-rangos-tabla">
           <thead><tr><th style="width:80px">Desde</th><th style="width:80px">Hasta</th><th>Precio por unidad</th><th style="width:26px"></th></tr></thead>
           <tbody id="prod-rangos-body"></tbody>
@@ -1875,9 +1876,12 @@ function setItem(encId,itemId,k,v){
 }
 let _acItemResults={};
 function detectarPrecioEscalonado(rangos,cantidad){
-  for(const r of(rangos||[])){
+  if(!rangos||!rangos.length)return null;
+  for(const r of rangos){
     if(cantidad>=r.desde&&(r.hasta==null||cantidad<=r.hasta))return r.precio;
   }
+  const ultimo=rangos[rangos.length-1];
+  if(ultimo.hasta!=null&&cantidad>ultimo.hasta)return ultimo.precio;
   return null;
 }
 function calcularPrecioRegla(lleva,paga,precioUnitario,cantidad){
@@ -2055,7 +2059,7 @@ function blurItemVal(el,encId,itemId){
 }
 
 /* ══ FICHA DE PRODUCTO: widgets ══ */
-let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='';
+let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='',fProdPrecioSugeridoActual=null;
 let _acComboResults={};
 let fProdComboModo='global';
 function setComboModo(modo){
@@ -2192,10 +2196,28 @@ function recalcPrecioSugerido(){
   let sugerido=null;
   if(tipo==='multiplicador'&&isFinite(margenValor))sugerido=Math.round(costoTotal*margenValor);
   else if(tipo==='porcentaje'&&isFinite(margenValor))sugerido=Math.round(costoTotal+costoTotal*(margenValor/100));
-  const cap=document.getElementById('prod-precio-sugerido-cap');
-  if(!cap)return;
-  if(sugerido!=null){cap.style.display='block';cap.textContent='Precio sugerido: '+fCOP(sugerido)}
-  else{cap.style.display='none'}
+  fProdPrecioSugeridoActual=sugerido;
+  actualizarVisibilidadPrecioBase();
+}
+function actualizarVisibilidadPrecioBase(){
+  const input=document.getElementById('prod-precio-base');
+  const cap=document.getElementById('prod-precio-base-auto-cap');
+  const sugCap=document.getElementById('prod-precio-sugerido-cap');
+  if(!input||!cap||!sugCap)return;
+  const esRegla=document.getElementById('prod-es-regla').checked;
+  const rangosNum=fProdRangos.map(r=>({desde:parseInt(r.desde,10)||0,hasta:(r.hasta===''||r.hasta==null)?null:parseInt(r.hasta,10),precio:evalExpr(r.precio)||0}));
+  const precioParaUno=(prodCaminoActual==='simple'&&!esRegla&&rangosNum.length)?detectarPrecioEscalonado(rangosNum,1):null;
+  if(precioParaUno!=null){
+    input.style.display='none';
+    sugCap.style.display='none';
+    cap.style.display='block';
+    cap.textContent='Precio por unidad: '+fCOP(precioParaUno)+' (lo define tu primer tramo, "Desde 1")';
+  }else{
+    input.style.display='block';
+    cap.style.display='none';
+    if(fProdPrecioSugeridoActual!=null){sugCap.style.display='block';sugCap.textContent='Precio sugerido: '+fCOP(fProdPrecioSugeridoActual)}
+    else{sugCap.style.display='none'}
+  }
 }
 function onMargenTipoChange(){
   const tipo=document.getElementById('prod-margen-tipo').value;
@@ -2215,15 +2237,17 @@ function elegirCaminoProducto(camino){
   document.getElementById('prod-sec-promocional').style.display=camino==='promocional'?'block':'none';
   document.getElementById('prod-btn-item-libre').style.display=camino==='promocional'?'inline-flex':'none';
   if(camino==='simple')onEsReglaChange();
+  actualizarVisibilidadPrecioBase();
 }
 function onEsReglaChange(){
   const esRegla=document.getElementById('prod-es-regla').checked;
   document.getElementById('prod-sec-tramos').style.display=esRegla?'none':'block';
   document.getElementById('prod-sec-regla').style.display=esRegla?'block':'none';
+  actualizarVisibilidadPrecioBase();
 }
 function addRango(){fProdRangos.push({id:uid(),desde:'',hasta:'',precio:''});renderRangos()}
 function remRango(id){fProdRangos=fProdRangos.filter(x=>x.id!==id);renderRangos()}
-function setRango(id,k,v){const r=fProdRangos.find(x=>x.id===id);if(r)r[k]=v}
+function setRango(id,k,v){const r=fProdRangos.find(x=>x.id===id);if(r)r[k]=v;actualizarVisibilidadPrecioBase()}
 function focusRangoPrecio(el,id){
   const r=fProdRangos.find(x=>x.id===id);
   el.value=(r&&r.precio)||'';
@@ -2240,6 +2264,7 @@ function renderRangos(){
       <td><input class="item-inp" type="text" value="${displayMoneyVal(r.precio)}" placeholder="$ 0" oninput="setRango('${r.id}','precio',this.value)" onfocus="focusRangoPrecio(this,'${r.id}')" onblur="blurRangoPrecio(this,'${r.id}')"></td>
       <td style="width:26px"><button class="item-del" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
+  actualizarVisibilidadPrecioBase();
 }
 function resetProdForm(){
   fProdInsumos=[];fProdRangos=[];fProdComponentes=[];fProdPrecioBaseRaw='';prodCatSel='';
