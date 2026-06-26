@@ -2393,6 +2393,27 @@ function renderPagRes(){
 }
 
 /* ══ COSTOS ══ */
+function costoTotalInsumosFicha(insumos){
+  return(insumos||[]).reduce((a,it)=>{
+    const cant=parseInt(String(it.cantidad_usada||0).replace(/\D/g,''))||0;
+    const unit=parseInt(String(it.costo_unitario_calc||0).replace(/\D/g,''))||0;
+    return a+cant*unit;
+  },0);
+}
+function recalcularCostosAutomaticos(){
+  fCostos=fCostos.filter(c=>!c._auto);
+  fEnc.forEach(e=>{
+    (e.items||[]).forEach(it=>{
+      if(!it._fichaSel||!it._fichaSel.insumos||!it._fichaSel.insumos.length)return;
+      const costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
+      if(costoUnit<=0)return;
+      const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+      if(cantNum<=0)return;
+      fCostos.push({id:uid(),descripcion:'Insumos: '+it._fichaSel.nombre,cantidad:String(cantNum),valor_unitario:String(costoUnit),monto:String(cantNum*costoUnit),_auto:true});
+    });
+  });
+  renderCostos();
+}
 function addCosto(){fCostos.push({id:uid(),descripcion:'',cantidad:'',valor_unitario:'',monto:''});renderCostos()}
 function remCosto(id){fCostos=fCostos.filter(x=>x.id!==id);renderCostos()}
 function setCostoVal(id,k,v){
