@@ -62,12 +62,21 @@ edita después (cambia la cantidad de un ítem), la "foto" sigue siendo la canti
 ORIGINAL que realmente se descontó — restaurar usa esa foto, no el estado actual del
 pedido, así nunca hay ambigüedad sobre cuánto devolver.
 
-### Restauración al cancelar
+### Restauración al cancelar o eliminar
 Si `cancelado` pasa de `0` a `1` (`PUT /api/pedidos/:id`) y el pedido tiene
 `stock_consumido` no vacío: se suma de vuelta cada `cantidad` a su `stock_actual`
 correspondiente, y `stock_consumido` se limpia a `NULL` (vuelve al estado "nada
 descontado todavía" — no hay un flujo de "reactivar pedido cancelado" hoy, pero si
 existiera en el futuro, este estado queda consistente para que pueda volver a descontar).
+
+El mismo `PUT` puede convertir una cotización directamente en cancelada en una sola
+edición (`es_cotizacion` pasa a falso Y `cancelado` pasa a verdadero al mismo tiempo) —
+en ese caso se descuenta y se restaura dentro de la misma request, en ese orden, dejando
+el stock sin cambios netos (correcto: nunca llegó a ser un compromiso real).
+
+**`DELETE /api/pedidos/:id`** (borrado duro, distinto de cancelar) también restaura el
+stock si el pedido tenía `stock_consumido` no vacío — si no, ese stock quedaría perdido
+para siempre sin ningún registro que lo explique.
 
 ### Alerta de stock bajo
 Badge "Stock bajo" en la card del producto (vista Productos) cuando `stock_actual` y
