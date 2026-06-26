@@ -1750,8 +1750,24 @@ function addEnc(){
   actualizarValorTotal();
 }
 function remEnc(id){fEnc=fEnc.filter(x=>x.id!==id);renderEncs();actualizarValorTotal()}
-function setEncCat(id,cat){const e=fEnc.find(x=>x.id===id);if(e){e.categoria=cat;e.subcategoria=''}renderEncs()}
-function setEncSub(id,sub){const e=fEnc.find(x=>x.id===id);if(e)e.subcategoria=sub;renderEncSubcats(id)}
+function toggleEncCat(id,catId){
+  const e=fEnc.find(x=>x.id===id);
+  if(!e)return;
+  e.categorias=e.categorias||[];
+  const i=e.categorias.indexOf(catId);
+  if(i>=0)e.categorias.splice(i,1);else e.categorias.push(catId);
+  const subsValidas=new Set(e.categorias.flatMap(cid=>CATS.find(c=>c.id===cid)?.subs||[]));
+  e.subcategorias=(e.subcategorias||[]).filter(s=>subsValidas.has(s));
+  renderEncs();
+}
+function toggleEncSub(id,sub){
+  const e=fEnc.find(x=>x.id===id);
+  if(!e)return;
+  e.subcategorias=e.subcategorias||[];
+  const i=e.subcategorias.indexOf(sub);
+  if(i>=0)e.subcategorias.splice(i,1);else e.subcategorias.push(sub);
+  renderEncSubcats(id);
+}
 function setEncVal(id,k,v){
   const e=fEnc.find(x=>x.id===id);
   if(e)e[k]=v;
@@ -1887,11 +1903,11 @@ function renderEncs(){
           </select>
         </div>
         <div>
-          <div class="cat-row" style="margin-bottom:${enc.categoria?'6px':'0'}">
-            ${CATS.map(c=>`<button class="cat-btn${enc.categoria===c.id?' sel':''}" onclick="setEncCat('${enc.id}','${c.id}')">${c.label}</button>`).join('')}
+          <div class="cat-row" style="margin-bottom:${(enc.categorias||[]).length?'6px':'0'}">
+            ${CATS.map(c=>`<button class="cat-btn${(enc.categorias||[]).includes(c.id)?' sel':''}" onclick="toggleEncCat('${enc.id}','${c.id}')">${c.label}</button>`).join('')}
           </div>
           <div class="subcat-row" id="sc-${enc.id}" style="margin-bottom:0">
-            ${enc.categoria?CATS.find(c=>c.id===enc.categoria)?.subs.map(s=>`<button class="scat-btn${enc.subcategoria===s?' sel':''}" onclick="setEncSub('${enc.id}','${s}')">${s}</button>`).join(''):''}
+            ${(enc.categorias||[]).length?[...new Set((enc.categorias||[]).flatMap(cid=>CATS.find(c=>c.id===cid)?.subs||[]))].map(s=>`<button class="scat-btn${(enc.subcategorias||[]).includes(s)?' sel':''}" onclick="toggleEncSub('${enc.id}','${s}')">${s}</button>`).join(''):''}
           </div>
         </div>
       </div>
@@ -1935,10 +1951,10 @@ function renderEncSubcats(id){
   if(!enc)return;
   const sw=document.getElementById('sc-'+id);
   if(!sw)return;
-  if(!enc.categoria){sw.innerHTML='';return}
-  const cat=CATS.find(c=>c.id===enc.categoria);
-  if(!cat){sw.innerHTML='';return}
-  sw.innerHTML=cat.subs.map(s=>`<button class="scat-btn${enc.subcategoria===s?' sel':''}" onclick="setEncSub('${enc.id}','${s}')">${s}</button>`).join('');
+  const cats=(enc.categorias||[]).map(cid=>CATS.find(c=>c.id===cid)).filter(Boolean);
+  if(!cats.length){sw.innerHTML='';return}
+  const subs=[...new Set(cats.flatMap(c=>c.subs))];
+  sw.innerHTML=subs.map(s=>`<button class="scat-btn${(enc.subcategorias||[]).includes(s)?' sel':''}" onclick="toggleEncSub('${enc.id}','${s}')">${s}</button>`).join('');
 }
 function renderEncItems(encId){
   const enc=fEnc.find(x=>x.id===encId);
