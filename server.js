@@ -411,11 +411,14 @@ function descontarStock(pid,wsId){
   const encargos=db.prepare('SELECT id FROM encargos WHERE pedido_id=?').all(pid);
   const consumo={};
   function acumular(fichaId,cantidad){
-    const ficha=db.prepare('SELECT tipo_precio,stock_actual FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
+    const ficha=db.prepare('SELECT stock_actual FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
     if(!ficha)return;
-    if(ficha.tipo_precio==='combo'){
-      const comps=db.prepare('SELECT componente_ficha_id,cantidad_consumida FROM combo_composicion WHERE ficha_id=?').all(fichaId);
-      comps.forEach(c=>acumular(c.componente_ficha_id,cantidad*c.cantidad_consumida));
+    const comps=db.prepare('SELECT componente_ficha_id,cantidad_consumida FROM combo_composicion WHERE ficha_id=?').all(fichaId);
+    if(comps.length){
+      comps.forEach(c=>{
+        if(!c.componente_ficha_id)return;
+        acumular(c.componente_ficha_id,cantidad*c.cantidad_consumida);
+      });
       return;
     }
     if(ficha.stock_actual==null)return;
