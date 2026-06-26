@@ -1681,7 +1681,7 @@ async function cargarProductos(q=''){
   productos=await api('GET',`/productos${p}`);
   const el=document.getElementById('lista-prod');
   if(!productos.length){el.innerHTML='<div class="empty"><i class="ti ti-box-off"></i><p>Sin productos</p></div>';return}
-  const TIPO_LABEL={unitario:'Unitario',escalonado:'Escalonado',promocional:'Promocional'};
+  const TIPO_LABEL={unitario:'Producto simple',escalonado:'Producto simple',regla:'Lleva N, paga M',combo:'Combo',promocional:'Promoción'};
   el.innerHTML=productos.map(p=>{
     const cat=CATS.find(c=>c.id===p.categoria_id);
     return`<div class="prod-card" onclick="abrirEditarProducto('${p.id}')">
