@@ -1739,7 +1739,7 @@ async function acItem(encId,itemId,q){
   });
   if(!vigentes.length){dr.style.display='none';return}
   _acItemResults[itemId]=vigentes.slice(0,6);
-  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',promocional:'ti-discount-2'};
+  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',combo:'ti-package',promocional:'ti-discount-2'};
   dr.innerHTML=_acItemResults[itemId].map((p,i)=>{
     const precioTxt=p.tipo_precio==='escalonado'?'según cantidad':fCOP(p.precio_oficial);
     const stockTxt=p.stock_actual!=null?` · Stock: ${p.stock_actual}`:'';
