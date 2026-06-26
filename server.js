@@ -717,6 +717,20 @@ app.get('/api/registros/utilidades',(req,res)=>{
   res.json(rows);
 });
 
+// ── INFORMACIÓN DE LA APP (estática, no es dato por workspace) ──
+const APP_INFO={
+  nombre:'GRAFÍA Studio',
+  fecha_actualizacion:'2026-06-26',
+  novedades:[
+    'Inventario: stock por producto con descuento y restauración automática.',
+    'Aviso de stock insuficiente al armar un pedido.',
+    'Nueva sección de Ayuda y About.'
+  ]
+};
+app.get('/api/app-info',(req,res)=>{
+  res.json({...APP_INFO,version:require('./package.json').version});
+});
+
 // ── CONFIGURACIÓN DEL NEGOCIO ──
 app.get('/api/configuracion',(req,res)=>{
   res.json(getConfiguracion(req.wsId));
