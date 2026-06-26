@@ -49,6 +49,19 @@ por:
 )`);
 ```
 
+**Importante — esto solo es suficiente para una base de datos nueva.** `configuracion_negocio`
+ya existe (se creó en la Fase 1E) tanto en local como en producción, y
+`CREATE TABLE IF NOT EXISTS` no agrega columnas a una tabla que ya existe. Agregar
+también, inmediatamente después del `)\`);` de arriba, el `ALTER TABLE` correspondiente
+envuelto en `try/catch` (mismo patrón que usa el resto del esquema para columnas nuevas
+en tablas viejas):
+
+```js
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_activo INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_porcentaje INTEGER DEFAULT 19"); } catch(e){}
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_desglosado INTEGER DEFAULT 0"); } catch(e){}
+```
+
 - [ ] **Step 2: `CFG_DEFAULTS`**
 
 Cambiar:
