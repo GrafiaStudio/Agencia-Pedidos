@@ -1058,7 +1058,7 @@ function cfJSON(b){
 function guardarVariantes(fichaId,variantes,wsId){
   db.prepare('DELETE FROM ficha_variantes WHERE ficha_id=?').run(fichaId);
   const insertarNodo=(v,parentId,i)=>{
-    const id=uid();
+    const id=v.id||uid();
     const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)}));
     db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,orden)VALUES(?,?,?,?,?,?,?,?,?,?,?)')
       .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,i);

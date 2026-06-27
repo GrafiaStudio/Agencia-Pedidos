@@ -2237,7 +2237,9 @@ function renderItemsHTML(enc){
           ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
           <span style="font-size:10px;color:var(--muted)">${SUF_UNIDAD[it._fichaSel.medida_unidad]||'m²'}</span>
           <span id="itmed-hint-${it.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk)"></span>
-        </div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='variantes')?renderVarSelectsHTML(enc.id,it):''}</td>
+        </div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='variantes')?`
+        <div style="margin-top:3px"><button type="button" class="btn-ghost" style="font-size:10px;padding:1px 6px" onclick="toggleVarItem('${enc.id}','${it.id}')"><i class="ti ti-chevron-${varItemPlegados.has(it.id)?'right':'down'}"></i> opciones</button></div>
+        <div style="display:${varItemPlegados.has(it.id)?'none':'block'}">${renderVarSelectsHTML(enc.id,it)}</div>`:''}</td>
       <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:34px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
@@ -2331,6 +2333,10 @@ function quitarNodoVar(id,nodos){
   for(const n of nodos){if(quitarNodoVar(id,n.hijos||[]))return true}
   return false;
 }
+let varColapsadas=new Set();
+function toggleVarCard(id){if(varColapsadas.has(id))varColapsadas.delete(id);else varColapsadas.add(id);renderVariantes()}
+let varItemPlegados=new Set();
+function toggleVarItem(encId,itemId){if(varItemPlegados.has(itemId))varItemPlegados.delete(itemId);else varItemPlegados.add(itemId);renderEncItems(encId)}
 function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false}}
 function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,
   costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
@@ -2389,13 +2395,16 @@ function htmlTramosVar(v){
 function htmlNodoVariante(v,nivel){
   const esGrupo=!!(v.hijos&&v.hijos.length);
   const sub=nivel<2;
+  const colapsado=varColapsadas.has(v.id);
   return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:${nivel>1?'var(--line-lt)':'var(--white)'}">
     <div style="display:flex;gap:8px;align-items:flex-end">
-      <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">${nivel>1?'Sub-variante':'Variante'}</label><input class="item-inp" type="text" value="${v.nombre||''}" placeholder="${nivel>1?'Ej: Con vidrio':'Ej: 20×25'}" oninput="setVariante('${v.id}','nombre',this.value)"></div>
+      <button class="item-del" title="Plegar/desplegar" onclick="toggleVarCard('${v.id}')"><i class="ti ti-chevron-${colapsado?'right':'down'}"></i></button>
+      <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">${nivel>1?'Sub-variante':'Variante'}${esGrupo?' (grupo)':''}</label><input class="item-inp" type="text" value="${v.nombre||''}" placeholder="${nivel>1?'Ej: Con vidrio':'Ej: 20×25'}" oninput="setVariante('${v.id}','nombre',this.value)"></div>
       ${esGrupo?'':`<div style="width:120px"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio público</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>`}
       <button class="item-del" title="Duplicar" onclick="duplicarVariante('${v.id}')" style="color:var(--teal)"><i class="ti ti-copy"></i></button>
       <button class="item-del" title="Eliminar" onclick="remVariante('${v.id}')"><i class="ti ti-trash"></i></button>
     </div>
+    <div style="display:${colapsado?'none':'block'}">
     <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Costos de este nivel${esGrupo?' (se suman a todas sus sub-variantes)':''}</div>
     ${htmlCostosVar(v)}
     <div id="var-util-${v.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk);margin-top:6px"></div>
@@ -2408,6 +2417,7 @@ function htmlNodoVariante(v,nivel){
       ${esGrupo?`<label class="ck-box" style="display:inline-flex;gap:6px;margin-bottom:6px"><input type="checkbox" ${v.multi?'checked':''} onchange="setVarMulti('${v.id}',this.checked)"><span style="font-size:10px">Permite elegir varias opciones (ej. varios estampados). Si está apagado, en el pedido se elige una sola (ej. un tamaño).</span></label>`:''}
       ${(v.hijos||[]).map(h=>htmlNodoVariante(h,nivel+1)).join('')}
       <button class="btn-add-row" onclick="addSubVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar sub-variante</button>`:''}
+    </div>
   </div>`;
 }
 function renderVariantes(){
@@ -2416,13 +2426,13 @@ function renderVariantes(){
   walk(fProdVariantes);
 }
 function cargarNodoVar(v){
-  return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,
+  return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,
     costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
     tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
     hijos:(v.hijos||[]).map(cargarNodoVar)};
 }
 function serializarNodoVar(v){
-  return {nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,
+  return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),
     tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
     hijos:(v.hijos||[]).map(serializarNodoVar)};
