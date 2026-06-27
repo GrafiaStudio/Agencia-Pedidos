@@ -1944,12 +1944,12 @@ function setItem(encId,itemId,k,v){
       const elU=document.getElementById('itval-'+itemId);
       if(elU)elU.value=displayMoneyVal(it.valor_unitario);
     }
-    if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='variantes'&&it._varSel!==''&&it._varSel!=null){
-      const vv=(it._fichaSel.variantes||[])[parseInt(it._varSel,10)];
-      if(vv){
+    if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='variantes'&&it._varPath&&it._varPath.length){
+      const hoja=hojaDePathVar(it._fichaSel,it._varPath);
+      if(hoja){
         const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
-        const porTramo=detectarPrecioEscalonado(vv.tramos||[],cantNum);
-        it.valor_unitario=String((cantNum>0&&porTramo!=null)?porTramo:(parseFloat(vv.precio_calc)||0));
+        const porTramo=detectarPrecioEscalonado(hoja.tramos||[],cantNum);
+        it.valor_unitario=String((cantNum>0&&porTramo!=null)?porTramo:(parseFloat(hoja.precio_calc)||0));
         const elU=document.getElementById('itval-'+itemId);
         if(elU)elU.value=displayMoneyVal(it.valor_unitario);
       }
@@ -2020,21 +2020,67 @@ function setMedidaItem(encId,itemId,campo,valor){
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
-function setVarItem(encId,itemId,idx){
+function nodosEnPathVar(ficha,path){
+  const cadena=[]; let nivel=ficha.variantes||[];
+  for(const idx of (path||[])){
+    const n=nivel[idx];
+    if(!n)break;
+    cadena.push(n);
+    nivel=n.hijos||[];
+  }
+  return cadena;
+}
+function hojaDePathVar(ficha,path){
+  const cadena=nodosEnPathVar(ficha,path);
+  if(!cadena.length)return null;
+  const ult=cadena[cadena.length-1];
+  return (ult.hijos&&ult.hijos.length)?null:ult;
+}
+function varPrecioBaseFE(n){
+  const p1=detectarPrecioEscalonado(n.tramos||[],1);
+  return (p1!=null)?p1:(parseFloat(n.precio_calc)||0);
+}
+function costoAcumuladoHojaFE(ficha,path){
+  let total=costoTotalInsumosFicha(ficha.insumos);
+  nodosEnPathVar(ficha,path).forEach(n=>{total+=costoTotalCostosArr(n.costos)});
+  return total;
+}
+function renderVarSelectsHTML(encId,it){
+  const path=it._varPath||[];
+  let html='<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+  let nivelNodos=it._fichaSel.variantes||[], nivel=0;
+  while(nivelNodos&&nivelNodos.length){
+    const sel=(nivel<path.length)?path[nivel]:'';
+    html+=`<select class="item-inp" style="width:auto;min-width:150px" onchange="setVarPath('${encId}','${it.id}',${nivel},this.value)">
+      <option value="">Elige…</option>
+      ${nivelNodos.map((n,i)=>{const hoja=!(n.hijos&&n.hijos.length);return `<option value="${i}"${String(i)===String(sel)?' selected':''}>${n.nombre}${hoja?' — '+fCOP(varPrecioBaseFE(n)):' ▸'}</option>`}).join('')}
+    </select>`;
+    if(sel===''||sel==null)break;
+    const chosen=nivelNodos[parseInt(sel,10)];
+    if(!chosen||!(chosen.hijos&&chosen.hijos.length))break;
+    nivelNodos=chosen.hijos; nivel++;
+  }
+  html+='</div>';
+  return html;
+}
+function setVarPath(encId,itemId,nivel,idxStr){
   const e=fEnc.find(x=>x.id===encId);
   const it=e&&e.items.find(i=>i.id===itemId);
   if(!it||!it._fichaSel)return;
-  const v=(it._fichaSel.variantes||[])[idx];
-  if(!v)return;
-  it._varSel=String(idx);
-  const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
-  const porTramo=detectarPrecioEscalonado(v.tramos||[],cantNum);
-  it.valor_unitario=String((cantNum>0&&porTramo!=null)?porTramo:(parseFloat(v.precio_calc)||0));
-  it._autoPrecio=true;
-  const base=it._fichaSel.nombre||it.detalle||'';
-  it.detalle=base.split(' — ')[0]+' — '+v.nombre;
-  const elU=document.getElementById('itval-'+itemId);
-  if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+  it._varPath=(it._varPath||[]).slice(0,nivel);
+  if(idxStr!==''&&idxStr!=null)it._varPath.push(parseInt(idxStr,10));
+  const hoja=hojaDePathVar(it._fichaSel,it._varPath);
+  if(hoja){
+    const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+    const porTramo=detectarPrecioEscalonado(hoja.tramos||[],cantNum);
+    it.valor_unitario=String((cantNum>0&&porTramo!=null)?porTramo:(parseFloat(hoja.precio_calc)||0));
+    it._autoPrecio=true;
+    const cadena=nodosEnPathVar(it._fichaSel,it._varPath).map(n=>n.nombre);
+    const base=(it._fichaSel.nombre||it.detalle||'').split(' — ')[0];
+    it.detalle=base+(cadena.length?' — '+cadena.join(' — '):'');
+  }else{
+    it.valor_unitario='';
+  }
   renderEncItems(encId);
   actualizarValorTotal();
   recalcularCostosAutomaticos();
@@ -2086,7 +2132,7 @@ function selItem(encId,itemId,idx){
     it.valor_unitario='';
     if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
   }else if(p.tipo_precio==='variantes'){
-    it._varSel='';it._autoPrecio=true;
+    it._varPath=[];it._autoPrecio=true;
     it.valor_unitario='';
     if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
   }else if(p.tipo_precio==='escalonado'){
@@ -2167,13 +2213,7 @@ function renderItemsHTML(enc){
           ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
           <span style="font-size:10px;color:var(--muted)">${SUF_UNIDAD[it._fichaSel.medida_unidad]||'m²'}</span>
           <span id="itmed-hint-${it.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk)"></span>
-        </div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='variantes')?`
-        <div style="margin-top:4px">
-          <select class="item-inp" style="width:auto;min-width:160px" onchange="setVarItem('${enc.id}','${it.id}',this.value)">
-            <option value="">Elige el tamaño/versión…</option>
-            ${(it._fichaSel.variantes||[]).map((v,vi)=>`<option value="${vi}"${String(vi)===String(it._varSel)?' selected':''}>${v.nombre} — ${fCOP(parseFloat(v.precio_calc)||0)}</option>`).join('')}
-          </select>
-        </div>`:''}</td>
+        </div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='variantes')?renderVarSelectsHTML(enc.id,it):''}</td>
       <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:34px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
@@ -2251,55 +2291,102 @@ function setModoCalculo(modo){
     document.getElementById('prod-sec-regla').style.display='none';
   }
 }
-function addVariante(){fProdVariantes.push({id:uid(),nombre:'',precio:'',costos:[],tramos:[]});renderVariantes()}
-function remVariante(id){fProdVariantes=fProdVariantes.filter(x=>x.id!==id);renderVariantes()}
-function setVariante(id,k,v){const c=fProdVariantes.find(x=>x.id===id);if(c){c[k]=v;if(k==='precio')actualizarUtilidadVariante(id)}}
-function addTramoVariante(vid){const v=fProdVariantes.find(x=>x.id===vid);if(v){v.tramos=v.tramos||[];v.tramos.push({id:uid(),desde:'',hasta:'',precio:''});renderVariantes()}}
-function remTramoVariante(vid,tid){const v=fProdVariantes.find(x=>x.id===vid);if(v){v.tramos=(v.tramos||[]).filter(t=>t.id!==tid);renderVariantes()}}
-function setTramoVariante(vid,tid,k,val){const v=fProdVariantes.find(x=>x.id===vid);if(v){const t=(v.tramos||[]).find(x=>x.id===tid);if(t)t[k]=val}}
-function addCostoVariante(vid){const v=fProdVariantes.find(x=>x.id===vid);if(v){v.costos=v.costos||[];v.costos.push({id:uid(),nombre:'',valor:''});renderVariantes()}}
-function remCostoVariante(vid,cid){const v=fProdVariantes.find(x=>x.id===vid);if(v){v.costos=(v.costos||[]).filter(c=>c.id!==cid);renderVariantes()}}
-function setCostoVariante(vid,cid,k,val){const v=fProdVariantes.find(x=>x.id===vid);if(v){const c=(v.costos||[]).find(x=>x.id===cid);if(c){c[k]=val;if(k==='valor')actualizarUtilidadVariante(vid)}}}
+function buscarNodoVar(id,nodos){
+  nodos=nodos||fProdVariantes;
+  for(const n of nodos){
+    if(n.id===id)return n;
+    const e=buscarNodoVar(id,n.hijos||[]);
+    if(e)return e;
+  }
+  return null;
+}
+function quitarNodoVar(id,nodos){
+  nodos=nodos||fProdVariantes;
+  const i=nodos.findIndex(n=>n.id===id);
+  if(i>=0){nodos.splice(i,1);return true}
+  for(const n of nodos){if(quitarNodoVar(id,n.hijos||[]))return true}
+  return false;
+}
+function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[]}}
+function addVariante(){fProdVariantes.push(nodoVarNuevo());renderVariantes()}
+function addSubVariante(vid){const v=buscarNodoVar(vid);if(v){v.hijos=v.hijos||[];v.hijos.push(nodoVarNuevo());renderVariantes()}}
+function remVariante(id){quitarNodoVar(id);renderVariantes()}
+function setVariante(id,k,v){const c=buscarNodoVar(id);if(c){c[k]=v;if(k==='precio')actualizarUtilidadVariante(id)}}
+function addTramoVariante(vid){const v=buscarNodoVar(vid);if(v){v.tramos=v.tramos||[];v.tramos.push({id:uid(),desde:'',hasta:'',precio:''});renderVariantes()}}
+function remTramoVariante(vid,tid){const v=buscarNodoVar(vid);if(v){v.tramos=(v.tramos||[]).filter(t=>t.id!==tid);renderVariantes()}}
+function setTramoVariante(vid,tid,k,val){const v=buscarNodoVar(vid);if(v){const t=(v.tramos||[]).find(x=>x.id===tid);if(t)t[k]=val}}
+function addCostoVariante(vid){const v=buscarNodoVar(vid);if(v){v.costos=v.costos||[];v.costos.push({id:uid(),nombre:'',valor:''});renderVariantes()}}
+function remCostoVariante(vid,cid){const v=buscarNodoVar(vid);if(v){v.costos=(v.costos||[]).filter(c=>c.id!==cid);renderVariantes()}}
+function setCostoVariante(vid,cid,k,val){const v=buscarNodoVar(vid);if(v){const c=(v.costos||[]).find(x=>x.id===cid);if(c){c[k]=val;if(k==='valor')actualizarUtilidadVariante(vid)}}}
 function costoTotalVarianteFE(v){return (v.costos||[]).reduce((a,c)=>a+(evalExpr(c.valor)||0),0)}
 function actualizarUtilidadVariante(vid){
-  const v=fProdVariantes.find(x=>x.id===vid);
+  const v=buscarNodoVar(vid);
   const el=document.getElementById('var-util-'+vid);
   if(!v||!el)return;
   const costo=costoTotalVarianteFE(v);
   const precio=evalExpr(v.precio)||0;
-  el.textContent='Costo: '+fCOP(costo)+(precio>0?(' · Utilidad: '+fCOP(precio-costo)):'');
+  const esGrupo=!!(v.hijos&&v.hijos.length);
+  el.textContent='Costo de este nivel: '+fCOP(costo)+((!esGrupo&&precio>0)?(' · Utilidad: '+fCOP(precio-costo)):'');
+}
+function htmlCostosVar(v){
+  return `<table class="items-table"><tbody>
+    ${(v.costos||[]).map(c=>`<tr>
+      <td><input class="item-inp" type="text" value="${c.nombre||''}" placeholder="Ej: Fabricante" oninput="setCostoVariante('${v.id}','${c.id}','nombre',this.value)"></td>
+      <td style="width:110px"><input class="item-inp" type="text" value="${c.valor||''}" placeholder="$ 0" oninput="setCostoVariante('${v.id}','${c.id}','valor',this.value)"></td>
+      <td style="width:26px"><button class="item-del" onclick="remCostoVariante('${v.id}','${c.id}')"><i class="ti ti-x"></i></button></td>
+    </tr>`).join('')}
+  </tbody></table>
+  <button class="btn-add-row" onclick="addCostoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar costo</button>`;
+}
+function htmlTramosVar(v){
+  return `<table class="items-table"><tbody>
+    ${(v.tramos||[]).map(t=>`<tr>
+      <td style="width:70px"><input class="item-inp" type="text" value="${t.desde||''}" placeholder="Desde" oninput="setTramoVariante('${v.id}','${t.id}','desde',this.value)"></td>
+      <td style="width:70px"><input class="item-inp" type="text" value="${t.hasta||''}" placeholder="Hasta" oninput="setTramoVariante('${v.id}','${t.id}','hasta',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${t.precio||''}" placeholder="$ 0" oninput="setTramoVariante('${v.id}','${t.id}','precio',this.value)"></td>
+      <td style="width:26px"><button class="item-del" onclick="remTramoVariante('${v.id}','${t.id}')"><i class="ti ti-x"></i></button></td>
+    </tr>`).join('')}
+  </tbody></table>
+  <button class="btn-add-row" onclick="addTramoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar tramo</button>`;
+}
+function htmlNodoVariante(v,nivel){
+  const esGrupo=!!(v.hijos&&v.hijos.length);
+  const sub=nivel<2;
+  return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:${nivel>1?'var(--line-lt)':'var(--white)'}">
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">${nivel>1?'Sub-variante':'Variante'}</label><input class="item-inp" type="text" value="${v.nombre||''}" placeholder="${nivel>1?'Ej: Con vidrio':'Ej: 20×25'}" oninput="setVariante('${v.id}','nombre',this.value)"></div>
+      ${esGrupo?'':`<div style="width:120px"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio público</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>`}
+      <button class="item-del" title="Eliminar" onclick="remVariante('${v.id}')"><i class="ti ti-trash"></i></button>
+    </div>
+    <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Costos de este nivel${esGrupo?' (se suman a todas sus sub-variantes)':''}</div>
+    ${htmlCostosVar(v)}
+    <div id="var-util-${v.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk);margin-top:6px"></div>
+    ${esGrupo?'':`
+      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Precios por cantidad (opcional)</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Si lo dejas vacío, se usa el Precio público. Ej: 1 a 6 → $15.000, 7 a 12 → $13.000. El último tramo cubre cantidades mayores.</div>
+      ${htmlTramosVar(v)}`}
+    ${sub?`
+      <div style="font-size:9px;font-weight:800;color:var(--navy);text-transform:uppercase;margin:12px 0 4px">Sub-variantes (versiones internas)</div>
+      ${(v.hijos||[]).map(h=>htmlNodoVariante(h,nivel+1)).join('')}
+      <button class="btn-add-row" onclick="addSubVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar sub-variante</button>`:''}
+  </div>`;
 }
 function renderVariantes(){
-  document.getElementById('prod-variantes-body').innerHTML=fProdVariantes.map(v=>`
-    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--white)">
-      <div style="display:flex;gap:8px;align-items:flex-end">
-        <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Nombre de la variante</label><input class="item-inp" type="text" value="${v.nombre||''}" placeholder="Ej: 10×15" oninput="setVariante('${v.id}','nombre',this.value)"></div>
-        <div style="width:120px"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio público</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>
-        <button class="item-del" title="Eliminar variante" onclick="remVariante('${v.id}')"><i class="ti ti-trash"></i></button>
-      </div>
-      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Costos de esta variante</div>
-      <table class="items-table"><tbody>
-        ${(v.costos||[]).map(c=>`<tr>
-          <td><input class="item-inp" type="text" value="${c.nombre||''}" placeholder="Ej: Fabricante" oninput="setCostoVariante('${v.id}','${c.id}','nombre',this.value)"></td>
-          <td style="width:110px"><input class="item-inp" type="text" value="${c.valor||''}" placeholder="$ 0" oninput="setCostoVariante('${v.id}','${c.id}','valor',this.value)"></td>
-          <td style="width:26px"><button class="item-del" onclick="remCostoVariante('${v.id}','${c.id}')"><i class="ti ti-x"></i></button></td>
-        </tr>`).join('')}
-      </tbody></table>
-      <button class="btn-add-row" onclick="addCostoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar costo</button>
-      <div id="var-util-${v.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk);margin-top:6px"></div>
-      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Precios por cantidad (opcional)</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Si dejas esto vacío, se usa el Precio público de arriba. Ej: 1 a 6 → $15.000, 7 a 12 → $13.000. El último tramo cubre también cantidades mayores.</div>
-      <table class="items-table"><tbody>
-        ${(v.tramos||[]).map(t=>`<tr>
-          <td style="width:70px"><input class="item-inp" type="text" value="${t.desde||''}" placeholder="Desde" oninput="setTramoVariante('${v.id}','${t.id}','desde',this.value)"></td>
-          <td style="width:70px"><input class="item-inp" type="text" value="${t.hasta||''}" placeholder="Hasta" oninput="setTramoVariante('${v.id}','${t.id}','hasta',this.value)"></td>
-          <td><input class="item-inp" type="text" value="${t.precio||''}" placeholder="$ 0" oninput="setTramoVariante('${v.id}','${t.id}','precio',this.value)"></td>
-          <td style="width:26px"><button class="item-del" onclick="remTramoVariante('${v.id}','${t.id}')"><i class="ti ti-x"></i></button></td>
-        </tr>`).join('')}
-      </tbody></table>
-      <button class="btn-add-row" onclick="addTramoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar tramo</button>
-    </div>`).join('');
-  fProdVariantes.forEach(v=>actualizarUtilidadVariante(v.id));
+  document.getElementById('prod-variantes-body').innerHTML=fProdVariantes.map(v=>htmlNodoVariante(v,1)).join('');
+  const walk=(nodos)=>{(nodos||[]).forEach(n=>{actualizarUtilidadVariante(n.id);walk(n.hijos)})};
+  walk(fProdVariantes);
+}
+function cargarNodoVar(v){
+  return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',
+    costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
+    tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
+    hijos:(v.hijos||[]).map(cargarNodoVar)};
+}
+function serializarNodoVar(v){
+  return {nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),
+    costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),
+    tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
+    hijos:(v.hijos||[]).map(serializarNodoVar)};
 }
 function colapsarInsumos(){
   const body=document.querySelector('#ovProd .coll-body');
@@ -2589,7 +2676,7 @@ async function abrirEditarProducto(id){
   fProdComponentes=(p.componentes||[]).map(c=>({id:uid(),componente_ficha_id:c.componente_ficha_id||'',componente_nombre:c.componente_nombre||'',cantidad_consumida:String(c.cantidad_consumida),precio_unitario:c.precio_unitario||'',_libre:!c.componente_ficha_id}));
   fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
   fProdCostosFijos=(p.costos_fijos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''}));
-  fProdVariantes=(p.variantes||[]).map(v=>({id:uid(),nombre:v.nombre||'',precio:v.precio||'',costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)}))}));
+  fProdVariantes=(p.variantes||[]).map(cargarNodoVar);
   prodModoCalculo=p.tipo_precio==='medidas'?'medidas':(p.tipo_precio==='variantes'?'variantes':'cantidad');
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
@@ -2687,7 +2774,7 @@ async function guardarProducto(){
     medida_tarifa:esMedidas?document.getElementById('prod-medida-tarifa').value.trim():'',
     costos_fijos:esMedidas?fProdCostosFijos.map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})):[],
     cobro_minimo:esMedidas?document.getElementById('prod-cobro-minimo').value.trim():'',
-    variantes:esVariantes?fProdVariantes.map(v=>({nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0}))})):[],
+    variantes:esVariantes?fProdVariantes.map(serializarNodoVar):[],
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
     fecha_fin:document.getElementById('prod-fecha-fin').value,
     cantidad_minima:document.getElementById('prod-cantidad-minima').value.trim(),
@@ -2818,10 +2905,11 @@ function recalcularCostosAutomaticos(){
       if(cantNum<=0)return;
       let costoUnit=0, desc='';
       if(it._fichaSel.tipo_precio==='variantes'){
-        const v=(it._fichaSel.variantes||[])[parseInt(it._varSel,10)];
-        if(!v)return;
-        costoUnit=costoTotalCostosArr(v.costos)+costoTotalInsumosFicha(it._fichaSel.insumos);
-        desc='Costos: '+it._fichaSel.nombre+' — '+v.nombre;
+        const hoja=hojaDePathVar(it._fichaSel,it._varPath);
+        if(!hoja)return;
+        costoUnit=costoAcumuladoHojaFE(it._fichaSel,it._varPath);
+        const cadena=nodosEnPathVar(it._fichaSel,it._varPath).map(n=>n.nombre).join(' — ');
+        desc='Costos: '+it._fichaSel.nombre+(cadena?' — '+cadena:'');
       }else{
         if(!it._fichaSel.insumos||!it._fichaSel.insumos.length)return;
         costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
