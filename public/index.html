@@ -917,11 +917,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <div id="prod-modo-calc-wrap" style="display:none">
       <div class="msec"><span class="tri"></span>Modo de cálculo</div>
-      <div class="fr2 fg" style="margin-bottom:4px">
+      <div class="fr3 fg" style="margin-bottom:4px">
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-cantidad" checked onchange="setModoCalculo('cantidad')"><label for="prod-modo-cantidad">Por cantidad / precio fijo</label></div>
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-medidas" onchange="setModoCalculo('medidas')"><label for="prod-modo-medidas">Por medidas (ancho × alto)</label></div>
+        <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-variantes" onchange="setModoCalculo('variantes')"><label for="prod-modo-variantes">Por variantes (tamaños/versiones)</label></div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: para pendones, lonas, vinilos — el precio sale del tamaño que pida el cliente.</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: el precio sale del tamaño que pida el cliente (pendones, lonas). Por variantes: un mismo producto en varias versiones, el cliente elige una (retablos por tamaño).</div>
     </div>
 
     <div class="collapsible" style="margin:8px 0">
@@ -979,6 +980,16 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </table>
       <button class="btn-add-row" onclick="addCostoFijo()"><i class="ti ti-plus"></i>Agregar costo fijo</button>
       <div class="fg" style="margin-top:12px"><label>Cobro mínimo (opcional)</label><input type="text" id="prod-cobro-minimo" placeholder="Ej: 50000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Si el cálculo da menos que esto, se cobra esto. Para trabajos muy chicos.</div></div>
+    </div>
+
+    <div id="prod-sec-variantes" style="display:none">
+      <div class="msec"><span class="tri"></span>Variantes</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Cada versión del producto con su propio precio. Ej: Retablo 10×10 → $25.000, 20×20 → $45.000. El cliente elige una al pedir.</div>
+      <table class="items-table" id="prod-variantes-tabla">
+        <thead><tr><th>Nombre de la variante</th><th style="width:130px">Precio</th><th style="width:26px"></th></tr></thead>
+        <tbody id="prod-variantes-body"></tbody>
+      </table>
+      <button class="btn-add-row" onclick="addVariante()"><i class="ti ti-plus"></i>Agregar variante</button>
     </div>
 
     <div id="prod-sec-escalonado" style="display:none">
@@ -1762,7 +1773,7 @@ async function cargarProductos(q=''){
   productos=await api('GET',`/productos${p}`);
   const el=document.getElementById('lista-prod');
   if(!productos.length){el.innerHTML='<div class="empty"><i class="ti ti-box-off"></i><p>Sin productos</p></div>';return}
-  const TIPO_LABEL={unitario:'Producto simple',escalonado:'Producto simple',regla:'Lleva N, paga M',combo:'Combo',promocional:'Promoción',medidas:'Por medidas'};
+  const TIPO_LABEL={unitario:'Producto simple',escalonado:'Producto simple',regla:'Lleva N, paga M',combo:'Combo',promocional:'Promoción',medidas:'Por medidas',variantes:'Por variantes'};
   el.innerHTML=productos.map(p=>{
     const cat=CATS.find(c=>c.id===p.categoria_id);
     return`<div class="prod-card" onclick="abrirEditarProducto('${p.id}')">
@@ -1770,7 +1781,7 @@ async function cargarProductos(q=''){
         <div class="cli-name">${p.nombre}</div>
         <div class="cli-sub">${cat?`<span class="ttag ${cat.tc}">${cat.label}</span> `:''}<span class="b-tipo">${TIPO_LABEL[p.tipo_precio]||p.tipo_precio}</span> ${!p.activo?'<span class="b-canc">Inactivo</span>':''} ${(p.stock_actual!=null&&p.stock_minimo!=null&&p.stock_actual<=p.stock_minimo)?'<span class="b-pend">Stock bajo</span>':''}</div>
       </div>
-      <div style="font-weight:800;color:var(--navy);flex-shrink:0">${fCOP(p.precio_oficial)}${p.tipo_precio==='medidas'?' / '+(SUF_UNIDAD[p.medida_unidad]||'m²'):''}</div>
+      <div style="font-weight:800;color:var(--navy);flex-shrink:0">${p.tipo_precio==='variantes'?'desde '+fCOP(p.precio_oficial):(fCOP(p.precio_oficial)+(p.tipo_precio==='medidas'?' / '+(SUF_UNIDAD[p.medida_unidad]||'m²'):''))}</div>
     </div>`;
   }).join('');
 }
@@ -2002,6 +2013,23 @@ function setMedidaItem(encId,itemId,campo,valor){
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
+function setVarItem(encId,itemId,idx){
+  const e=fEnc.find(x=>x.id===encId);
+  const it=e&&e.items.find(i=>i.id===itemId);
+  if(!it||!it._fichaSel)return;
+  const v=(it._fichaSel.variantes||[])[idx];
+  if(!v)return;
+  it._varSel=String(idx);
+  it.valor_unitario=String(parseFloat(v.precio_calc)||0);
+  it._autoPrecio=true;
+  const base=it._fichaSel.nombre||it.detalle||'';
+  it.detalle=base.split(' — ')[0]+' — '+v.nombre;
+  const elU=document.getElementById('itval-'+itemId);
+  if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+  renderEncItems(encId);
+  actualizarValorTotal();
+  recalcularCostosAutomaticos();
+}
 function calcularPrecioRegla(lleva,paga,precioUnitario,cantidad){
   if(!lleva||!paga||cantidad<lleva)return precioUnitario;
   const grupos=Math.floor(cantidad/lleva);
@@ -2023,10 +2051,10 @@ async function acItem(encId,itemId,q){
   });
   if(!vigentes.length){dr.style.display='none';return}
   _acItemResults[itemId]=vigentes.slice(0,6);
-  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',regla:'ti-discount',combo:'ti-package',promocional:'ti-discount-2',medidas:'ti-ruler-2'};
+  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',regla:'ti-discount',combo:'ti-package',promocional:'ti-discount-2',medidas:'ti-ruler-2',variantes:'ti-layout-grid'};
   dr.innerHTML=_acItemResults[itemId].map((p,i)=>{
     const tieneTramos=p.tipo_precio==='escalonado'&&(p.rangos||[]).length>0;
-    const precioTxt=p.tipo_precio==='medidas'?(fCOP(p.precio_oficial)+' / '+(SUF_UNIDAD[p.medida_unidad]||'m²')):((tieneTramos||p.tipo_precio==='regla')?'según cantidad':fCOP(p.precio_oficial));
+    const precioTxt=p.tipo_precio==='medidas'?(fCOP(p.precio_oficial)+' / '+(SUF_UNIDAD[p.medida_unidad]||'m²')):(p.tipo_precio==='variantes'?('desde '+fCOP(p.precio_oficial)):((tieneTramos||p.tipo_precio==='regla')?'según cantidad':fCOP(p.precio_oficial)));
     const stockTxt=p.stock_actual!=null?` · Stock: ${p.stock_actual}`:'';
     return`<div class="ac-item" onclick="selItem('${encId}','${itemId}',${i})">
       <div class="ac-name"><i class="ti ${ICONOS[p.tipo_precio]||'ti-tag'}" style="margin-right:5px"></i>${p.nombre}</div>
@@ -2046,6 +2074,10 @@ function selItem(encId,itemId,idx){
   it.ficha_id=p.id;
   if(p.tipo_precio==='medidas'){
     it._medidas=true;it._ancho='';it._alto='';it._autoPrecio=true;
+    it.valor_unitario='';
+    if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
+  }else if(p.tipo_precio==='variantes'){
+    it._varSel='';it._autoPrecio=true;
     it.valor_unitario='';
     if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
   }else if(p.tipo_precio==='escalonado'){
@@ -2126,6 +2158,12 @@ function renderItemsHTML(enc){
           ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
           <span style="font-size:10px;color:var(--muted)">${SUF_UNIDAD[it._fichaSel.medida_unidad]||'m²'}</span>
           <span id="itmed-hint-${it.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk)"></span>
+        </div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='variantes')?`
+        <div style="margin-top:4px">
+          <select class="item-inp" style="width:auto;min-width:160px" onchange="setVarItem('${enc.id}','${it.id}',this.value)">
+            <option value="">Elige el tamaño/versión…</option>
+            ${(it._fichaSel.variantes||[]).map((v,vi)=>`<option value="${vi}"${String(vi)===String(it._varSel)?' selected':''}>${v.nombre} — ${fCOP(parseFloat(v.precio_calc)||0)}</option>`).join('')}
+          </select>
         </div>`:''}</td>
       <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:34px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
@@ -2187,21 +2225,33 @@ function blurItemVal(el,encId,itemId){
 }
 
 /* ══ FICHA DE PRODUCTO: widgets ══ */
-let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='',fProdPrecioSugeridoActual=null,fProdStockActual=null,fProdStockMinimo=null,fProdCostosFijos=[];
+let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='',fProdPrecioSugeridoActual=null,fProdStockActual=null,fProdStockMinimo=null,fProdCostosFijos=[],fProdVariantes=[];
 let prodModoCalculo='cantidad';
 const SUF_UNIDAD={m2:'m²',m:'m',cm2:'cm²'};
 function setModoCalculo(modo){
   prodModoCalculo=modo;
-  const esMed=modo==='medidas';
+  const esMed=modo==='medidas', esVar=modo==='variantes', esCant=modo==='cantidad';
   document.getElementById('prod-sec-medidas').style.display=esMed?'block':'none';
-  document.getElementById('prod-sec-margen-precio').style.display=esMed?'none':'block';
-  document.getElementById('prod-sec-escalonado').style.display=esMed?'none':'block';
-  if(esMed){
+  document.getElementById('prod-sec-variantes').style.display=esVar?'block':'none';
+  document.getElementById('prod-sec-margen-precio').style.display=esCant?'block':'none';
+  document.getElementById('prod-sec-escalonado').style.display=esCant?'block':'none';
+  if(esCant){
+    onEsReglaChange();
+  }else{
     document.getElementById('prod-sec-tramos').style.display='none';
     document.getElementById('prod-sec-regla').style.display='none';
-  }else{
-    onEsReglaChange();
   }
+}
+function addVariante(){fProdVariantes.push({id:uid(),nombre:'',precio:''});renderVariantes()}
+function remVariante(id){fProdVariantes=fProdVariantes.filter(x=>x.id!==id);renderVariantes()}
+function setVariante(id,k,v){const c=fProdVariantes.find(x=>x.id===id);if(c)c[k]=v}
+function renderVariantes(){
+  document.getElementById('prod-variantes-body').innerHTML=fProdVariantes.map(c=>`
+    <tr>
+      <td><input class="item-inp" type="text" value="${c.nombre||''}" placeholder="Ej: 10×10" oninput="setVariante('${c.id}','nombre',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${c.precio||''}" placeholder="$ 0" oninput="setVariante('${c.id}','precio',this.value)"></td>
+      <td style="width:26px"><button class="item-del" onclick="remVariante('${c.id}')"><i class="ti ti-x"></i></button></td>
+    </tr>`).join('');
 }
 function colapsarInsumos(){
   const body=document.querySelector('#ovProd .coll-body');
@@ -2399,7 +2449,7 @@ function elegirCaminoProducto(camino){
   document.getElementById('prod-sec-promocional').style.display=camino==='promocional'?'block':'none';
   document.getElementById('prod-btn-item-libre').style.display=camino==='promocional'?'inline-flex':'none';
   if(esSimple)setModoCalculo(prodModoCalculo);
-  else{document.getElementById('prod-sec-medidas').style.display='none';document.getElementById('prod-sec-margen-precio').style.display='block';}
+  else{document.getElementById('prod-sec-medidas').style.display='none';document.getElementById('prod-sec-variantes').style.display='none';document.getElementById('prod-sec-margen-precio').style.display='block';}
   actualizarVisibilidadPrecioBase();
 }
 function onEsReglaChange(){
@@ -2434,15 +2484,18 @@ function resetProdForm(){
   fProdComboModo='global';
   prodCaminoActual='simple';
   prodModoCalculo='cantidad';
-  fProdCostosFijos=[];
+  fProdCostosFijos=[];fProdVariantes=[];
   document.getElementById('prod-modo-cantidad').checked=true;
   document.getElementById('prod-modo-medidas').checked=false;
+  document.getElementById('prod-modo-variantes').checked=false;
   document.getElementById('prod-medida-unidad').value='m2';
   document.getElementById('prod-medida-tarifa').value='';
   document.getElementById('prod-cobro-minimo').value='';
   renderCostosFijos();
+  renderVariantes();
   document.getElementById('prod-modo-calc-wrap').style.display='none';
   document.getElementById('prod-sec-medidas').style.display='none';
+  document.getElementById('prod-sec-variantes').style.display='none';
   document.getElementById('prod-sec-margen-precio').style.display='block';
   document.getElementById('prod-nombre').value='';
   document.getElementById('prod-es-regla').checked=false;
@@ -2488,7 +2541,8 @@ async function abrirEditarProducto(id){
   fProdComponentes=(p.componentes||[]).map(c=>({id:uid(),componente_ficha_id:c.componente_ficha_id||'',componente_nombre:c.componente_nombre||'',cantidad_consumida:String(c.cantidad_consumida),precio_unitario:c.precio_unitario||'',_libre:!c.componente_ficha_id}));
   fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
   fProdCostosFijos=(p.costos_fijos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''}));
-  prodModoCalculo=p.tipo_precio==='medidas'?'medidas':'cantidad';
+  fProdVariantes=(p.variantes||[]).map(v=>({id:uid(),nombre:v.nombre||'',precio:v.precio||''}));
+  prodModoCalculo=p.tipo_precio==='medidas'?'medidas':(p.tipo_precio==='variantes'?'variantes':'cantidad');
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
   document.getElementById('prod-nombre').value=p.nombre;
@@ -2512,6 +2566,7 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-combo-th-precio').style.display=fProdComboModo==='individual'?'table-cell':'none';
   document.getElementById('prod-modo-cantidad').checked=prodModoCalculo==='cantidad';
   document.getElementById('prod-modo-medidas').checked=prodModoCalculo==='medidas';
+  document.getElementById('prod-modo-variantes').checked=prodModoCalculo==='variantes';
   document.getElementById('prod-medida-unidad').value=p.medida_unidad||'m2';
   document.getElementById('prod-medida-tarifa').value=displayMoneyVal(p.medida_tarifa||'');
   document.getElementById('prod-cobro-minimo').value=displayMoneyVal(p.cobro_minimo||'');
@@ -2519,6 +2574,7 @@ async function abrirEditarProducto(id){
   renderInsumos();
   renderRangos();
   renderCostosFijos();
+  renderVariantes();
   renderComponentes();
   onMargenTipoChange();
   const camino=(p.tipo_precio==='combo')?'combo':(p.tipo_precio==='promocional')?'promocional':'simple';
@@ -2540,6 +2596,13 @@ function validarProductoBody(b){
     }
     if(definidoFE(b.cobro_minimo)&&evalExpr(b.cobro_minimo)===null)return'El cobro mínimo no es una expresión válida';
   }
+  if(b.tipo_precio==='variantes'){
+    if(!b.variantes||!b.variantes.length)return'Agrega al menos una variante';
+    for(let i=0;i<b.variantes.length;i++){
+      if(!String(b.variantes[i].nombre||'').trim())return`Variante #${i+1}: escribe un nombre`;
+      if(!definidoFE(b.variantes[i].precio)||evalExpr(b.variantes[i].precio)===null)return`Variante #${i+1}: precio no válido`;
+    }
+  }
   if(b.tipo_precio==='combo'||b.tipo_precio==='promocional'){
     if(b.tipo_precio==='combo'&&(!b.componentes||!b.componentes.length))return'Combo necesita al menos un componente';
     for(let i=0;i<(b.componentes||[]).length;i++){
@@ -2554,7 +2617,8 @@ async function guardarProducto(){
   const nombre=document.getElementById('prod-nombre').value.trim();
   if(!nombre){document.getElementById('prod-nombre').focus();toast('Ingresa el nombre del producto',false);return}
   const esMedidas=prodCaminoActual==='simple'&&prodModoCalculo==='medidas';
-  const tipoPrecio=prodCaminoActual==='simple'?(esMedidas?'medidas':(document.getElementById('prod-es-regla').checked?'regla':'escalonado')):prodCaminoActual;
+  const esVariantes=prodCaminoActual==='simple'&&prodModoCalculo==='variantes';
+  const tipoPrecio=prodCaminoActual==='simple'?(esMedidas?'medidas':(esVariantes?'variantes':(document.getElementById('prod-es-regla').checked?'regla':'escalonado'))):prodCaminoActual;
   const body={
     nombre,
     categoria_id:prodCatSel,
@@ -2575,6 +2639,7 @@ async function guardarProducto(){
     medida_tarifa:esMedidas?document.getElementById('prod-medida-tarifa').value.trim():'',
     costos_fijos:esMedidas?fProdCostosFijos.map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})):[],
     cobro_minimo:esMedidas?document.getElementById('prod-cobro-minimo').value.trim():'',
+    variantes:esVariantes?fProdVariantes.map(v=>({nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim()})):[],
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
     fecha_fin:document.getElementById('prod-fecha-fin').value,
     cantidad_minima:document.getElementById('prod-cantidad-minima').value.trim(),
