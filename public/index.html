@@ -3000,13 +3000,19 @@ async function guardarProducto(){
   const esVariantes=prodCaminoActual==='simple'&&prodModoCalculo==='variantes';
   const esPliego=prodCaminoActual==='simple'&&prodModoCalculo==='pliego';
   const tipoPrecio=prodCaminoActual==='simple'?(esMedidas?'medidas':(esVariantes?'variantes':(esPliego?'pliego':(document.getElementById('prod-es-regla').checked?'regla':'escalonado')))):prodCaminoActual;
+  // El Precio base solo se manda cuando el campo está realmente en uso (visible): camino
+  // combo/promoción (precio global), o simple+cantidad con el input visible. Si está oculto
+  // (tramo "Desde 1" lo deriva, o modos medidas/variantes/hoja), se manda vacío para que un
+  // valor viejo/inválido en memoria no rompa la validación.
+  const _pbInput=document.getElementById('prod-precio-base');
+  const usaPrecioBase=(prodCaminoActual==='combo'||prodCaminoActual==='promocional')||(prodCaminoActual==='simple'&&prodModoCalculo==='cantidad'&&_pbInput&&_pbInput.style.display!=='none');
   const body={
     nombre,
     categoria_id:prodCatSel,
     tipo_precio:tipoPrecio,
     margen_tipo:document.getElementById('prod-margen-tipo').value,
     margen_valor:document.getElementById('prod-margen-valor').value.trim(),
-    precio_base:esMedidas?'':(fProdPrecioBaseRaw||'').trim(),
+    precio_base:usaPrecioBase?(fProdPrecioBaseRaw||'').trim():'',
     activo:document.getElementById('prod-activo').checked,
     stock_actual:fProdStockActual,
     stock_minimo:fProdStockMinimo,
