@@ -910,10 +910,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div></div>
     </div>
 
-    <div class="msec"><span class="tri"></span>Categoría</div>
-    <div class="cat-row" id="prod-cat-row" style="margin-bottom:0"></div>
-
-    <div class="ck-box" style="display:inline-flex;margin:12px 0"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div>
+    <div class="fr2 fg" style="margin-top:10px;align-items:end">
+      <div><label>Categoría (informativa)</label><select id="prod-cat-sel" onchange="setProdCat(this.value)"></select></div>
+      <div style="display:flex;align-items:center;padding-bottom:8px"><div class="ck-box" style="display:inline-flex"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div></div>
+    </div>
 
     <div id="prod-modo-calc-wrap" style="display:none">
       <div class="msec"><span class="tri"></span>Modo de cálculo</div>
@@ -2106,6 +2106,8 @@ function setVarPickMulti(encId,itemId,parteId,opcionId,qtyStr){
   recalcVarItem(it);
   const elU=document.getElementById('itval-'+itemId);
   if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+  const elD=document.getElementById('itdet-'+itemId);
+  if(elD){elD.value=it.detalle||'';autoTA(elD)}
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
@@ -2231,7 +2233,7 @@ function renderItemsHTML(enc){
     return`
     <tr${it.suministrado?' style="opacity:.55"':''}>
       <td style="width:70px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"><div id="itstock-${it.id}" style="font-size:8px;font-weight:700;color:var(--red);margin-top:2px;display:${stockWarn?'block':'none'}">${stockWarn}</div></td>
-      <td><div class="ac-wrap"><textarea class="item-ta" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div>${(it._fichaSel&&it._fichaSel.tipo_precio==='medidas')?`
+      <td><div class="ac-wrap"><textarea class="item-ta" id="itdet-${it.id}" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div>${(it._fichaSel&&it._fichaSel.tipo_precio==='medidas')?`
         <div style="display:flex;gap:5px;align-items:center;margin-top:4px;flex-wrap:wrap">
           <input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._ancho||''}" placeholder="Ancho" oninput="setMedidaItem('${enc.id}','${it.id}','_ancho',this.value)">
           ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
@@ -2506,9 +2508,11 @@ function selCombo(rowId,idx){
 }
 
 function renderProdCatRow(){
-  document.getElementById('prod-cat-row').innerHTML=CATS.map(c=>`<button type="button" class="cat-btn${prodCatSel===c.id?' sel':''}" onclick="setProdCat('${c.id}')">${c.label}</button>`).join('');
+  const sel=document.getElementById('prod-cat-sel');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Sin categoría —</option>'+CATS.map(c=>`<option value="${c.id}"${prodCatSel===c.id?' selected':''}>${c.label}</option>`).join('');
 }
-function setProdCat(catId){prodCatSel=catId;renderProdCatRow()}
+function setProdCat(catId){prodCatSel=catId}
 
 const UNIDADES_MEDIDA=['metros','centímetros','gramos','kilogramos','litros','mililitros','unidades','pliegos','hojas'];
 function addInsumo(){fProdInsumos.push({id:uid(),nombre_insumo:'',proveedor:'',costo_unitario:'',cantidad_usada:'',unidad_medida:'',es_variable:false});renderInsumos()}
@@ -2727,6 +2731,7 @@ async function abrirEditarProducto(id){
   fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
   fProdCostosFijos=(p.costos_fijos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''}));
   fProdVariantes=(p.variantes||[]).map(cargarNodoVar);
+  varColapsadas=new Set();(function colap(ns){(ns||[]).forEach(n=>{varColapsadas.add(n.id);colap(n.hijos)})})(fProdVariantes);
   prodModoCalculo=p.tipo_precio==='medidas'?'medidas':(p.tipo_precio==='variantes'?'variantes':'cantidad');
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
@@ -3176,6 +3181,7 @@ async function abrirEditar(id){
     fEnc.forEach(e=>e.items.forEach(it=>{
       if(it.ficha_id&&fichasPorId[it.ficha_id])it._fichaSel=fichasPorId[it.ficha_id];
       if(it.config){try{const cfg=JSON.parse(it.config);if(cfg.varPicks)it._varPicks=cfg.varPicks;if(cfg.ancho)it._ancho=cfg.ancho;if(cfg.alto)it._alto=cfg.alto;}catch(e){}}
+      if(it._varPicks&&Object.keys(it._varPicks).length)varItemPlegados.add(it.id);
     }));
     recalcularCostosAutomaticos();
     renderEncs();
