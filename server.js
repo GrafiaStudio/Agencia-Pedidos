@@ -612,7 +612,9 @@ function validarFicha(b,wsId,fid){
       if(tieneHijos){
         v.hijos.forEach((h,j)=>validarNodo(h,etiq+'.'+(j+1)));
       }else{
-        if(!definido(v.precio)||evalExpr(v.precio)===null)errores.push(`Variante ${etiq}: necesita un precio válido`);
+        const precioOk=definido(v.precio)&&evalExpr(v.precio)!==null;
+        const tramoUno=detectarPrecioEscalonado(v.tramos||[],1);
+        if(!precioOk&&tramoUno==null)errores.push(`Variante ${etiq}: necesita un precio (o un tramo que empiece en 1)`);
       }
     };
     (b.variantes||[]).forEach((v,i)=>validarNodo(v,String(i+1)));

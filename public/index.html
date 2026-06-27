@@ -1944,15 +1944,10 @@ function setItem(encId,itemId,k,v){
       const elU=document.getElementById('itval-'+itemId);
       if(elU)elU.value=displayMoneyVal(it.valor_unitario);
     }
-    if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='variantes'&&it._varPath&&it._varPath.length){
-      const hoja=hojaDePathVar(it._fichaSel,it._varPath);
-      if(hoja){
-        const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
-        const porTramo=detectarPrecioEscalonado(hoja.tramos||[],cantNum);
-        it.valor_unitario=String((cantNum>0&&porTramo!=null)?porTramo:(parseFloat(hoja.precio_calc)||0));
-        const elU=document.getElementById('itval-'+itemId);
-        if(elU)elU.value=displayMoneyVal(it.valor_unitario);
-      }
+    if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='variantes'&&it._varPicks&&Object.keys(it._varPicks).length){
+      recalcVarItem(it);
+      const elU=document.getElementById('itval-'+itemId);
+      if(elU)elU.value=displayMoneyVal(it.valor_unitario);
     }
     if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='regla'){
       const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
@@ -2020,67 +2015,65 @@ function setMedidaItem(encId,itemId,campo,valor){
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
-function nodosEnPathVar(ficha,path){
-  const cadena=[]; let nivel=ficha.variantes||[];
-  for(const idx of (path||[])){
-    const n=nivel[idx];
-    if(!n)break;
-    cadena.push(n);
-    nivel=n.hijos||[];
-  }
-  return cadena;
+function varPrecioNodoFE(n,cant){
+  const t=detectarPrecioEscalonado(n.tramos||[],cant);
+  return (t!=null)?t:(parseFloat(n.precio_calc)||0);
 }
-function hojaDePathVar(ficha,path){
-  const cadena=nodosEnPathVar(ficha,path);
-  if(!cadena.length)return null;
-  const ult=cadena[cadena.length-1];
-  return (ult.hijos&&ult.hijos.length)?null:ult;
+function varPrecioBaseFE(n){return varPrecioNodoFE(n,1)}
+/* Partes (1er nivel) elegidas en el pedido: cada una suma. Una parte con hijos
+   aporta la OPCIÓN elegida (excluyente); una parte hoja aporta su propio precio. */
+function partesSeleccionadasVar(it){
+  const picks=it._varPicks||{};
+  const sel=[];
+  (it._fichaSel.variantes||[]).forEach(parte=>{
+    const val=picks[parte.id];
+    if(parte.hijos&&parte.hijos.length){
+      if(val){const op=parte.hijos.find(h=>h.id===val);if(op)sel.push({parte,opcion:op})}
+    }else{
+      if(val)sel.push({parte,opcion:null});
+    }
+  });
+  return sel;
 }
-function varPrecioBaseFE(n){
-  const p1=detectarPrecioEscalonado(n.tramos||[],1);
-  return (p1!=null)?p1:(parseFloat(n.precio_calc)||0);
-}
-function costoAcumuladoHojaFE(ficha,path){
-  let total=costoTotalInsumosFicha(ficha.insumos);
-  nodosEnPathVar(ficha,path).forEach(n=>{total+=costoTotalCostosArr(n.costos)});
-  return total;
+function recalcVarItem(it){
+  if(!it||!it._fichaSel)return;
+  const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+  const sel=partesSeleccionadasVar(it);
+  let total=0;
+  sel.forEach(s=>{total+=varPrecioNodoFE(s.opcion||s.parte,cant>0?cant:1)});
+  it.valor_unitario=sel.length?String(total):'';
+  it._autoPrecio=true;
+  const nombres=sel.map(s=>s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre);
+  const base=(it._fichaSel.nombre||it.detalle||'').split(' — ')[0];
+  it.detalle=base+(nombres.length?' — '+nombres.join(' + '):'');
 }
 function renderVarSelectsHTML(encId,it){
-  const path=it._varPath||[];
-  let html='<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
-  let nivelNodos=it._fichaSel.variantes||[], nivel=0;
-  while(nivelNodos&&nivelNodos.length){
-    const sel=(nivel<path.length)?path[nivel]:'';
-    html+=`<select class="item-inp" style="width:auto;min-width:150px" onchange="setVarPath('${encId}','${it.id}',${nivel},this.value)">
-      <option value="">Elige…</option>
-      ${nivelNodos.map((n,i)=>{const hoja=!(n.hijos&&n.hijos.length);return `<option value="${i}"${String(i)===String(sel)?' selected':''}>${n.nombre}${hoja?' — '+fCOP(varPrecioBaseFE(n)):' ▸'}</option>`}).join('')}
-    </select>`;
-    if(sel===''||sel==null)break;
-    const chosen=nivelNodos[parseInt(sel,10)];
-    if(!chosen||!(chosen.hijos&&chosen.hijos.length))break;
-    nivelNodos=chosen.hijos; nivel++;
-  }
+  const picks=it._varPicks||{};
+  let html='<div style="margin-top:5px;display:flex;flex-direction:column;gap:4px">';
+  (it._fichaSel.variantes||[]).forEach(parte=>{
+    if(parte.hijos&&parte.hijos.length){
+      const val=picks[parte.id]||'';
+      html+=`<div style="display:flex;gap:6px;align-items:center"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">${parte.nombre}</span>
+        <select class="item-inp" style="width:auto;min-width:150px" onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.value)">
+          <option value="">— ninguno —</option>
+          ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre} — ${fCOP(varPrecioBaseFE(h))}</option>`).join('')}
+        </select></div>`;
+    }else{
+      const on=!!picks[parte.id];
+      html+=`<label class="ck-box" style="display:inline-flex;gap:6px"><input type="checkbox" ${on?'checked':''} onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.checked?'1':'')"><span style="font-size:11px">${parte.nombre} — ${fCOP(varPrecioBaseFE(parte))}</span></label>`;
+    }
+  });
   html+='</div>';
   return html;
 }
-function setVarPath(encId,itemId,nivel,idxStr){
+function setVarPick(encId,itemId,parteId,value){
   const e=fEnc.find(x=>x.id===encId);
   const it=e&&e.items.find(i=>i.id===itemId);
-  if(!it||!it._fichaSel)return;
-  it._varPath=(it._varPath||[]).slice(0,nivel);
-  if(idxStr!==''&&idxStr!=null)it._varPath.push(parseInt(idxStr,10));
-  const hoja=hojaDePathVar(it._fichaSel,it._varPath);
-  if(hoja){
-    const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
-    const porTramo=detectarPrecioEscalonado(hoja.tramos||[],cantNum);
-    it.valor_unitario=String((cantNum>0&&porTramo!=null)?porTramo:(parseFloat(hoja.precio_calc)||0));
-    it._autoPrecio=true;
-    const cadena=nodosEnPathVar(it._fichaSel,it._varPath).map(n=>n.nombre);
-    const base=(it._fichaSel.nombre||it.detalle||'').split(' — ')[0];
-    it.detalle=base+(cadena.length?' — '+cadena.join(' — '):'');
-  }else{
-    it.valor_unitario='';
-  }
+  if(!it)return;
+  it._varPicks=it._varPicks||{};
+  if(value===''||value==null||value===false)delete it._varPicks[parteId];
+  else it._varPicks[parteId]=value;
+  recalcVarItem(it);
   renderEncItems(encId);
   actualizarValorTotal();
   recalcularCostosAutomaticos();
@@ -2132,7 +2125,7 @@ function selItem(encId,itemId,idx){
     it.valor_unitario='';
     if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
   }else if(p.tipo_precio==='variantes'){
-    it._varPath=[];it._autoPrecio=true;
+    it._varPicks={};it._autoPrecio=true;
     it.valor_unitario='';
     if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
   }else if(p.tipo_precio==='escalonado'){
@@ -2308,6 +2301,19 @@ function quitarNodoVar(id,nodos){
   return false;
 }
 function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[]}}
+function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',
+  costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
+  tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
+  hijos:(v.hijos||[]).map(clonarNodoVar)}}
+function duplicarVariante(id){
+  const buscar=(lista)=>{
+    const i=lista.findIndex(n=>n.id===id);
+    if(i>=0){const copia=clonarNodoVar(lista[i]);copia.nombre=(copia.nombre||'')+' (copia)';lista.splice(i+1,0,copia);return true}
+    for(const n of lista){if(buscar(n.hijos||[]))return true}
+    return false;
+  };
+  buscar(fProdVariantes);renderVariantes();
+}
 function addVariante(){fProdVariantes.push(nodoVarNuevo());renderVariantes()}
 function addSubVariante(vid){const v=buscarNodoVar(vid);if(v){v.hijos=v.hijos||[];v.hijos.push(nodoVarNuevo());renderVariantes()}}
 function remVariante(id){quitarNodoVar(id);renderVariantes()}
@@ -2356,6 +2362,7 @@ function htmlNodoVariante(v,nivel){
     <div style="display:flex;gap:8px;align-items:flex-end">
       <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">${nivel>1?'Sub-variante':'Variante'}</label><input class="item-inp" type="text" value="${v.nombre||''}" placeholder="${nivel>1?'Ej: Con vidrio':'Ej: 20×25'}" oninput="setVariante('${v.id}','nombre',this.value)"></div>
       ${esGrupo?'':`<div style="width:120px"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio público</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>`}
+      <button class="item-del" title="Duplicar" onclick="duplicarVariante('${v.id}')" style="color:var(--teal)"><i class="ti ti-copy"></i></button>
       <button class="item-del" title="Eliminar" onclick="remVariante('${v.id}')"><i class="ti ti-trash"></i></button>
     </div>
     <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Costos de este nivel${esGrupo?' (se suman a todas sus sub-variantes)':''}</div>
@@ -2733,10 +2740,18 @@ function validarProductoBody(b){
   }
   if(b.tipo_precio==='variantes'){
     if(!b.variantes||!b.variantes.length)return'Agrega al menos una variante';
-    for(let i=0;i<b.variantes.length;i++){
-      if(!String(b.variantes[i].nombre||'').trim())return`Variante #${i+1}: escribe un nombre`;
-      if(!definidoFE(b.variantes[i].precio)||evalExpr(b.variantes[i].precio)===null)return`Variante #${i+1}: precio no válido`;
-    }
+    const valNodo=(v,etiq)=>{
+      if(!String(v.nombre||'').trim())return`Variante ${etiq}: escribe un nombre`;
+      if(v.hijos&&v.hijos.length){
+        for(let j=0;j<v.hijos.length;j++){const e=valNodo(v.hijos[j],etiq+'.'+(j+1));if(e)return e}
+      }else{
+        const precioOk=definidoFE(v.precio)&&evalExpr(v.precio)!==null;
+        const tramoUno=detectarPrecioEscalonado(v.tramos||[],1);
+        if(!precioOk&&tramoUno==null)return`Variante ${etiq}: necesita un precio (o un tramo que empiece en 1)`;
+      }
+      return null;
+    };
+    for(let i=0;i<b.variantes.length;i++){const e=valNodo(b.variantes[i],String(i+1));if(e)return e}
   }
   if(b.tipo_precio==='combo'||b.tipo_precio==='promocional'){
     if(b.tipo_precio==='combo'&&(!b.componentes||!b.componentes.length))return'Combo necesita al menos un componente';
@@ -2905,10 +2920,11 @@ function recalcularCostosAutomaticos(){
       if(cantNum<=0)return;
       let costoUnit=0, desc='';
       if(it._fichaSel.tipo_precio==='variantes'){
-        const hoja=hojaDePathVar(it._fichaSel,it._varPath);
-        if(!hoja)return;
-        costoUnit=costoAcumuladoHojaFE(it._fichaSel,it._varPath);
-        const cadena=nodosEnPathVar(it._fichaSel,it._varPath).map(n=>n.nombre).join(' — ');
+        const sel=partesSeleccionadasVar(it);
+        if(!sel.length)return;
+        costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
+        sel.forEach(s=>{costoUnit+=costoTotalCostosArr(s.parte.costos);if(s.opcion)costoUnit+=costoTotalCostosArr(s.opcion.costos)});
+        const cadena=sel.map(s=>s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre).join(' + ');
         desc='Costos: '+it._fichaSel.nombre+(cadena?' — '+cadena:'');
       }else{
         if(!it._fichaSel.insumos||!it._fichaSel.insumos.length)return;
