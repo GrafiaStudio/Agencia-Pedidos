@@ -220,6 +220,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS ficha_variantes(
   orden INTEGER DEFAULT 0
 )`);
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN costos TEXT DEFAULT '[]'"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN parent_id TEXT DEFAULT ''"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -538,11 +539,7 @@ function fichaCompleta(f){
   if(!f)return null;
   f.insumos=db.prepare('SELECT * FROM ficha_insumos WHERE ficha_id=? ORDER BY orden').all(f.id);
   f.componentes=db.prepare('SELECT * FROM combo_composicion WHERE ficha_id=? ORDER BY orden').all(f.id);
-  f.variantes=db.prepare('SELECT * FROM ficha_variantes WHERE ficha_id=? ORDER BY orden').all(f.id).map(v=>{
-    try{v.costos=JSON.parse(v.costos||'[]')}catch(e){v.costos=[]}
-    try{v.tramos=JSON.parse(v.tramos||'[]')}catch(e){v.tramos=[]}
-    return v;
-  });
+  f.variantes=arbolVariantes(db.prepare('SELECT * FROM ficha_variantes WHERE ficha_id=? ORDER BY orden').all(f.id));
   f.activo=!!f.activo;
   try{f.rangos=JSON.parse(f.rangos||'[]')}catch(e){f.rangos=[]}
   try{f.costos_fijos=JSON.parse(f.costos_fijos||'[]')}catch(e){f.costos_fijos=[]}
@@ -551,10 +548,11 @@ function fichaCompleta(f){
   if((f.tipo_precio==='combo'||f.tipo_precio==='promocional')&&f.combo_precio_modo==='individual'&&f.componentes.length){
     f.precio_oficial=f.componentes.reduce((a,c)=>a+c.cantidad_consumida*toNum(c.precio_unitario_calc),0);
   }else if(f.tipo_precio==='variantes'&&f.variantes.length){
-    f.precio_oficial=Math.min(...f.variantes.map(v=>{
+    const hojas=hojasVariantes(f.variantes);
+    f.precio_oficial=hojas.length?Math.min(...hojas.map(v=>{
       const p1=detectarPrecioEscalonado(v.tramos||[],1);
       return p1!=null?p1:toNum(v.precio_calc);
-    }));
+    })):0;
   }else{
     f.precio_oficial=precioOficialFicha(f,f.precio_sugerido);
   }
@@ -608,10 +606,16 @@ function validarFicha(b,wsId,fid){
   }
   if(b.tipo_precio==='variantes'){
     if(!Array.isArray(b.variantes)||!b.variantes.length)errores.push('Un producto por variantes necesita al menos una variante');
-    (b.variantes||[]).forEach((v,i)=>{
-      if(!String(v.nombre||'').trim())errores.push(`Variante #${i+1}: escribe un nombre (ej. 10×10)`);
-      if(!definido(v.precio)||evalExpr(v.precio)===null)errores.push(`Variante #${i+1}: necesita un precio válido`);
-    });
+    const validarNodo=(v,etiq)=>{
+      if(!String(v.nombre||'').trim())errores.push(`Variante ${etiq}: escribe un nombre`);
+      const tieneHijos=Array.isArray(v.hijos)&&v.hijos.length;
+      if(tieneHijos){
+        v.hijos.forEach((h,j)=>validarNodo(h,etiq+'.'+(j+1)));
+      }else{
+        if(!definido(v.precio)||evalExpr(v.precio)===null)errores.push(`Variante ${etiq}: necesita un precio válido`);
+      }
+    };
+    (b.variantes||[]).forEach((v,i)=>validarNodo(v,String(i+1)));
   }
   if(b.tipo_precio==='regla'){
     if(!Number.isInteger(b.regla_lleva)||b.regla_lleva<=0)errores.push('"Lleva" debe ser un número entero mayor a 0');
@@ -1047,11 +1051,36 @@ function cfJSON(b){
 }
 function guardarVariantes(fichaId,variantes,wsId){
   db.prepare('DELETE FROM ficha_variantes WHERE ficha_id=?').run(fichaId);
-  (variantes||[]).forEach((v,i)=>{
+  const insertarNodo=(v,parentId,i)=>{
+    const id=uid();
     const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)}));
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,nombre,precio,precio_calc,tramos,costos,orden)VALUES(?,?,?,?,?,?,?,?,?)')
-      .run(uid(),fichaId,wsId,String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),i);
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,orden)VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),i);
+    (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));
+  };
+  (variantes||[]).forEach((v,i)=>insertarNodo(v,'',i));
+}
+function arbolVariantes(filas){
+  filas.forEach(v=>{
+    try{v.costos=JSON.parse(v.costos||'[]')}catch(e){v.costos=[]}
+    try{v.tramos=JSON.parse(v.tramos||'[]')}catch(e){v.tramos=[]}
+    v.hijos=[];
   });
+  const porId={}; filas.forEach(v=>porId[v.id]=v);
+  const raiz=[];
+  filas.forEach(v=>{
+    if(v.parent_id&&porId[v.parent_id])porId[v.parent_id].hijos.push(v);
+    else raiz.push(v);
+  });
+  return raiz;
+}
+function hojasVariantes(nodos){
+  const out=[];
+  (nodos||[]).forEach(n=>{
+    if(n.hijos&&n.hijos.length)out.push(...hojasVariantes(n.hijos));
+    else out.push(n);
+  });
+  return out;
 }
 app.post('/api/productos',(req,res)=>{
   try{
