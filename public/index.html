@@ -343,6 +343,11 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .prod-card{background:var(--white);border-radius:var(--r);border:1.5px solid var(--line);padding:13px 15px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:11px;transition:all .13s}
 .prod-card:hover{border-color:var(--teal-lt);box-shadow:var(--sh)}
 .prod-grupo-hd{font-size:11px;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px;padding-left:2px;display:flex;align-items:center;gap:8px}
+.crear-card{flex:1 1 200px;max-width:230px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px;padding:24px 18px;border:1.5px solid var(--line);border-radius:var(--r-lg);background:var(--white);cursor:pointer;transition:all .15s;color:var(--navy)}
+.crear-card:hover{border-color:var(--teal);background:var(--teal-lt);transform:translateY(-2px);box-shadow:var(--sh)}
+.crear-card i{font-size:30px;color:var(--teal-dk)}
+.crear-card span{font-size:13px;font-weight:800}
+.crear-card small{font-size:10px;font-weight:600;color:var(--muted);line-height:1.4}
 .b-tipo{background:var(--teal-lt);color:var(--teal-dk);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .cli-av{width:40px;height:40px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--teal);flex-shrink:0}
 .cli-name{font-size:13px;font-weight:800;color:var(--navy)}
@@ -903,11 +908,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   <div class="mbody">
 
     <div id="prod-paso-tipo">
-      <div class="msec"><span class="tri"></span>¿Qué quieres crear?</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-        <button class="btn-add-row" style="padding:14px 18px;font-size:11px" onclick="elegirCaminoProducto('simple')"><i class="ti ti-tag"></i>Producto simple</button>
-        <button class="btn-add-row" style="padding:14px 18px;font-size:11px" onclick="elegirCaminoProducto('combo')"><i class="ti ti-package"></i>Combo</button>
-        <button class="btn-add-row" style="padding:14px 18px;font-size:11px" onclick="elegirCaminoProducto('promocional')"><i class="ti ti-discount-2"></i>Promoción</button>
+      <div style="text-align:center;font-size:15px;font-weight:800;color:var(--navy);margin:18px 0 4px">¿Qué quieres crear?</div>
+      <div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:26px">Elige el tipo de ficha. Después configuras los detalles.</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:760px;margin:0 auto 28px">
+        <button class="crear-card" onclick="elegirCaminoProducto('simple')"><i class="ti ti-tag"></i><span>Producto simple</span><small>Un precio: por cantidad, medidas, variantes o por hoja</small></button>
+        <button class="crear-card" onclick="elegirCaminoProducto('combo')"><i class="ti ti-package"></i><span>Combo</span><small>Varios productos juntos a un precio</small></button>
+        <button class="crear-card" onclick="elegirCaminoProducto('promocional')"><i class="ti ti-discount-2"></i><span>Promoción</span><small>Oferta con vigencia por fechas</small></button>
       </div>
     </div>
 
