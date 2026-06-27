@@ -917,12 +917,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <div id="prod-modo-calc-wrap" style="display:none">
       <div class="msec"><span class="tri"></span>Modo de cálculo</div>
-      <div class="fr3 fg" style="margin-bottom:4px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:4px">
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-cantidad" checked onchange="setModoCalculo('cantidad')"><label for="prod-modo-cantidad">Por cantidad / precio fijo</label></div>
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-medidas" onchange="setModoCalculo('medidas')"><label for="prod-modo-medidas">Por medidas (ancho × alto)</label></div>
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-variantes" onchange="setModoCalculo('variantes')"><label for="prod-modo-variantes">Por variantes (tamaños/versiones)</label></div>
+        <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-pliego" onchange="setModoCalculo('pliego')"><label for="prod-modo-pliego">Por pliego (imposición)</label></div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: el precio sale del tamaño que pida el cliente (pendones, lonas). Por variantes: un mismo producto en varias versiones, el cliente elige una (retablos por tamaño).</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: el precio sale del tamaño (pendones, lonas). Por variantes: varias versiones, el cliente elige (retablos). Por pliego: para tarjetas/volantes — el costo es por pliego, no por pieza (1000 y 1050 pueden costar igual si caben en los mismos pliegos).</div>
     </div>
 
     <div class="collapsible" style="margin:8px 0">
@@ -980,6 +981,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </table>
       <button class="btn-add-row" onclick="addCostoFijo()"><i class="ti ti-plus"></i>Agregar costo fijo</button>
       <div class="fg" style="margin-top:12px"><label>Cobro mínimo (opcional)</label><input type="text" id="prod-cobro-minimo" placeholder="Ej: 50000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Si el cálculo da menos que esto, se cobra esto. Para trabajos muy chicos.</div></div>
+    </div>
+
+    <div id="prod-sec-pliego" style="display:none">
+      <div class="msec"><span class="tri"></span>Precio por pliego</div>
+      <div class="fr2 fg">
+        <div><label>Piezas por pliego</label><input type="number" id="prod-piezas-pliego" min="1" placeholder="Ej: 21"><div style="font-size:10px;color:var(--muted);margin-top:3px">Cuántas piezas salen de un pliego (según el montaje/imposición).</div></div>
+        <div><label>Precio por pliego</label><input type="text" id="prod-precio-pliego" placeholder="Ej: 10000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Lo que cobras por cada pliego completo (ya incluye tu ganancia).</div></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">En el pedido, el sistema calcula los pliegos necesarios para la cantidad pedida y reparte el costo. Ej: 21 piezas/pliego a $10.000 → 1000 tarjetas = 48 pliegos = $480.000.</div>
     </div>
 
     <div id="prod-sec-variantes" style="display:none">
@@ -1770,7 +1780,7 @@ async function cargarProductos(q=''){
   productos=await api('GET',`/productos${p}`);
   const el=document.getElementById('lista-prod');
   if(!productos.length){el.innerHTML='<div class="empty"><i class="ti ti-box-off"></i><p>Sin productos</p></div>';return}
-  const TIPO_LABEL={unitario:'Producto simple',escalonado:'Producto simple',regla:'Lleva N, paga M',combo:'Combo',promocional:'Promoción',medidas:'Por medidas',variantes:'Por variantes'};
+  const TIPO_LABEL={unitario:'Producto simple',escalonado:'Producto simple',regla:'Lleva N, paga M',combo:'Combo',promocional:'Promoción',medidas:'Por medidas',variantes:'Por variantes',pliego:'Por pliego'};
   el.innerHTML=productos.map(p=>{
     const cat=CATS.find(c=>c.id===p.categoria_id);
     return`<div class="prod-card" onclick="abrirEditarProducto('${p.id}')">
@@ -1778,7 +1788,7 @@ async function cargarProductos(q=''){
         <div class="cli-name">${p.nombre}</div>
         <div class="cli-sub">${cat?`<span class="ttag ${cat.tc}">${cat.label}</span> `:''}<span class="b-tipo">${TIPO_LABEL[p.tipo_precio]||p.tipo_precio}</span> ${!p.activo?'<span class="b-canc">Inactivo</span>':''} ${(p.stock_actual!=null&&p.stock_minimo!=null&&p.stock_actual<=p.stock_minimo)?'<span class="b-pend">Stock bajo</span>':''}</div>
       </div>
-      <div style="font-weight:800;color:var(--navy);flex-shrink:0">${p.tipo_precio==='variantes'?'desde '+fCOP(p.precio_oficial):(fCOP(p.precio_oficial)+(p.tipo_precio==='medidas'?' / '+(SUF_UNIDAD[p.medida_unidad]||'m²'):''))}</div>
+      <div style="font-weight:800;color:var(--navy);flex-shrink:0">${p.tipo_precio==='variantes'?'desde '+fCOP(p.precio_oficial):(p.tipo_precio==='pliego'?fCOP(p.precio_oficial)+' c/u aprox':(fCOP(p.precio_oficial)+(p.tipo_precio==='medidas'?' / '+(SUF_UNIDAD[p.medida_unidad]||'m²'):'')))}</div>
     </div>`;
   }).join('');
 }
@@ -1949,6 +1959,12 @@ function setItem(encId,itemId,k,v){
       const elU=document.getElementById('itval-'+itemId);
       if(elU)elU.value=displayMoneyVal(it.valor_unitario);
     }
+    if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='pliego'){
+      const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
+      it.valor_unitario=cantNum>0?String(calcPrecioPliegoUnit(it._fichaSel,cantNum)):'';
+      const elU=document.getElementById('itval-'+itemId);
+      if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+    }
     if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='regla'){
       const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
       if(cantNum>0){
@@ -1984,6 +2000,14 @@ function detectarPrecioEscalonado(rangos,cantidad){
   const ultimo=rangos[rangos.length-1];
   if(ultimo.hasta!=null&&cantidad>ultimo.hasta)return ultimo.precio;
   return null;
+}
+function calcPrecioPliegoUnit(ficha,cantidad){
+  if(!ficha)return 0;
+  const ppp=parseInt(ficha.piezas_por_pliego,10)||0;
+  const ppl=parseFloat(ficha.precio_pliego_calc)||0;
+  const n=parseInt(cantidad,10)||0;
+  if(ppp<=0||n<=0)return 0;
+  return Math.round(Math.ceil(n/ppp)*ppl/n);
 }
 function calcPrecioMedidas(ficha,ancho,alto){
   if(!ficha)return 0;
@@ -2132,10 +2156,10 @@ async function acItem(encId,itemId,q){
   });
   if(!vigentes.length){dr.style.display='none';return}
   _acItemResults[itemId]=vigentes.slice(0,6);
-  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',regla:'ti-discount',combo:'ti-package',promocional:'ti-discount-2',medidas:'ti-ruler-2',variantes:'ti-layout-grid'};
+  const ICONOS={unitario:'ti-tag',escalonado:'ti-stairs',regla:'ti-discount',combo:'ti-package',promocional:'ti-discount-2',medidas:'ti-ruler-2',variantes:'ti-layout-grid',pliego:'ti-layout-board-split'};
   dr.innerHTML=_acItemResults[itemId].map((p,i)=>{
     const tieneTramos=p.tipo_precio==='escalonado'&&(p.rangos||[]).length>0;
-    const precioTxt=p.tipo_precio==='medidas'?(fCOP(p.precio_oficial)+' / '+(SUF_UNIDAD[p.medida_unidad]||'m²')):(p.tipo_precio==='variantes'?('desde '+fCOP(p.precio_oficial)):((tieneTramos||p.tipo_precio==='regla')?'según cantidad':fCOP(p.precio_oficial)));
+    const precioTxt=p.tipo_precio==='medidas'?(fCOP(p.precio_oficial)+' / '+(SUF_UNIDAD[p.medida_unidad]||'m²')):(p.tipo_precio==='variantes'?('desde '+fCOP(p.precio_oficial)):(p.tipo_precio==='pliego'?'según cantidad (pliegos)':((tieneTramos||p.tipo_precio==='regla')?'según cantidad':fCOP(p.precio_oficial))));
     const stockTxt=p.stock_actual!=null?` · Stock: ${p.stock_actual}`:'';
     return`<div class="ac-item" onclick="selItem('${encId}','${itemId}',${i})">
       <div class="ac-name"><i class="ti ${ICONOS[p.tipo_precio]||'ti-tag'}" style="margin-right:5px"></i>${p.nombre}</div>
@@ -2161,6 +2185,10 @@ function selItem(encId,itemId,idx){
     it._varPicks={};it._autoPrecio=true;
     it.valor_unitario='';
     if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
+  }else if(p.tipo_precio==='pliego'){
+    it._autoPrecio=true;
+    const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+    it.valor_unitario=cantNum>0?String(calcPrecioPliegoUnit(p,cantNum)):'';
   }else if(p.tipo_precio==='escalonado'){
     it._autoPrecio=true;
     const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
@@ -2312,9 +2340,10 @@ let prodModoCalculo='cantidad';
 const SUF_UNIDAD={m2:'m²',m:'m',cm2:'cm²'};
 function setModoCalculo(modo){
   prodModoCalculo=modo;
-  const esMed=modo==='medidas', esVar=modo==='variantes', esCant=modo==='cantidad';
+  const esMed=modo==='medidas', esVar=modo==='variantes', esCant=modo==='cantidad', esPli=modo==='pliego';
   document.getElementById('prod-sec-medidas').style.display=esMed?'block':'none';
   document.getElementById('prod-sec-variantes').style.display=esVar?'block':'none';
+  document.getElementById('prod-sec-pliego').style.display=esPli?'block':'none';
   document.getElementById('prod-sec-margen-precio').style.display=esCant?'block':'none';
   document.getElementById('prod-sec-escalonado').style.display=esCant?'block':'none';
   if(esCant){
@@ -2643,7 +2672,7 @@ function elegirCaminoProducto(camino){
   document.getElementById('prod-sec-promocional').style.display=camino==='promocional'?'block':'none';
   document.getElementById('prod-btn-item-libre').style.display=camino==='promocional'?'inline-flex':'none';
   if(esSimple)setModoCalculo(prodModoCalculo);
-  else{document.getElementById('prod-sec-medidas').style.display='none';document.getElementById('prod-sec-variantes').style.display='none';document.getElementById('prod-sec-margen-precio').style.display='block';}
+  else{document.getElementById('prod-sec-medidas').style.display='none';document.getElementById('prod-sec-variantes').style.display='none';document.getElementById('prod-sec-pliego').style.display='none';document.getElementById('prod-sec-margen-precio').style.display='block';}
   actualizarVisibilidadPrecioBase();
 }
 function onEsReglaChange(){
@@ -2682,14 +2711,18 @@ function resetProdForm(){
   document.getElementById('prod-modo-cantidad').checked=true;
   document.getElementById('prod-modo-medidas').checked=false;
   document.getElementById('prod-modo-variantes').checked=false;
+  document.getElementById('prod-modo-pliego').checked=false;
   document.getElementById('prod-medida-unidad').value='m2';
   document.getElementById('prod-medida-tarifa').value='';
   document.getElementById('prod-cobro-minimo').value='';
+  document.getElementById('prod-piezas-pliego').value='';
+  document.getElementById('prod-precio-pliego').value='';
   renderCostosFijos();
   renderVariantes();
   document.getElementById('prod-modo-calc-wrap').style.display='none';
   document.getElementById('prod-sec-medidas').style.display='none';
   document.getElementById('prod-sec-variantes').style.display='none';
+  document.getElementById('prod-sec-pliego').style.display='none';
   document.getElementById('prod-sec-margen-precio').style.display='block';
   document.getElementById('prod-nombre').value='';
   document.getElementById('prod-es-regla').checked=false;
@@ -2737,7 +2770,7 @@ async function abrirEditarProducto(id){
   fProdCostosFijos=(p.costos_fijos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''}));
   fProdVariantes=(p.variantes||[]).map(cargarNodoVar);
   varColapsadas=new Set();(function colap(ns){(ns||[]).forEach(n=>{varColapsadas.add(n.id);colap(n.hijos)})})(fProdVariantes);
-  prodModoCalculo=p.tipo_precio==='medidas'?'medidas':(p.tipo_precio==='variantes'?'variantes':'cantidad');
+  prodModoCalculo=p.tipo_precio==='medidas'?'medidas':(p.tipo_precio==='variantes'?'variantes':(p.tipo_precio==='pliego'?'pliego':'cantidad'));
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
   document.getElementById('prod-nombre').value=p.nombre;
@@ -2762,9 +2795,12 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-modo-cantidad').checked=prodModoCalculo==='cantidad';
   document.getElementById('prod-modo-medidas').checked=prodModoCalculo==='medidas';
   document.getElementById('prod-modo-variantes').checked=prodModoCalculo==='variantes';
+  document.getElementById('prod-modo-pliego').checked=prodModoCalculo==='pliego';
   document.getElementById('prod-medida-unidad').value=p.medida_unidad||'m2';
   document.getElementById('prod-medida-tarifa').value=displayMoneyVal(p.medida_tarifa||'');
   document.getElementById('prod-cobro-minimo').value=displayMoneyVal(p.cobro_minimo||'');
+  document.getElementById('prod-piezas-pliego').value=p.piezas_por_pliego??'';
+  document.getElementById('prod-precio-pliego').value=displayMoneyVal(p.precio_pliego||'');
   renderProdCatRow();
   renderInsumos();
   renderRangos();
@@ -2790,6 +2826,10 @@ function validarProductoBody(b){
       if(definidoFE(b.costos_fijos[i].valor)&&evalExpr(b.costos_fijos[i].valor)===null)return`Costo fijo #${i+1} no es una expresión válida`;
     }
     if(definidoFE(b.cobro_minimo)&&evalExpr(b.cobro_minimo)===null)return'El cobro mínimo no es una expresión válida';
+  }
+  if(b.tipo_precio==='pliego'){
+    if(!Number.isInteger(b.piezas_por_pliego)||b.piezas_por_pliego<=0)return'Piezas por pliego debe ser un número mayor a 0';
+    if(!definidoFE(b.precio_pliego)||evalExpr(b.precio_pliego)===null)return'El precio por pliego es obligatorio';
   }
   if(b.tipo_precio==='variantes'){
     if(!b.variantes||!b.variantes.length)return'Agrega al menos una variante';
@@ -2821,7 +2861,8 @@ async function guardarProducto(){
   if(!nombre){document.getElementById('prod-nombre').focus();toast('Ingresa el nombre del producto',false);return}
   const esMedidas=prodCaminoActual==='simple'&&prodModoCalculo==='medidas';
   const esVariantes=prodCaminoActual==='simple'&&prodModoCalculo==='variantes';
-  const tipoPrecio=prodCaminoActual==='simple'?(esMedidas?'medidas':(esVariantes?'variantes':(document.getElementById('prod-es-regla').checked?'regla':'escalonado'))):prodCaminoActual;
+  const esPliego=prodCaminoActual==='simple'&&prodModoCalculo==='pliego';
+  const tipoPrecio=prodCaminoActual==='simple'?(esMedidas?'medidas':(esVariantes?'variantes':(esPliego?'pliego':(document.getElementById('prod-es-regla').checked?'regla':'escalonado')))):prodCaminoActual;
   const body={
     nombre,
     categoria_id:prodCatSel,
@@ -2843,6 +2884,8 @@ async function guardarProducto(){
     costos_fijos:esMedidas?fProdCostosFijos.map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})):[],
     cobro_minimo:esMedidas?document.getElementById('prod-cobro-minimo').value.trim():'',
     variantes:esVariantes?fProdVariantes.map(serializarNodoVar):[],
+    piezas_por_pliego:esPliego?(document.getElementById('prod-piezas-pliego').value===''?null:parseInt(document.getElementById('prod-piezas-pliego').value,10)):null,
+    precio_pliego:esPliego?document.getElementById('prod-precio-pliego').value.trim():'',
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
     fecha_fin:document.getElementById('prod-fecha-fin').value,
     cantidad_minima:document.getElementById('prod-cantidad-minima').value.trim(),

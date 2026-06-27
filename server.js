@@ -170,6 +170,9 @@ try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_tarifa_calc TEXT");
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costos_fijos TEXT DEFAULT '[]'"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN cobro_minimo TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN cobro_minimo_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN piezas_por_pliego INTEGER"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN precio_pliego TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN precio_pliego_calc TEXT"); } catch(e){}
 
 // ── FICHAS DE PRODUCTO (Fase 2A+2B del documento maestro, sin combos) ──
 db.exec(`CREATE TABLE IF NOT EXISTS fichas_producto(
@@ -492,7 +495,15 @@ function logError(contexto,err){
 }
 
 // ── FICHAS DE PRODUCTO: helpers ──
-const TIPOS_PRECIO_VALIDOS=['unitario','escalonado','promocional','combo','regla','medidas','variantes'];
+const TIPOS_PRECIO_VALIDOS=['unitario','escalonado','promocional','combo','regla','medidas','variantes','pliego'];
+function calcPrecioPliegoUnit(ficha,cantidad){
+  const ppp=parseInt(ficha.piezas_por_pliego,10)||0;
+  const ppl=toNum(ficha.precio_pliego_calc);
+  const n=parseInt(cantidad,10)||0;
+  if(ppp<=0||n<=0)return 0;
+  const pliegos=Math.ceil(n/ppp);
+  return Math.round(pliegos*ppl/n);
+}
 const MEDIDA_UNIDADES_VALIDAS=['m2','m','cm2'];
 function calcPrecioMedidas(ficha,ancho,alto){
   const tarifa=toNum(ficha.medida_tarifa_calc);
@@ -533,6 +544,7 @@ function detectarPrecioEscalonado(rangos,cantidad){
 }
 function precioOficialFicha(ficha,precioSugerido){
   if(ficha.tipo_precio==='medidas')return toNum(ficha.medida_tarifa_calc);
+  if(ficha.tipo_precio==='pliego'){const ppp=parseInt(ficha.piezas_por_pliego,10)||0;return ppp>0?Math.round(toNum(ficha.precio_pliego_calc)/ppp):0;}
   if(ficha.tipo_precio==='escalonado'&&Array.isArray(ficha.rangos)&&ficha.rangos.length){
     const precioParaUno=detectarPrecioEscalonado(ficha.rangos,1);
     if(precioParaUno!=null)return precioParaUno;
@@ -607,6 +619,10 @@ function validarFicha(b,wsId,fid){
       if(definido(c.valor)&&evalExpr(c.valor)===null)errores.push(`Costo fijo #${i+1} no es una expresión válida`);
     });
     if(definido(b.cobro_minimo)&&evalExpr(b.cobro_minimo)===null)errores.push('El cobro mínimo no es una expresión válida');
+  }
+  if(b.tipo_precio==='pliego'){
+    if(!Number.isInteger(b.piezas_por_pliego)||b.piezas_por_pliego<=0)errores.push('Piezas por pliego debe ser un número entero mayor a 0');
+    if(!definido(b.precio_pliego)||evalExpr(b.precio_pliego)===null)errores.push('El precio por pliego es obligatorio y debe ser una expresión válida');
   }
   if(b.tipo_precio==='variantes'){
     if(!Array.isArray(b.variantes)||!b.variantes.length)errores.push('Un producto por variantes necesita al menos una variante');
@@ -1096,9 +1112,9 @@ app.post('/api/productos',(req,res)=>{
     const errores=validarFicha(b,req.wsId);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid();
-    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo,medida_unidad,medida_tarifa,medida_tarifa_calc,costos_fijos,cobro_minimo,cobro_minimo_calc)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,req.wsId,b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo));
+    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo,medida_unidad,medida_tarifa,medida_tarifa_calc,costos_fijos,cobro_minimo,cobro_minimo_calc,piezas_por_pliego,precio_pliego,precio_pliego_calc)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,req.wsId,b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego));
     guardarInsumos(id,b.insumos,req.wsId);
     guardarComposicion(id,b.componentes,req.wsId);
     guardarVariantes(id,b.variantes,req.wsId);
@@ -1113,8 +1129,8 @@ app.put('/api/productos/:id',(req,res)=>{
     if(!f)return res.status(404).json({error:'No encontrado'});
     const errores=validarFicha(b,req.wsId,fid);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
-    db.prepare(`UPDATE fichas_producto SET nombre=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=?,medida_unidad=?,medida_tarifa=?,medida_tarifa_calc=?,costos_fijos=?,cobro_minimo=?,cobro_minimo_calc=? WHERE id=? AND workspace_id=?`)
-      .run(b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),fid,req.wsId);
+    db.prepare(`UPDATE fichas_producto SET nombre=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=?,medida_unidad=?,medida_tarifa=?,medida_tarifa_calc=?,costos_fijos=?,cobro_minimo=?,cobro_minimo_calc=?,piezas_por_pliego=?,precio_pliego=?,precio_pliego_calc=? WHERE id=? AND workspace_id=?`)
+      .run(b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),fid,req.wsId);
     if(b.insumos!==undefined)guardarInsumos(fid,b.insumos,req.wsId);
     if(b.componentes!==undefined)guardarComposicion(fid,b.componentes,req.wsId);
     if(b.variantes!==undefined)guardarVariantes(fid,b.variantes,req.wsId);
