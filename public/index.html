@@ -921,9 +921,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-cantidad" checked onchange="setModoCalculo('cantidad')"><label for="prod-modo-cantidad">Por cantidad / precio fijo</label></div>
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-medidas" onchange="setModoCalculo('medidas')"><label for="prod-modo-medidas">Por medidas (ancho × alto)</label></div>
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-variantes" onchange="setModoCalculo('variantes')"><label for="prod-modo-variantes">Por variantes (tamaños/versiones)</label></div>
-        <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-pliego" onchange="setModoCalculo('pliego')"><label for="prod-modo-pliego">Por pliego (imposición)</label></div>
+        <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-pliego" onchange="setModoCalculo('pliego')"><label for="prod-modo-pliego">Por hoja / imposición</label></div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: el precio sale del tamaño (pendones, lonas). Por variantes: varias versiones, el cliente elige (retablos). Por pliego: para tarjetas/volantes — el costo es por pliego, no por pieza (1000 y 1050 pueden costar igual si caben en los mismos pliegos).</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: el precio sale del tamaño (pendones, lonas). Por variantes: varias versiones, el cliente elige (retablos). Por hoja: para tarjetas/volantes — defines en qué hojas imprimes (Carta, A4, A3…) cuántas piezas rinde cada una y su precio; el sistema calcula las hojas necesarias. Más extras opcionales (doble lado, corte, acabados).</div>
     </div>
 
     <div class="collapsible" style="margin:8px 0">
@@ -984,12 +984,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     </div>
 
     <div id="prod-sec-pliego" style="display:none">
-      <div class="msec"><span class="tri"></span>Precio por pliego</div>
-      <div class="fr2 fg">
-        <div><label>Piezas por pliego</label><input type="number" id="prod-piezas-pliego" min="1" placeholder="Ej: 21"><div style="font-size:10px;color:var(--muted);margin-top:3px">Cuántas piezas salen de un pliego (según el montaje/imposición).</div></div>
-        <div><label>Precio por pliego</label><input type="text" id="prod-precio-pliego" placeholder="Ej: 10000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Lo que cobras por cada pliego completo (ya incluye tu ganancia).</div></div>
-      </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">En el pedido, el sistema calcula los pliegos necesarios para la cantidad pedida y reparte el costo. Ej: 21 piezas/pliego a $10.000 → 1000 tarjetas = 48 pliegos = $480.000.</div>
+      <div class="msec"><span class="tri"></span>Hojas / superficies de impresión</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">En cuáles imprimes (Carta, Oficio, A4, A3, o una medida propia como "50×30"), cuántas piezas rinde cada una y su precio. Al cotizar eliges la hoja y el sistema calcula cuántas necesitas. Ej: A4 rinde 8 tarjetas a $1.000 la hoja → 100 tarjetas = 13 hojas.</div>
+      <table class="items-table" id="prod-hoja-sup-tabla">
+        <thead><tr><th>Hoja / tamaño</th><th style="width:90px">Piezas que rinde</th><th style="width:110px">Precio de la hoja</th><th style="width:26px"></th></tr></thead>
+        <tbody id="prod-hoja-sup-body"></tbody>
+      </table>
+      <button class="btn-add-row" onclick="addHojaSup()"><i class="ti ti-plus"></i>Agregar hoja</button>
+      <div class="msec" style="margin-top:14px"><span class="tri"></span>Extras y acabados (opcional)</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Lo que se suma según el trabajo: doble lado, corte, perforado, laminado mate, UV parcial… Cada uno cobra por pieza, por hoja, o fijo por trabajo. Al cotizar marcas los que apliquen.</div>
+      <table class="items-table" id="prod-hoja-extras-tabla">
+        <thead><tr><th>Extra / acabado</th><th style="width:100px">Valor</th><th style="width:120px">Cobra por</th><th style="width:26px"></th></tr></thead>
+        <tbody id="prod-hoja-extras-body"></tbody>
+      </table>
+      <button class="btn-add-row" onclick="addHojaExtra()"><i class="ti ti-plus"></i>Agregar extra</button>
     </div>
 
     <div id="prod-sec-variantes" style="display:none">
@@ -1960,8 +1968,7 @@ function setItem(encId,itemId,k,v){
       if(elU)elU.value=displayMoneyVal(it.valor_unitario);
     }
     if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='pliego'){
-      const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
-      it.valor_unitario=cantNum>0?String(calcPrecioPliegoUnit(it._fichaSel,cantNum)):'';
+      recalcHojaItem(it);
       const elU=document.getElementById('itval-'+itemId);
       if(elU)elU.value=displayMoneyVal(it.valor_unitario);
     }
@@ -2001,13 +2008,77 @@ function detectarPrecioEscalonado(rangos,cantidad){
   if(ultimo.hasta!=null&&cantidad>ultimo.hasta)return ultimo.precio;
   return null;
 }
-function calcPrecioPliegoUnit(ficha,cantidad){
+function hojaSuperficies(ficha){
+  let sup=ficha&&ficha.pliego_superficies;
+  if((!sup||!sup.length)&&ficha&&parseInt(ficha.piezas_por_pliego,10)>0)sup=[{nombre:'Hoja',piezas:parseInt(ficha.piezas_por_pliego,10),precio_calc:ficha.precio_pliego_calc}];
+  return sup||[];
+}
+function calcPrecioHojaUnit(ficha,surfIdx,extrasSel,cantidad){
   if(!ficha)return 0;
-  const ppp=parseInt(ficha.piezas_por_pliego,10)||0;
-  const ppl=parseFloat(ficha.precio_pliego_calc)||0;
+  const sups=hojaSuperficies(ficha);
+  const s=sups[parseInt(surfIdx,10)];
+  if(!s)return 0;
+  const piezas=parseInt(s.piezas,10)||0;
+  const precio=parseFloat(s.precio_calc)||0;
   const n=parseInt(cantidad,10)||0;
-  if(ppp<=0||n<=0)return 0;
-  return Math.round(Math.ceil(n/ppp)*ppl/n);
+  if(piezas<=0||n<=0)return 0;
+  const pliegos=Math.ceil(n/piezas);
+  let total=pliegos*precio;
+  (ficha.pliego_extras||[]).forEach((e,i)=>{
+    if(!extrasSel||!extrasSel[i])return;
+    const v=parseFloat(e.valor_calc)||0;
+    if(e.tipo==='pieza')total+=v*n;
+    else if(e.tipo==='hoja')total+=v*pliegos;
+    else total+=v;
+  });
+  return Math.round(total/n);
+}
+function recalcHojaItem(it){
+  if(!it||!it._fichaSel)return;
+  const n=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+  const sups=hojaSuperficies(it._fichaSel);
+  const s=sups[parseInt(it._hojaSurf,10)];
+  if(!s||n<=0){it.valor_unitario='';return}
+  it.valor_unitario=String(calcPrecioHojaUnit(it._fichaSel,it._hojaSurf,it._hojaExtras||{},n));
+  it._autoPrecio=true;
+  const extrasN=(it._fichaSel.pliego_extras||[]).filter((e,i)=>(it._hojaExtras||{})[i]).map(e=>e.nombre);
+  const base=(it._fichaSel.nombre||it.detalle||'').split(' — ')[0];
+  it.detalle=base+' — '+s.nombre+(extrasN.length?' + '+extrasN.join(' + '):'');
+}
+function renderHojaSelectsHTML(encId,it){
+  const sups=hojaSuperficies(it._fichaSel);
+  const extras=it._fichaSel.pliego_extras||[];
+  const surfSel=it._hojaSurf;
+  let html='<div style="margin-top:5px;display:flex;flex-direction:column;gap:5px">';
+  html+=`<div style="display:flex;gap:6px;align-items:center"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">Hoja</span>
+    <select class="item-inp" style="width:auto;min-width:150px" onchange="setHojaSurf('${encId}','${it.id}',this.value)">
+      <option value="">— elige —</option>
+      ${sups.map((s,i)=>`<option value="${i}"${String(i)===String(surfSel)?' selected':''}>${s.nombre} (${s.piezas} pzs / ${fCOP(parseFloat(s.precio_calc)||0)})</option>`).join('')}
+    </select></div>`;
+  if(extras.length){
+    html+=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">Extras</span>
+      ${extras.map((e,i)=>`<label class="ck-box" style="display:inline-flex;gap:4px"><input type="checkbox" ${(it._hojaExtras||{})[i]?'checked':''} onchange="setHojaExtraItem('${encId}','${it.id}',${i},this.checked)"><span style="font-size:10px">${e.nombre} (${fCOP(parseFloat(e.valor_calc)||0)} ${e.tipo==='pieza'?'c/u':e.tipo==='hoja'?'x hoja':'fijo'})</span></label>`).join('')}
+    </div>`;
+  }
+  html+='</div>';
+  return html;
+}
+function setHojaSurf(encId,itemId,idx){
+  const e=fEnc.find(x=>x.id===encId);const it=e&&e.items.find(i=>i.id===itemId);
+  if(!it)return;
+  it._hojaSurf=idx;
+  recalcHojaItem(it);
+  renderEncItems(encId);actualizarValorTotal();recalcularCostosAutomaticos();
+}
+function setHojaExtraItem(encId,itemId,extraIdx,on){
+  const e=fEnc.find(x=>x.id===encId);const it=e&&e.items.find(i=>i.id===itemId);
+  if(!it)return;
+  it._hojaExtras=it._hojaExtras||{};
+  if(on)it._hojaExtras[extraIdx]=true;else delete it._hojaExtras[extraIdx];
+  recalcHojaItem(it);
+  const elU=document.getElementById('itval-'+itemId);if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+  const elD=document.getElementById('itdet-'+itemId);if(elD){elD.value=it.detalle||'';autoTA(elD)}
+  actualizarValorTotal();recalcularCostosAutomaticos();
 }
 function calcPrecioMedidas(ficha,ancho,alto){
   if(!ficha)return 0;
@@ -2186,9 +2257,9 @@ function selItem(encId,itemId,idx){
     it.valor_unitario='';
     if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
   }else if(p.tipo_precio==='pliego'){
-    it._autoPrecio=true;
-    const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
-    it.valor_unitario=cantNum>0?String(calcPrecioPliegoUnit(p,cantNum)):'';
+    it._autoPrecio=true;it._hojaSurf='';it._hojaExtras={};
+    it.valor_unitario='';
+    if(!it.cantidad||!String(it.cantidad).trim())it.cantidad='1';
   }else if(p.tipo_precio==='escalonado'){
     it._autoPrecio=true;
     const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
@@ -2274,7 +2345,9 @@ function renderItemsHTML(enc){
           <span id="itmed-hint-${it.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk)"></span>
         </div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='variantes')?`
         <div style="margin-top:3px"><button type="button" class="btn-ghost" style="font-size:10px;padding:1px 6px" onclick="toggleVarItem('${enc.id}','${it.id}')"><i class="ti ti-chevron-${varItemPlegados.has(it.id)?'right':'down'}"></i> opciones</button></div>
-        <div style="display:${varItemPlegados.has(it.id)?'none':'block'}">${renderVarSelectsHTML(enc.id,it)}</div>`:''}</td>
+        <div style="display:${varItemPlegados.has(it.id)?'none':'block'}">${renderVarSelectsHTML(enc.id,it)}</div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='pliego')?`
+        <div style="margin-top:3px"><button type="button" class="btn-ghost" style="font-size:10px;padding:1px 6px" onclick="toggleVarItem('${enc.id}','${it.id}')"><i class="ti ti-chevron-${varItemPlegados.has(it.id)?'right':'down'}"></i> hoja / extras</button></div>
+        <div style="display:${varItemPlegados.has(it.id)?'none':'block'}">${renderHojaSelectsHTML(enc.id,it)}</div>`:''}</td>
       <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:34px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
@@ -2335,7 +2408,35 @@ function blurItemVal(el,encId,itemId){
 }
 
 /* ══ FICHA DE PRODUCTO: widgets ══ */
-let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='',fProdPrecioSugeridoActual=null,fProdStockActual=null,fProdStockMinimo=null,fProdCostosFijos=[],fProdVariantes=[];
+let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='',fProdPrecioSugeridoActual=null,fProdStockActual=null,fProdStockMinimo=null,fProdCostosFijos=[],fProdVariantes=[],fProdHojaSuperficies=[],fProdHojaExtras=[];
+function addHojaSup(){fProdHojaSuperficies.push({id:uid(),nombre:'',piezas:'',precio:''});renderHojaSup()}
+function remHojaSup(id){fProdHojaSuperficies=fProdHojaSuperficies.filter(x=>x.id!==id);renderHojaSup()}
+function setHojaSup(id,k,v){const s=fProdHojaSuperficies.find(x=>x.id===id);if(s)s[k]=v}
+function renderHojaSup(){
+  document.getElementById('prod-hoja-sup-body').innerHTML=fProdHojaSuperficies.map(s=>`
+    <tr>
+      <td><input class="item-inp" type="text" value="${s.nombre||''}" placeholder="Ej: A4" oninput="setHojaSup('${s.id}','nombre',this.value)"></td>
+      <td><input class="item-inp" type="number" min="1" value="${s.piezas||''}" placeholder="Ej: 8" oninput="setHojaSup('${s.id}','piezas',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${s.precio||''}" placeholder="$ 0" oninput="setHojaSup('${s.id}','precio',this.value)"></td>
+      <td style="width:26px"><button class="item-del" onclick="remHojaSup('${s.id}')"><i class="ti ti-x"></i></button></td>
+    </tr>`).join('');
+}
+function addHojaExtra(){fProdHojaExtras.push({id:uid(),nombre:'',valor:'',tipo:'pieza'});renderHojaExtras()}
+function remHojaExtra(id){fProdHojaExtras=fProdHojaExtras.filter(x=>x.id!==id);renderHojaExtras()}
+function setHojaExtra(id,k,v){const e=fProdHojaExtras.find(x=>x.id===id);if(e)e[k]=v}
+function renderHojaExtras(){
+  document.getElementById('prod-hoja-extras-body').innerHTML=fProdHojaExtras.map(e=>`
+    <tr>
+      <td><input class="item-inp" type="text" value="${e.nombre||''}" placeholder="Ej: Doble lado" oninput="setHojaExtra('${e.id}','nombre',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${e.valor||''}" placeholder="$ 0" oninput="setHojaExtra('${e.id}','valor',this.value)"></td>
+      <td><select class="item-inp" onchange="setHojaExtra('${e.id}','tipo',this.value)">
+        <option value="pieza"${e.tipo==='pieza'?' selected':''}>por pieza</option>
+        <option value="hoja"${e.tipo==='hoja'?' selected':''}>por hoja</option>
+        <option value="fijo"${e.tipo==='fijo'?' selected':''}>fijo (1 vez)</option>
+      </select></td>
+      <td style="width:26px"><button class="item-del" onclick="remHojaExtra('${e.id}')"><i class="ti ti-x"></i></button></td>
+    </tr>`).join('');
+}
 let prodModoCalculo='cantidad';
 const SUF_UNIDAD={m2:'m²',m:'m',cm2:'cm²'};
 function setModoCalculo(modo){
@@ -2715,10 +2816,11 @@ function resetProdForm(){
   document.getElementById('prod-medida-unidad').value='m2';
   document.getElementById('prod-medida-tarifa').value='';
   document.getElementById('prod-cobro-minimo').value='';
-  document.getElementById('prod-piezas-pliego').value='';
-  document.getElementById('prod-precio-pliego').value='';
+  fProdHojaSuperficies=[];fProdHojaExtras=[];
   renderCostosFijos();
   renderVariantes();
+  renderHojaSup();
+  renderHojaExtras();
   document.getElementById('prod-modo-calc-wrap').style.display='none';
   document.getElementById('prod-sec-medidas').style.display='none';
   document.getElementById('prod-sec-variantes').style.display='none';
@@ -2769,6 +2871,8 @@ async function abrirEditarProducto(id){
   fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
   fProdCostosFijos=(p.costos_fijos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''}));
   fProdVariantes=(p.variantes||[]).map(cargarNodoVar);
+  fProdHojaSuperficies=(p.pliego_superficies||[]).map(s=>({id:uid(),nombre:s.nombre||'',piezas:s.piezas||'',precio:s.precio||''}));
+  fProdHojaExtras=(p.pliego_extras||[]).map(e=>({id:uid(),nombre:e.nombre||'',valor:e.valor||'',tipo:e.tipo||'pieza'}));
   varColapsadas=new Set();(function colap(ns){(ns||[]).forEach(n=>{varColapsadas.add(n.id);colap(n.hijos)})})(fProdVariantes);
   prodModoCalculo=p.tipo_precio==='medidas'?'medidas':(p.tipo_precio==='variantes'?'variantes':(p.tipo_precio==='pliego'?'pliego':'cantidad'));
   prodCatSel=p.categoria_id||'';
@@ -2799,13 +2903,13 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-medida-unidad').value=p.medida_unidad||'m2';
   document.getElementById('prod-medida-tarifa').value=displayMoneyVal(p.medida_tarifa||'');
   document.getElementById('prod-cobro-minimo').value=displayMoneyVal(p.cobro_minimo||'');
-  document.getElementById('prod-piezas-pliego').value=p.piezas_por_pliego??'';
-  document.getElementById('prod-precio-pliego').value=displayMoneyVal(p.precio_pliego||'');
   renderProdCatRow();
   renderInsumos();
   renderRangos();
   renderCostosFijos();
   renderVariantes();
+  renderHojaSup();
+  renderHojaExtras();
   renderComponentes();
   onMargenTipoChange();
   const camino=(p.tipo_precio==='combo')?'combo':(p.tipo_precio==='promocional')?'promocional':'simple';
@@ -2828,8 +2932,18 @@ function validarProductoBody(b){
     if(definidoFE(b.cobro_minimo)&&evalExpr(b.cobro_minimo)===null)return'El cobro mínimo no es una expresión válida';
   }
   if(b.tipo_precio==='pliego'){
-    if(!Number.isInteger(b.piezas_por_pliego)||b.piezas_por_pliego<=0)return'Piezas por pliego debe ser un número mayor a 0';
-    if(!definidoFE(b.precio_pliego)||evalExpr(b.precio_pliego)===null)return'El precio por pliego es obligatorio';
+    if(!b.pliego_superficies||!b.pliego_superficies.length)return'Agrega al menos una hoja/superficie de impresión';
+    for(let i=0;i<b.pliego_superficies.length;i++){
+      const s=b.pliego_superficies[i];
+      if(!String(s.nombre||'').trim())return`Hoja #${i+1}: escribe un nombre (ej. A4)`;
+      if(!Number.isInteger(s.piezas)||s.piezas<=0)return`Hoja #${i+1}: piezas que rinde debe ser un número mayor a 0`;
+      if(!definidoFE(s.precio)||evalExpr(s.precio)===null)return`Hoja #${i+1}: el precio no es válido`;
+    }
+    for(let i=0;i<(b.pliego_extras||[]).length;i++){
+      const e=b.pliego_extras[i];
+      if(!String(e.nombre||'').trim())return`Extra #${i+1}: escribe un nombre`;
+      if(definidoFE(e.valor)&&evalExpr(e.valor)===null)return`Extra #${i+1}: el valor no es válido`;
+    }
   }
   if(b.tipo_precio==='variantes'){
     if(!b.variantes||!b.variantes.length)return'Agrega al menos una variante';
@@ -2884,8 +2998,8 @@ async function guardarProducto(){
     costos_fijos:esMedidas?fProdCostosFijos.map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})):[],
     cobro_minimo:esMedidas?document.getElementById('prod-cobro-minimo').value.trim():'',
     variantes:esVariantes?fProdVariantes.map(serializarNodoVar):[],
-    piezas_por_pliego:esPliego?(document.getElementById('prod-piezas-pliego').value===''?null:parseInt(document.getElementById('prod-piezas-pliego').value,10)):null,
-    precio_pliego:esPliego?document.getElementById('prod-precio-pliego').value.trim():'',
+    pliego_superficies:esPliego?fProdHojaSuperficies.map(s=>({nombre:(s.nombre||'').trim(),piezas:parseInt(s.piezas,10)||0,precio:(s.precio||'').toString().trim()})):[],
+    pliego_extras:esPliego?fProdHojaExtras.map(e=>({nombre:(e.nombre||'').trim(),valor:(e.valor||'').toString().trim(),tipo:e.tipo||'pieza'})):[],
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
     fecha_fin:document.getElementById('prod-fecha-fin').value,
     cantidad_minima:document.getElementById('prod-cantidad-minima').value.trim(),
@@ -3228,8 +3342,8 @@ async function abrirEditar(id){
     fichas.forEach(f=>{if(f)fichasPorId[f.id]=f});
     fEnc.forEach(e=>e.items.forEach(it=>{
       if(it.ficha_id&&fichasPorId[it.ficha_id])it._fichaSel=fichasPorId[it.ficha_id];
-      if(it.config){try{const cfg=JSON.parse(it.config);if(cfg.varPicks)it._varPicks=cfg.varPicks;if(cfg.ancho)it._ancho=cfg.ancho;if(cfg.alto)it._alto=cfg.alto;}catch(e){}}
-      if(it._varPicks&&Object.keys(it._varPicks).length)varItemPlegados.add(it.id);
+      if(it.config){try{const cfg=JSON.parse(it.config);if(cfg.varPicks)it._varPicks=cfg.varPicks;if(cfg.ancho)it._ancho=cfg.ancho;if(cfg.alto)it._alto=cfg.alto;if(cfg.hojaSurf!==undefined&&cfg.hojaSurf!=='')it._hojaSurf=cfg.hojaSurf;if(cfg.hojaExtras)it._hojaExtras=cfg.hojaExtras;}catch(e){}}
+      if((it._varPicks&&Object.keys(it._varPicks).length)||(it._hojaSurf!==undefined&&it._hojaSurf!==''))varItemPlegados.add(it.id);
     }));
     recalcularCostosAutomaticos();
     renderEncs();
