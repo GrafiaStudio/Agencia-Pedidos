@@ -551,7 +551,10 @@ function fichaCompleta(f){
   if((f.tipo_precio==='combo'||f.tipo_precio==='promocional')&&f.combo_precio_modo==='individual'&&f.componentes.length){
     f.precio_oficial=f.componentes.reduce((a,c)=>a+c.cantidad_consumida*toNum(c.precio_unitario_calc),0);
   }else if(f.tipo_precio==='variantes'&&f.variantes.length){
-    f.precio_oficial=Math.min(...f.variantes.map(v=>toNum(v.precio_calc)));
+    f.precio_oficial=Math.min(...f.variantes.map(v=>{
+      const p1=detectarPrecioEscalonado(v.tramos||[],1);
+      return p1!=null?p1:toNum(v.precio_calc);
+    }));
   }else{
     f.precio_oficial=precioOficialFicha(f,f.precio_sugerido);
   }
