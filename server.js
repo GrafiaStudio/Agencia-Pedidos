@@ -162,6 +162,12 @@ try { db.exec("ALTER TABLE combo_composicion ADD COLUMN precio_unitario TEXT DEF
 try { db.exec("ALTER TABLE combo_composicion ADD COLUMN precio_unitario_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN ficha_id TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN stock_consumido TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_unidad TEXT DEFAULT 'm2'"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_tarifa TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_tarifa_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costos_fijos TEXT DEFAULT '[]'"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN cobro_minimo TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN cobro_minimo_calc TEXT"); } catch(e){}
 
 // ── FICHAS DE PRODUCTO (Fase 2A+2B del documento maestro, sin combos) ──
 db.exec(`CREATE TABLE IF NOT EXISTS fichas_producto(
@@ -469,7 +475,17 @@ function logError(contexto,err){
 }
 
 // ── FICHAS DE PRODUCTO: helpers ──
-const TIPOS_PRECIO_VALIDOS=['unitario','escalonado','promocional','combo','regla'];
+const TIPOS_PRECIO_VALIDOS=['unitario','escalonado','promocional','combo','regla','medidas'];
+const MEDIDA_UNIDADES_VALIDAS=['m2','m','cm2'];
+function calcPrecioMedidas(ficha,ancho,alto){
+  const tarifa=toNum(ficha.medida_tarifa_calc);
+  const a=parseFloat(ancho)||0, b=parseFloat(alto)||0;
+  const area=(ficha.medida_unidad==='m')?a:a*b;
+  let fijos=0;
+  try{(Array.isArray(ficha.costos_fijos)?ficha.costos_fijos:JSON.parse(ficha.costos_fijos||'[]')).forEach(c=>{fijos+=toNum(c.valor_calc)})}catch(e){}
+  const minimo=toNum(ficha.cobro_minimo_calc);
+  return Math.max(minimo, Math.round(area*tarifa+fijos));
+}
 const MARGEN_TIPOS_VALIDOS=['multiplicador','porcentaje','fijo'];
 
 function calcCostoTotalInsumos(insumos){
@@ -499,6 +515,7 @@ function detectarPrecioEscalonado(rangos,cantidad){
   return null;
 }
 function precioOficialFicha(ficha,precioSugerido){
+  if(ficha.tipo_precio==='medidas')return toNum(ficha.medida_tarifa_calc);
   if(ficha.tipo_precio==='escalonado'&&Array.isArray(ficha.rangos)&&ficha.rangos.length){
     const precioParaUno=detectarPrecioEscalonado(ficha.rangos,1);
     if(precioParaUno!=null)return precioParaUno;
@@ -511,6 +528,7 @@ function fichaCompleta(f){
   f.componentes=db.prepare('SELECT * FROM combo_composicion WHERE ficha_id=? ORDER BY orden').all(f.id);
   f.activo=!!f.activo;
   try{f.rangos=JSON.parse(f.rangos||'[]')}catch(e){f.rangos=[]}
+  try{f.costos_fijos=JSON.parse(f.costos_fijos||'[]')}catch(e){f.costos_fijos=[]}
   f.costo_total=calcCostoTotalInsumos(f.insumos);
   f.precio_sugerido=calcPrecioSugerido(f,f.costo_total);
   if((f.tipo_precio==='combo'||f.tipo_precio==='promocional')&&f.combo_precio_modo==='individual'&&f.componentes.length){
@@ -557,6 +575,14 @@ function validarFicha(b,wsId,fid){
       if(!Number.isInteger(c.cantidad_consumida)||c.cantidad_consumida<=0)errores.push(`Componente #${i+1}: la cantidad debe ser un número entero mayor a 0`);
       if(modoIndividual&&(!definido(c.precio_unitario)||evalExpr(c.precio_unitario)===null))errores.push(`Componente #${i+1}: necesita un precio válido (modo "por producto")`);
     });
+  }
+  if(b.tipo_precio==='medidas'){
+    if(b.medida_unidad!==undefined&&!MEDIDA_UNIDADES_VALIDAS.includes(b.medida_unidad))errores.push('Unidad de medida no válida');
+    if(!definido(b.medida_tarifa)||evalExpr(b.medida_tarifa)===null)errores.push('La tarifa por unidad de medida es obligatoria y debe ser una expresión válida');
+    (b.costos_fijos||[]).forEach((c,i)=>{
+      if(definido(c.valor)&&evalExpr(c.valor)===null)errores.push(`Costo fijo #${i+1} no es una expresión válida`);
+    });
+    if(definido(b.cobro_minimo)&&evalExpr(b.cobro_minimo)===null)errores.push('El cobro mínimo no es una expresión válida');
   }
   if(b.tipo_precio==='regla'){
     if(!Number.isInteger(b.regla_lleva)||b.regla_lleva<=0)errores.push('"Lleva" debe ser un número entero mayor a 0');
@@ -987,6 +1013,9 @@ function guardarComposicion(fichaId,componentes,wsId){
   });
 }
 
+function cfJSON(b){
+  return JSON.stringify((b.costos_fijos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)})));
+}
 app.post('/api/productos',(req,res)=>{
   try{
     const b=req.body;
@@ -994,9 +1023,9 @@ app.post('/api/productos',(req,res)=>{
     const errores=validarFicha(b,req.wsId);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid();
-    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,req.wsId,b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global');
+    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo,medida_unidad,medida_tarifa,medida_tarifa_calc,costos_fijos,cobro_minimo,cobro_minimo_calc)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,req.wsId,b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo));
     guardarInsumos(id,b.insumos,req.wsId);
     guardarComposicion(id,b.componentes,req.wsId);
     res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(id)));
@@ -1010,8 +1039,8 @@ app.put('/api/productos/:id',(req,res)=>{
     if(!f)return res.status(404).json({error:'No encontrado'});
     const errores=validarFicha(b,req.wsId,fid);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
-    db.prepare(`UPDATE fichas_producto SET nombre=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=? WHERE id=? AND workspace_id=?`)
-      .run(b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',fid,req.wsId);
+    db.prepare(`UPDATE fichas_producto SET nombre=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=?,medida_unidad=?,medida_tarifa=?,medida_tarifa_calc=?,costos_fijos=?,cobro_minimo=?,cobro_minimo_calc=? WHERE id=? AND workspace_id=?`)
+      .run(b.nombre.trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),fid,req.wsId);
     if(b.insumos!==undefined)guardarInsumos(fid,b.insumos,req.wsId);
     if(b.componentes!==undefined)guardarComposicion(fid,b.componentes,req.wsId);
     res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(fid)));
