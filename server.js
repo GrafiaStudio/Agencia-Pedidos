@@ -216,8 +216,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS ficha_variantes(
   precio TEXT DEFAULT '',
   precio_calc TEXT,
   tramos TEXT DEFAULT '[]',
+  costos TEXT DEFAULT '[]',
   orden INTEGER DEFAULT 0
 )`);
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN costos TEXT DEFAULT '[]'"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -536,7 +538,11 @@ function fichaCompleta(f){
   if(!f)return null;
   f.insumos=db.prepare('SELECT * FROM ficha_insumos WHERE ficha_id=? ORDER BY orden').all(f.id);
   f.componentes=db.prepare('SELECT * FROM combo_composicion WHERE ficha_id=? ORDER BY orden').all(f.id);
-  f.variantes=db.prepare('SELECT * FROM ficha_variantes WHERE ficha_id=? ORDER BY orden').all(f.id);
+  f.variantes=db.prepare('SELECT * FROM ficha_variantes WHERE ficha_id=? ORDER BY orden').all(f.id).map(v=>{
+    try{v.costos=JSON.parse(v.costos||'[]')}catch(e){v.costos=[]}
+    try{v.tramos=JSON.parse(v.tramos||'[]')}catch(e){v.tramos=[]}
+    return v;
+  });
   f.activo=!!f.activo;
   try{f.rangos=JSON.parse(f.rangos||'[]')}catch(e){f.rangos=[]}
   try{f.costos_fijos=JSON.parse(f.costos_fijos||'[]')}catch(e){f.costos_fijos=[]}
@@ -1039,8 +1045,9 @@ function cfJSON(b){
 function guardarVariantes(fichaId,variantes,wsId){
   db.prepare('DELETE FROM ficha_variantes WHERE ficha_id=?').run(fichaId);
   (variantes||[]).forEach((v,i)=>{
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,nombre,precio,precio_calc,tramos,orden)VALUES(?,?,?,?,?,?,?,?)')
-      .run(uid(),fichaId,wsId,String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),i);
+    const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)}));
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,nombre,precio,precio_calc,tramos,costos,orden)VALUES(?,?,?,?,?,?,?,?,?)')
+      .run(uid(),fichaId,wsId,String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),i);
   });
 }
 app.post('/api/productos',(req,res)=>{
