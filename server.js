@@ -229,6 +229,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS ficha_variantes(
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN costos TEXT DEFAULT '[]'"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN parent_id TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN multi INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN modo TEXT DEFAULT 'precio'"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN piezas INTEGER"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -592,6 +594,7 @@ function fichaCompleta(f){
   }else if(f.tipo_precio==='variantes'&&f.variantes.length){
     const hojas=hojasVariantes(f.variantes);
     f.precio_oficial=hojas.length?Math.min(...hojas.map(v=>{
+      if(v.modo==='hoja'){const pz=parseInt(v.piezas,10)||0;return pz>0?Math.round(toNum(v.precio_calc)/pz):0;}
       const p1=detectarPrecioEscalonado(v.tramos||[],1);
       return p1!=null?p1:toNum(v.precio_calc);
     })):0;
@@ -666,6 +669,9 @@ function validarFicha(b,wsId,fid){
       const tieneHijos=Array.isArray(v.hijos)&&v.hijos.length;
       if(tieneHijos){
         v.hijos.forEach((h,j)=>validarNodo(h,etiq+'.'+(j+1)));
+      }else if(v.modo==='hoja'){
+        if(!Number.isInteger(v.piezas)&&!(parseInt(v.piezas,10)>0))errores.push(`Variante ${etiq}: piezas por hoja debe ser un número mayor a 0`);
+        if(!definido(v.precio)||evalExpr(v.precio)===null)errores.push(`Variante ${etiq}: el precio por hoja no es válido`);
       }else{
         const precioOk=definido(v.precio)&&evalExpr(v.precio)!==null;
         const tramoUno=detectarPrecioEscalonado(v.tramos||[],1);
@@ -1117,8 +1123,8 @@ function guardarVariantes(fichaId,variantes,wsId){
   const insertarNodo=(v,parentId,i)=>{
     const id=v.id||uid();
     const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)}));
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,orden)VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,i);
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,v.modo==='hoja'?'hoja':'precio',Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i);
     (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));
   };
   (variantes||[]).forEach((v,i)=>insertarNodo(v,'',i));

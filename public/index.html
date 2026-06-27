@@ -2111,10 +2111,18 @@ function setMedidaItem(encId,itemId,campo,valor){
   recalcularCostosAutomaticos();
 }
 function varPrecioNodoFE(n,cant){
+  if(n.modo==='hoja'){
+    const piezas=parseInt(n.piezas,10)||0, precio=parseFloat(n.precio_calc)||0;
+    if(piezas<=0||cant<=0)return 0;
+    return Math.round(Math.ceil(cant/piezas)*precio/cant);
+  }
   const t=detectarPrecioEscalonado(n.tramos||[],cant);
   return (t!=null)?t:(parseFloat(n.precio_calc)||0);
 }
-function varPrecioBaseFE(n){return varPrecioNodoFE(n,1)}
+function varPrecioBaseFE(n){
+  if(n.modo==='hoja'){const pz=parseInt(n.piezas,10)||0;return pz>0?Math.round((parseFloat(n.precio_calc)||0)/pz):0;}
+  return varPrecioNodoFE(n,1);
+}
 /* Partes (1er nivel) elegidas en el pedido: cada una suma, con su cantidad de instancias.
    - parte hoja: se incluye 1 vez (checkbox).
    - grupo "elige una" (multi=false): aporta la OPCIÓN elegida, 1 vez.
@@ -2474,11 +2482,12 @@ let varColapsadas=new Set();
 function toggleVarCard(id){if(varColapsadas.has(id))varColapsadas.delete(id);else varColapsadas.add(id);renderVariantes()}
 let varItemPlegados=new Set();
 function toggleVarItem(encId,itemId){if(varItemPlegados.has(itemId))varItemPlegados.delete(itemId);else varItemPlegados.add(itemId);renderEncItems(encId)}
-function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false}}
-function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,
+function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'precio',piezas:''}}
+function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',
   costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
   tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
   hijos:(v.hijos||[]).map(clonarNodoVar)}}
+function setVarModo(id,modo){const v=buscarNodoVar(id);if(v){v.modo=modo;renderVariantes()}}
 function duplicarVariante(id){
   const buscar=(lista)=>{
     const i=lista.findIndex(n=>n.id===id);
@@ -2537,7 +2546,7 @@ function htmlNodoVariante(v,nivel){
     <div style="display:flex;gap:8px;align-items:flex-end">
       <button class="item-del" title="Plegar/desplegar" onclick="toggleVarCard('${v.id}')"><i class="ti ti-chevron-${colapsado?'right':'down'}"></i></button>
       <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">${nivel>1?'Sub-variante':'Variante'}${esGrupo?' (grupo)':''}</label><input class="item-inp" type="text" value="${v.nombre||''}" placeholder="${nivel>1?'Ej: Con vidrio':'Ej: 20×25'}" oninput="setVariante('${v.id}','nombre',this.value)"></div>
-      ${esGrupo?'':`<div style="width:120px"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio público</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>`}
+      ${(esGrupo||v.modo==='hoja')?'':`<div style="width:120px"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio público</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>`}
       <button class="item-del" title="Duplicar" onclick="duplicarVariante('${v.id}')" style="color:var(--teal)"><i class="ti ti-copy"></i></button>
       <button class="item-del" title="Eliminar" onclick="remVariante('${v.id}')"><i class="ti ti-trash"></i></button>
     </div>
@@ -2546,9 +2555,20 @@ function htmlNodoVariante(v,nivel){
     ${htmlCostosVar(v)}
     <div id="var-util-${v.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk);margin-top:6px"></div>
     ${esGrupo?'':`
-      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Precios por cantidad (opcional)</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Si lo dejas vacío, se usa el Precio público. Ej: 1 a 6 → $15.000, 7 a 12 → $13.000. El último tramo cubre cantidades mayores.</div>
-      ${htmlTramosVar(v)}`}
+      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Cómo se cobra</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px">
+        <label class="ck-box" style="display:inline-flex;gap:6px"><input type="radio" name="vmodo-${v.id}" ${v.modo!=='hoja'?'checked':''} onchange="setVarModo('${v.id}','precio')"><span style="font-size:11px">Precio fijo / por cantidad</span></label>
+        <label class="ck-box" style="display:inline-flex;gap:6px"><input type="radio" name="vmodo-${v.id}" ${v.modo==='hoja'?'checked':''} onchange="setVarModo('${v.id}','hoja')"><span style="font-size:11px">Por hoja (rendimiento)</span></label>
+      </div>
+      ${v.modo==='hoja'?`
+        <div class="fr2 fg">
+          <div><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Piezas por hoja</label><input class="item-inp" type="number" min="1" value="${v.piezas||''}" placeholder="Ej: 8" oninput="setVariante('${v.id}','piezas',this.value)"></div>
+          <div><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio por hoja</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">Al cotizar, el sistema calcula cuántas hojas se necesitan. Ej: 8 piezas/hoja a $1.000 → 100 piezas = 13 hojas = $13.000.</div>`:`
+        <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Precios por cantidad (opcional)</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Si lo dejas vacío, se usa el Precio público. Ej: 1 a 6 → $15.000, 7 a 12 → $13.000. El último tramo cubre cantidades mayores.</div>
+        ${htmlTramosVar(v)}`}`}
     ${sub?`
       <div style="font-size:9px;font-weight:800;color:var(--navy);text-transform:uppercase;margin:12px 0 4px">Sub-variantes (versiones internas)</div>
       ${esGrupo?`<label class="ck-box" style="display:inline-flex;gap:6px;margin-bottom:6px"><input type="checkbox" ${v.multi?'checked':''} onchange="setVarMulti('${v.id}',this.checked)"><span style="font-size:10px">Permite elegir varias opciones (ej. varios estampados). Si está apagado, en el pedido se elige una sola (ej. un tamaño).</span></label>`:''}
@@ -2563,13 +2583,13 @@ function renderVariantes(){
   walk(fProdVariantes);
 }
 function cargarNodoVar(v){
-  return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,
+  return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',
     costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
     tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
     hijos:(v.hijos||[]).map(cargarNodoVar)};
 }
 function serializarNodoVar(v){
-  return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,
+  return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo:v.modo==='hoja'?'hoja':'precio',piezas:parseInt(v.piezas,10)||null,
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),
     tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
     hijos:(v.hijos||[]).map(serializarNodoVar)};
@@ -2951,6 +2971,9 @@ function validarProductoBody(b){
       if(!String(v.nombre||'').trim())return`Variante ${etiq}: escribe un nombre`;
       if(v.hijos&&v.hijos.length){
         for(let j=0;j<v.hijos.length;j++){const e=valNodo(v.hijos[j],etiq+'.'+(j+1));if(e)return e}
+      }else if(v.modo==='hoja'){
+        if(!(parseInt(v.piezas,10)>0))return`Variante ${etiq}: piezas por hoja debe ser un número mayor a 0`;
+        if(!definidoFE(v.precio)||evalExpr(v.precio)===null)return`Variante ${etiq}: el precio por hoja no es válido`;
       }else{
         const precioOk=definidoFE(v.precio)&&evalExpr(v.precio)!==null;
         const tramoUno=detectarPrecioEscalonado(v.tramos||[],1);
