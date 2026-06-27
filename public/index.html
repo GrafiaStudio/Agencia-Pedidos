@@ -2020,17 +2020,25 @@ function varPrecioNodoFE(n,cant){
   return (t!=null)?t:(parseFloat(n.precio_calc)||0);
 }
 function varPrecioBaseFE(n){return varPrecioNodoFE(n,1)}
-/* Partes (1er nivel) elegidas en el pedido: cada una suma. Una parte con hijos
-   aporta la OPCIÓN elegida (excluyente); una parte hoja aporta su propio precio. */
+/* Partes (1er nivel) elegidas en el pedido: cada una suma, con su cantidad de instancias.
+   - parte hoja: se incluye 1 vez (checkbox).
+   - grupo "elige una" (multi=false): aporta la OPCIÓN elegida, 1 vez.
+   - grupo "permite varias" (multi=true): cada opción con su cantidad (Carta×2, Tabloide×1).
+   Devuelve [{parte, opcion, qty}]. */
 function partesSeleccionadasVar(it){
   const picks=it._varPicks||{};
   const sel=[];
   (it._fichaSel.variantes||[]).forEach(parte=>{
     const val=picks[parte.id];
     if(parte.hijos&&parte.hijos.length){
-      if(val){const op=parte.hijos.find(h=>h.id===val);if(op)sel.push({parte,opcion:op})}
+      if(parte.multi){
+        const mapa=(val&&typeof val==='object')?val:{};
+        parte.hijos.forEach(op=>{const q=parseInt(mapa[op.id],10)||0;if(q>0)sel.push({parte,opcion:op,qty:q})});
+      }else{
+        if(val){const op=parte.hijos.find(h=>h.id===val);if(op)sel.push({parte,opcion:op,qty:1})}
+      }
     }else{
-      if(val)sel.push({parte,opcion:null});
+      if(val)sel.push({parte,opcion:null,qty:1});
     }
   });
   return sel;
@@ -2040,24 +2048,31 @@ function recalcVarItem(it){
   const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
   const sel=partesSeleccionadasVar(it);
   let total=0;
-  sel.forEach(s=>{total+=varPrecioNodoFE(s.opcion||s.parte,cant>0?cant:1)});
+  sel.forEach(s=>{total+=varPrecioNodoFE(s.opcion||s.parte,cant>0?cant:1)*(s.qty||1)});
   it.valor_unitario=sel.length?String(total):'';
   it._autoPrecio=true;
-  const nombres=sel.map(s=>s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre);
+  const nombres=sel.map(s=>{const n=s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre;return (s.qty>1)?(n+' ×'+s.qty):n});
   const base=(it._fichaSel.nombre||it.detalle||'').split(' — ')[0];
   it.detalle=base+(nombres.length?' — '+nombres.join(' + '):'');
 }
 function renderVarSelectsHTML(encId,it){
   const picks=it._varPicks||{};
-  let html='<div style="margin-top:5px;display:flex;flex-direction:column;gap:4px">';
+  let html='<div style="margin-top:5px;display:flex;flex-direction:column;gap:5px">';
   (it._fichaSel.variantes||[]).forEach(parte=>{
     if(parte.hijos&&parte.hijos.length){
-      const val=picks[parte.id]||'';
-      html+=`<div style="display:flex;gap:6px;align-items:center"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">${parte.nombre}</span>
-        <select class="item-inp" style="width:auto;min-width:150px" onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.value)">
-          <option value="">— ninguno —</option>
-          ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre} — ${fCOP(varPrecioBaseFE(h))}</option>`).join('')}
-        </select></div>`;
+      if(parte.multi){
+        const mapa=(picks[parte.id]&&typeof picks[parte.id]==='object')?picks[parte.id]:{};
+        html+=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">${parte.nombre}</span>
+          ${parte.hijos.map(op=>`<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px"><input class="item-inp" type="number" min="0" style="width:46px" value="${parseInt(mapa[op.id],10)||''}" placeholder="0" oninput="setVarPickMulti('${encId}','${it.id}','${parte.id}','${op.id}',this.value)"> ${op.nombre} (${fCOP(varPrecioBaseFE(op))})</span>`).join('')}
+        </div>`;
+      }else{
+        const val=picks[parte.id]||'';
+        html+=`<div style="display:flex;gap:6px;align-items:center"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">${parte.nombre}</span>
+          <select class="item-inp" style="width:auto;min-width:150px" onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.value)">
+            <option value="">— ninguno —</option>
+            ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre} — ${fCOP(varPrecioBaseFE(h))}</option>`).join('')}
+          </select></div>`;
+      }
     }else{
       const on=!!picks[parte.id];
       html+=`<label class="ck-box" style="display:inline-flex;gap:6px"><input type="checkbox" ${on?'checked':''} onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.checked?'1':'')"><span style="font-size:11px">${parte.nombre} — ${fCOP(varPrecioBaseFE(parte))}</span></label>`;
@@ -2075,6 +2090,22 @@ function setVarPick(encId,itemId,parteId,value){
   else it._varPicks[parteId]=value;
   recalcVarItem(it);
   renderEncItems(encId);
+  actualizarValorTotal();
+  recalcularCostosAutomaticos();
+}
+function setVarPickMulti(encId,itemId,parteId,opcionId,qtyStr){
+  const e=fEnc.find(x=>x.id===encId);
+  const it=e&&e.items.find(i=>i.id===itemId);
+  if(!it)return;
+  it._varPicks=it._varPicks||{};
+  if(!it._varPicks[parteId]||typeof it._varPicks[parteId]!=='object')it._varPicks[parteId]={};
+  const q=parseInt(qtyStr,10)||0;
+  if(q>0)it._varPicks[parteId][opcionId]=q;
+  else delete it._varPicks[parteId][opcionId];
+  if(!Object.keys(it._varPicks[parteId]).length)delete it._varPicks[parteId];
+  recalcVarItem(it);
+  const elU=document.getElementById('itval-'+itemId);
+  if(elU)elU.value=displayMoneyVal(it.valor_unitario);
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
@@ -2300,8 +2331,8 @@ function quitarNodoVar(id,nodos){
   for(const n of nodos){if(quitarNodoVar(id,n.hijos||[]))return true}
   return false;
 }
-function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[]}}
-function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',
+function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false}}
+function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,
   costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
   tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
   hijos:(v.hijos||[]).map(clonarNodoVar)}}
@@ -2374,6 +2405,7 @@ function htmlNodoVariante(v,nivel){
       ${htmlTramosVar(v)}`}
     ${sub?`
       <div style="font-size:9px;font-weight:800;color:var(--navy);text-transform:uppercase;margin:12px 0 4px">Sub-variantes (versiones internas)</div>
+      ${esGrupo?`<label class="ck-box" style="display:inline-flex;gap:6px;margin-bottom:6px"><input type="checkbox" ${v.multi?'checked':''} onchange="setVarMulti('${v.id}',this.checked)"><span style="font-size:10px">Permite elegir varias opciones (ej. varios estampados). Si está apagado, en el pedido se elige una sola (ej. un tamaño).</span></label>`:''}
       ${(v.hijos||[]).map(h=>htmlNodoVariante(h,nivel+1)).join('')}
       <button class="btn-add-row" onclick="addSubVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar sub-variante</button>`:''}
   </div>`;
@@ -2384,17 +2416,18 @@ function renderVariantes(){
   walk(fProdVariantes);
 }
 function cargarNodoVar(v){
-  return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',
+  return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,
     costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
     tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
     hijos:(v.hijos||[]).map(cargarNodoVar)};
 }
 function serializarNodoVar(v){
-  return {nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),
+  return {nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),
     tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
     hijos:(v.hijos||[]).map(serializarNodoVar)};
 }
+function setVarMulti(id,on){const v=buscarNodoVar(id);if(v)v.multi=on}
 function colapsarInsumos(){
   const body=document.querySelector('#ovProd .coll-body');
   if(!body)return;
@@ -2923,8 +2956,12 @@ function recalcularCostosAutomaticos(){
         const sel=partesSeleccionadasVar(it);
         if(!sel.length)return;
         costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
-        sel.forEach(s=>{costoUnit+=costoTotalCostosArr(s.parte.costos);if(s.opcion)costoUnit+=costoTotalCostosArr(s.opcion.costos)});
-        const cadena=sel.map(s=>s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre).join(' + ');
+        const partesUsadas=new Set();
+        sel.forEach(s=>{
+          if(!partesUsadas.has(s.parte.id)){partesUsadas.add(s.parte.id);costoUnit+=costoTotalCostosArr(s.parte.costos)}
+          if(s.opcion)costoUnit+=costoTotalCostosArr(s.opcion.costos)*(s.qty||1);
+        });
+        const cadena=sel.map(s=>{const n=s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre;return (s.qty>1)?(n+' ×'+s.qty):n}).join(' + ');
         desc='Costos: '+it._fichaSel.nombre+(cadena?' — '+cadena:'');
       }else{
         if(!it._fichaSel.insumos||!it._fichaSel.insumos.length)return;
@@ -3120,14 +3157,18 @@ async function abrirEditar(id){
   encCounter=fEnc.length?Math.max(...fEnc.map(e=>e.numero||0)):0;
   fPag=JSON.parse(JSON.stringify(p.pagos||[]));
   fArch=JSON.parse(JSON.stringify(p.archivos||[]));
-  fCostos=JSON.parse(JSON.stringify(p.costos||[]));
+  fCostos=JSON.parse(JSON.stringify(p.costos||[])).map(c=>({...c,_auto:!!c.auto}));
   const fichaIds=[...new Set(fEnc.flatMap(e=>e.items.map(it=>it.ficha_id).filter(Boolean)))];
   if(fichaIds.length){
     const fichas=await Promise.all(fichaIds.map(fid=>api('GET',`/productos/${fid}`).catch(()=>null)));
     const fichasPorId={};
     fichas.forEach(f=>{if(f)fichasPorId[f.id]=f});
-    fEnc.forEach(e=>e.items.forEach(it=>{if(it.ficha_id&&fichasPorId[it.ficha_id])it._fichaSel=fichasPorId[it.ficha_id]}));
+    fEnc.forEach(e=>e.items.forEach(it=>{
+      if(it.ficha_id&&fichasPorId[it.ficha_id])it._fichaSel=fichasPorId[it.ficha_id];
+      if(it.config){try{const cfg=JSON.parse(it.config);if(cfg.varPicks)it._varPicks=cfg.varPicks;if(cfg.ancho)it._ancho=cfg.ancho;if(cfg.alto)it._alto=cfg.alto;}catch(e){}}
+    }));
     recalcularCostosAutomaticos();
+    renderEncs();
   }
   document.getElementById('f-nom').value=p.nombre;
   document.getElementById('f-tel').value=p.tel||'';
@@ -3190,7 +3231,7 @@ async function guardar(){
     valor_final:(fValorFinalRaw||'').trim(),
     encargos:fEnc,
     pagos:fPag,
-    costos:fCostos,
+    costos:fCostos.map(c=>({...c,auto:c._auto?1:0})),
   };
   const errExpr=validarExpresionesBody(body);
   if(errExpr){toast(errExpr,false);return}
