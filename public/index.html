@@ -460,6 +460,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="clientes" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
     <button class="nav-item" data-view="registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
     <button class="nav-item" data-view="productos" onclick="showView('productos')"><i class="ti ti-box"></i>Productos</button>
+    <button class="nav-item" data-view="inventario" onclick="showView('inventario')"><i class="ti ti-boxes"></i>Inventario</button>
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
     <button class="nav-item" onclick="filtroRapido('pendiente')"><i class="ti ti-clock"></i>Pendientes</button>
@@ -546,6 +547,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <button class="btn-new" onclick="abrirNuevoProducto()"><span class="tri"></span> Nuevo producto</button>
       </div>
       <div class="cli-grid" id="lista-prod"></div>
+    </div>
+
+    <!-- INVENTARIO -->
+    <div id="view-inventario" class="view">
+      <div class="toolbar">
+        <div class="search-b" style="flex:1;max-width:300px"><i class="ti ti-search"></i>
+          <input type="text" id="inv-s" placeholder="Buscar producto…" oninput="cargarInventario(this.value)" style="max-width:100%">
+        </div>
+      </div>
+      <table class="items-table" id="inv-tabla">
+        <thead><tr><th>Producto</th><th>Categoría</th><th style="width:120px">Stock actual</th><th style="width:120px">Stock mínimo</th><th style="width:90px"></th></tr></thead>
+        <tbody id="inv-body"></tbody>
+      </table>
+      <div class="empty" id="inv-empty" style="display:none"><i class="ti ti-box-off"></i><p>Sin productos con seguimiento de inventario</p></div>
     </div>
 
     <!-- CONFIGURACIÓN -->
@@ -742,6 +757,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   <div class="mhead"><div class="mhead-l"><div class="mtitle">Más</div></div><button class="mclose" onclick="cerrarMas()"><i class="ti ti-x"></i></button></div>
   <div class="mbody">
     <button class="mas-item" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
+    <button class="mas-item" onclick="irDesdeMas('inventario')"><i class="ti ti-boxes"></i>Inventario</button>
     <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="mas-item" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
     <button class="mas-item" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
@@ -898,12 +914,6 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="cat-row" id="prod-cat-row" style="margin-bottom:0"></div>
 
     <div class="ck-box" style="display:inline-flex;margin:12px 0"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div>
-
-    <div class="msec"><span class="tri"></span>Inventario (opcional)</div>
-    <div class="fr2 fg">
-      <div><label>Stock actual</label><input type="number" id="prod-stock-actual" min="0" placeholder="Sin seguimiento"></div>
-      <div><label>Stock mínimo (alerta)</label><input type="number" id="prod-stock-minimo" min="0" placeholder="Opcional"></div>
-    </div>
 
     <div class="msec"><span class="tri"></span>Insumos (opcional)</div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Ejemplo: si esta camisa usa 2 metros de tela a $5.000 el metro, escribe Cantidad: 2, Unidad: metros, Costo por unidad: $5.000 — el Subtotal se calcula solo.</div>
@@ -1559,14 +1569,15 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',ayuda:'Ayuda y About'};
+  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',inventario:'Inventario',ayuda:'Ayuda y About'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
-  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,productos:4,ayuda:4,configuracion:4}[v]??0]?.classList.add('active');
+  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,productos:4,inventario:4,ayuda:4,configuracion:4}[v]??0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
   if(v==='productos')cargarProductos();
+  if(v==='inventario')cargarInventario();
 }
 
 /* ══ STATS ══ */
@@ -1723,6 +1734,44 @@ async function cargarProductos(q=''){
       <div style="font-weight:800;color:var(--navy);flex-shrink:0">${fCOP(p.precio_oficial)}</div>
     </div>`;
   }).join('');
+}
+function grupoStock(p){return (p.stock_actual!=null&&p.stock_minimo!=null&&p.stock_actual<=p.stock_minimo)?0:(p.stock_actual!=null?1:2)}
+async function cargarInventario(q=''){
+  const p=q?`?q=${encodeURIComponent(q)}`:'';
+  productos=await api('GET',`/productos${p}`);
+  const lista=productos.filter(x=>x.tipo_precio!=='combo'&&x.tipo_precio!=='promocional');
+  lista.sort((a,b)=>grupoStock(a)-grupoStock(b)||a.nombre.localeCompare(b.nombre));
+  const el=document.getElementById('inv-body');
+  const vacio=document.getElementById('inv-empty');
+  if(!lista.length){el.innerHTML='';vacio.style.display='block';return}
+  vacio.style.display='none';
+  el.innerHTML=lista.map(p=>{
+    const cat=CATS.find(c=>c.id===p.categoria_id);
+    const bajo=grupoStock(p)===0;
+    return`<tr>
+      <td>${p.nombre}</td>
+      <td>${cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:'—'}</td>
+      <td><input class="item-inp" type="number" min="0" value="${p.stock_actual??''}" placeholder="Sin seguimiento" onblur="guardarStockInventario('${p.id}','stock_actual',this.value)"></td>
+      <td><input class="item-inp" type="number" min="0" value="${p.stock_minimo??''}" placeholder="Opcional" onblur="guardarStockInventario('${p.id}','stock_minimo',this.value)"></td>
+      <td>${bajo?'<span class="b-pend">Stock bajo</span>':''}</td>
+    </tr>`;
+  }).join('');
+}
+async function guardarStockInventario(fichaId,campo,valor){
+  const p=productos.find(x=>x.id===fichaId);
+  if(!p)return;
+  const nuevo=valor===''?null:parseInt(valor,10);
+  if(nuevo!=null&&(!Number.isInteger(nuevo)||nuevo<0)){
+    toast('Stock no válido',false);
+    cargarInventario(document.getElementById('inv-s').value);
+    return;
+  }
+  if((p[campo]??null)===nuevo)return;
+  try{
+    await api('PUT',`/productos/${fichaId}`,{...p,[campo]:nuevo});
+    toast('Stock actualizado ✓');
+  }catch(e){toast(e.message,false)}
+  cargarInventario(document.getElementById('inv-s').value);
 }
 
 // Almacena cliente actual para el modal
@@ -2059,7 +2108,7 @@ function blurItemVal(el,encId,itemId){
 }
 
 /* ══ FICHA DE PRODUCTO: widgets ══ */
-let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='',fProdPrecioSugeridoActual=null;
+let fProdInsumos=[],fProdRangos=[],fProdComponentes=[],prodCatSel='',editProdId=null,fProdPrecioBaseRaw='',fProdPrecioSugeridoActual=null,fProdStockActual=null,fProdStockMinimo=null;
 let _acComboResults={};
 let fProdComboModo='global';
 function setComboModo(modo){
@@ -2279,8 +2328,7 @@ function resetProdForm(){
   document.getElementById('prod-margen-valor').value='';
   document.getElementById('prod-precio-base').value='';
   document.getElementById('prod-activo').checked=true;
-  document.getElementById('prod-stock-actual').value='';
-  document.getElementById('prod-stock-minimo').value='';
+  fProdStockActual=null;fProdStockMinimo=null;
   document.getElementById('prod-regla-lleva').value='';
   document.getElementById('prod-regla-paga').value='';
   document.getElementById('prod-fecha-inicio').value='';
@@ -2320,8 +2368,8 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-margen-valor').value=p.margen_valor||'';
   document.getElementById('prod-precio-base').value=displayMoneyVal(fProdPrecioBaseRaw);
   document.getElementById('prod-activo').checked=!!p.activo;
-  document.getElementById('prod-stock-actual').value=p.stock_actual??'';
-  document.getElementById('prod-stock-minimo').value=p.stock_minimo??'';
+  fProdStockActual=p.stock_actual??null;
+  fProdStockMinimo=p.stock_minimo??null;
   document.getElementById('prod-regla-lleva').value=p.regla_lleva??'';
   document.getElementById('prod-regla-paga').value=p.regla_paga??'';
   document.getElementById('prod-fecha-inicio').value=p.fecha_inicio||'';
@@ -2372,8 +2420,8 @@ async function guardarProducto(){
     margen_valor:document.getElementById('prod-margen-valor').value.trim(),
     precio_base:(fProdPrecioBaseRaw||'').trim(),
     activo:document.getElementById('prod-activo').checked,
-    stock_actual:document.getElementById('prod-stock-actual').value===''?null:parseInt(document.getElementById('prod-stock-actual').value,10),
-    stock_minimo:document.getElementById('prod-stock-minimo').value===''?null:parseInt(document.getElementById('prod-stock-minimo').value,10),
+    stock_actual:fProdStockActual,
+    stock_minimo:fProdStockMinimo,
     regla_lleva:document.getElementById('prod-regla-lleva').value===''?null:parseInt(document.getElementById('prod-regla-lleva').value,10),
     regla_paga:document.getElementById('prod-regla-paga').value===''?null:parseInt(document.getElementById('prod-regla-paga').value,10),
     insumos:fProdInsumos,
