@@ -19,8 +19,8 @@
   --green:#2BAD72;--green-lt:#E4F7EE;
   --purple:#7B6EF6;--purple-lt:#EEEAFF;
   --orange:#F07140;--orange-lt:#FEF0E8;
-  --r:10px;--r-sm:6px;--r-lg:16px;
-  --sh:0 2px 12px rgba(26,30,58,.08);--sh-lg:0 8px 36px rgba(26,30,58,.16);
+  --r:13px;--r-sm:9px;--r-lg:22px;
+  --sh:0 3px 16px rgba(26,30,58,.07);--sh-lg:0 16px 50px rgba(26,30,58,.18);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--navy);font-size:13px;min-height:100vh}
@@ -63,7 +63,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .icon-btn:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-lt)}
 
 /* CONTENT */
-.content{padding:20px}
+.content{padding:26px 30px}
 .view{display:none}.view.active{display:block}
 
 /* STATS minimal */
@@ -176,26 +176,27 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .valor-total-badge{font-size:11px;font-weight:800;color:var(--navy)}
 
 /* ══ MODAL ══ */
-.overlay{display:none;position:fixed;inset:0;background:rgba(10,14,40,.55);backdrop-filter:blur(5px);z-index:200;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+.overlay{display:none;position:fixed;inset:0;background:rgba(10,14,40,.5);backdrop-filter:blur(6px);z-index:200;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto}
 .overlay.open{display:flex}
-.modal{background:var(--white);border-radius:var(--r-lg);width:100%;max-width:680px;box-shadow:var(--sh-lg);margin:auto;overflow:hidden}
-.mhead{background:var(--navy);padding:18px 22px;display:flex;align-items:center;justify-content:space-between}
+.modal{background:var(--white);border-radius:var(--r-lg);width:92vw;max-width:1340px;box-shadow:var(--sh-lg);margin:auto;overflow:hidden}
+.modal.modal-sm{max-width:440px}
+.mhead{background:var(--navy);padding:20px 30px;display:flex;align-items:center;justify-content:space-between}
 .mhead-l{flex:1}
 .mtitle{font-size:16px;font-weight:800;color:white;letter-spacing:-.01em}
 .mref{font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.3);margin-top:2px}
 .mclose{background:rgba(255,255,255,.1);border:none;cursor:pointer;color:rgba(255,255,255,.6);width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:background .13s;flex-shrink:0}
 .mclose:hover{background:rgba(255,255,255,.2);color:white}
-.mbody{padding:18px 22px;max-height:calc(100vh - 140px);overflow-y:auto}
-.mfoot{padding:12px 22px;border-top:1.5px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:var(--line-lt)}
+.mbody{padding:26px 30px;max-height:calc(100vh - 132px);overflow-y:auto}
+.mfoot{padding:15px 30px;border-top:1.5px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:var(--line-lt)}
 
 /* Form helpers */
-.fg{margin-bottom:12px}
-.fr2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
-.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
-.fr4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
+.fg{margin-bottom:15px}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.fr4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
 
 /* Divisor sección */
-.msec{display:flex;align-items:center;gap:8px;margin:16px 0 10px;font-size:9px;font-weight:800;color:var(--navy2);text-transform:uppercase;letter-spacing:.1em}
+.msec{display:flex;align-items:center;gap:8px;margin:22px 0 12px;font-size:9px;font-weight:800;color:var(--navy2);text-transform:uppercase;letter-spacing:.1em}
 .msec::before,.msec::after{content:'';flex:1;height:1px;background:var(--line)}
 .msec .tri{display:inline-block;width:7px;height:7px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%)}
 .msec:first-child{margin-top:0}
@@ -907,7 +908,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="btn-ghost" id="prod-btn-cambiar-tipo" style="margin-bottom:10px" onclick="document.getElementById('prod-paso-tipo').style.display='block';document.getElementById('prod-paso-form').style.display='none'"><i class="ti ti-arrow-left"></i>Cambiar tipo</button>
     <div class="fr2 fg">
       <div><label>Nombre del producto</label><input type="text" id="prod-nombre" placeholder="Ej: Retablo 10x15cm"></div>
-      <div></div>
+      <div><label>Código (opcional)</label><input type="text" id="prod-codigo" placeholder="Ej: RET-1015" style="font-family:'DM Mono',monospace;text-transform:uppercase"></div>
     </div>
 
     <div class="fr2 fg" style="margin-top:10px;align-items:end">
@@ -1793,7 +1794,7 @@ async function cargarProductos(q=''){
     const cat=CATS.find(c=>c.id===p.categoria_id);
     return`<div class="prod-card" onclick="abrirEditarProducto('${p.id}')">
       <div style="flex:1;min-width:0">
-        <div class="cli-name">${p.nombre}</div>
+        <div class="cli-name">${p.codigo?`<span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--teal-dk);background:var(--teal-lt);padding:2px 7px;border-radius:6px;margin-right:7px;letter-spacing:.03em">${p.codigo}</span>`:''}${p.nombre}</div>
         <div class="cli-sub">${cat?`<span class="ttag ${cat.tc}">${cat.label}</span> `:''}<span class="b-tipo">${TIPO_LABEL[p.tipo_precio]||p.tipo_precio}</span> ${!p.activo?'<span class="b-canc">Inactivo</span>':''} ${(p.stock_actual!=null&&p.stock_minimo!=null&&p.stock_actual<=p.stock_minimo)?'<span class="b-pend">Stock bajo</span>':''}</div>
       </div>
       <div style="font-weight:800;color:var(--navy);flex-shrink:0">${p.tipo_precio==='variantes'?'desde '+fCOP(p.precio_oficial):(p.tipo_precio==='pliego'?fCOP(p.precio_oficial)+' c/u aprox':(fCOP(p.precio_oficial)+(p.tipo_precio==='medidas'?' / '+(SUF_UNIDAD[p.medida_unidad]||'m²'):'')))}</div>
@@ -2847,6 +2848,7 @@ function resetProdForm(){
   document.getElementById('prod-sec-pliego').style.display='none';
   document.getElementById('prod-sec-margen-precio').style.display='block';
   document.getElementById('prod-nombre').value='';
+  document.getElementById('prod-codigo').value='';
   document.getElementById('prod-es-regla').checked=false;
   document.getElementById('combo-modo-global').checked=true;
   document.getElementById('combo-modo-individual').checked=false;
@@ -2898,6 +2900,7 @@ async function abrirEditarProducto(id){
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
   document.getElementById('prod-nombre').value=p.nombre;
+  document.getElementById('prod-codigo').value=p.codigo||'';
   document.getElementById('prod-margen-tipo').value=p.margen_tipo;
   document.getElementById('prod-margen-valor').value=p.margen_valor||'';
   document.getElementById('prod-precio-base').value=displayMoneyVal(fProdPrecioBaseRaw);
@@ -3008,6 +3011,7 @@ async function guardarProducto(){
   const usaPrecioBase=(prodCaminoActual==='combo'||prodCaminoActual==='promocional')||(prodCaminoActual==='simple'&&prodModoCalculo==='cantidad'&&_pbInput&&_pbInput.style.display!=='none');
   const body={
     nombre,
+    codigo:document.getElementById('prod-codigo').value.trim(),
     categoria_id:prodCatSel,
     tipo_precio:tipoPrecio,
     margen_tipo:document.getElementById('prod-margen-tipo').value,
