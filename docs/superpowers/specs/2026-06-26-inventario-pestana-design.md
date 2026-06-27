@@ -41,6 +41,13 @@ Investigado el código real antes de diseñar:
   información comercial y de cálculo.
 - Un producto nuevo se sigue guardando con `stock_actual:null`/`stock_minimo:null` (sin
   seguimiento), igual que hoy. Activar seguimiento se hace después, desde Inventario.
+- **Cuidado al editar un producto que YA tiene stock**: como `PUT /api/productos/:id`
+  sobreescribe `stock_actual`/`stock_minimo` con lo que reciba (o `null` si no viene),
+  guardar desde el modal de Producto sin esos campos en el DOM NO puede simplemente
+  omitirlos — eso borraría el stock ya cargado de cualquier producto al editar su nombre,
+  precio, etc. La pantalla de Producto debe seguir conociendo (en memoria, no en el DOM)
+  los valores de stock actuales de la ficha que se está editando, y reenviarlos sin
+  cambios al guardar. Solo un producto recién creado parte de `null`/`null`.
 
 ### Vista Inventario
 - Toolbar con buscador por nombre (mismo patrón que Productos/Clientes) — filtra
