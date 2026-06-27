@@ -984,11 +984,8 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <div id="prod-sec-variantes" style="display:none">
       <div class="msec"><span class="tri"></span>Variantes</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Cada versión del producto con su propio precio. Ej: Retablo 10×10 → $25.000, 20×20 → $45.000. El cliente elige una al pedir.</div>
-      <table class="items-table" id="prod-variantes-tabla">
-        <thead><tr><th>Nombre de la variante</th><th style="width:130px">Precio</th><th style="width:26px"></th></tr></thead>
-        <tbody id="prod-variantes-body"></tbody>
-      </table>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Cada versión con su propio precio y sus propios costos. Ej: Retablo 10×15 → $15.000 (cuesta fabricante $3.000 + vinilo $3.000 + laminado $1.000). El cliente elige una al pedir, y entran su precio y sus costos. Los Insumos de arriba (si pones alguno) son costos globales que aplican a todas las variantes.</div>
+      <div id="prod-variantes-body"></div>
       <button class="btn-add-row" onclick="addVariante()"><i class="ti ti-plus"></i>Agregar variante</button>
     </div>
 
@@ -2242,16 +2239,41 @@ function setModoCalculo(modo){
     document.getElementById('prod-sec-regla').style.display='none';
   }
 }
-function addVariante(){fProdVariantes.push({id:uid(),nombre:'',precio:''});renderVariantes()}
+function addVariante(){fProdVariantes.push({id:uid(),nombre:'',precio:'',costos:[]});renderVariantes()}
 function remVariante(id){fProdVariantes=fProdVariantes.filter(x=>x.id!==id);renderVariantes()}
-function setVariante(id,k,v){const c=fProdVariantes.find(x=>x.id===id);if(c)c[k]=v}
+function setVariante(id,k,v){const c=fProdVariantes.find(x=>x.id===id);if(c){c[k]=v;if(k==='precio')actualizarUtilidadVariante(id)}}
+function addCostoVariante(vid){const v=fProdVariantes.find(x=>x.id===vid);if(v){v.costos=v.costos||[];v.costos.push({id:uid(),nombre:'',valor:''});renderVariantes()}}
+function remCostoVariante(vid,cid){const v=fProdVariantes.find(x=>x.id===vid);if(v){v.costos=(v.costos||[]).filter(c=>c.id!==cid);renderVariantes()}}
+function setCostoVariante(vid,cid,k,val){const v=fProdVariantes.find(x=>x.id===vid);if(v){const c=(v.costos||[]).find(x=>x.id===cid);if(c){c[k]=val;if(k==='valor')actualizarUtilidadVariante(vid)}}}
+function costoTotalVarianteFE(v){return (v.costos||[]).reduce((a,c)=>a+(evalExpr(c.valor)||0),0)}
+function actualizarUtilidadVariante(vid){
+  const v=fProdVariantes.find(x=>x.id===vid);
+  const el=document.getElementById('var-util-'+vid);
+  if(!v||!el)return;
+  const costo=costoTotalVarianteFE(v);
+  const precio=evalExpr(v.precio)||0;
+  el.textContent='Costo: '+fCOP(costo)+(precio>0?(' · Utilidad: '+fCOP(precio-costo)):'');
+}
 function renderVariantes(){
-  document.getElementById('prod-variantes-body').innerHTML=fProdVariantes.map(c=>`
-    <tr>
-      <td><input class="item-inp" type="text" value="${c.nombre||''}" placeholder="Ej: 10×10" oninput="setVariante('${c.id}','nombre',this.value)"></td>
-      <td><input class="item-inp" type="text" value="${c.precio||''}" placeholder="$ 0" oninput="setVariante('${c.id}','precio',this.value)"></td>
-      <td style="width:26px"><button class="item-del" onclick="remVariante('${c.id}')"><i class="ti ti-x"></i></button></td>
-    </tr>`).join('');
+  document.getElementById('prod-variantes-body').innerHTML=fProdVariantes.map(v=>`
+    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--white)">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Nombre de la variante</label><input class="item-inp" type="text" value="${v.nombre||''}" placeholder="Ej: 10×15" oninput="setVariante('${v.id}','nombre',this.value)"></div>
+        <div style="width:120px"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Precio público</label><input class="item-inp" type="text" value="${v.precio||''}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>
+        <button class="item-del" title="Eliminar variante" onclick="remVariante('${v.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:9px 0 4px">Costos de esta variante</div>
+      <table class="items-table"><tbody>
+        ${(v.costos||[]).map(c=>`<tr>
+          <td><input class="item-inp" type="text" value="${c.nombre||''}" placeholder="Ej: Fabricante" oninput="setCostoVariante('${v.id}','${c.id}','nombre',this.value)"></td>
+          <td style="width:110px"><input class="item-inp" type="text" value="${c.valor||''}" placeholder="$ 0" oninput="setCostoVariante('${v.id}','${c.id}','valor',this.value)"></td>
+          <td style="width:26px"><button class="item-del" onclick="remCostoVariante('${v.id}','${c.id}')"><i class="ti ti-x"></i></button></td>
+        </tr>`).join('')}
+      </tbody></table>
+      <button class="btn-add-row" onclick="addCostoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar costo</button>
+      <div id="var-util-${v.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk);margin-top:6px"></div>
+    </div>`).join('');
+  fProdVariantes.forEach(v=>actualizarUtilidadVariante(v.id));
 }
 function colapsarInsumos(){
   const body=document.querySelector('#ovProd .coll-body');
@@ -2541,7 +2563,7 @@ async function abrirEditarProducto(id){
   fProdComponentes=(p.componentes||[]).map(c=>({id:uid(),componente_ficha_id:c.componente_ficha_id||'',componente_nombre:c.componente_nombre||'',cantidad_consumida:String(c.cantidad_consumida),precio_unitario:c.precio_unitario||'',_libre:!c.componente_ficha_id}));
   fProdRangos=(p.rangos||[]).map(r=>({id:uid(),desde:r.desde,hasta:r.hasta,precio:String(r.precio)}));
   fProdCostosFijos=(p.costos_fijos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''}));
-  fProdVariantes=(p.variantes||[]).map(v=>({id:uid(),nombre:v.nombre||'',precio:v.precio||''}));
+  fProdVariantes=(p.variantes||[]).map(v=>({id:uid(),nombre:v.nombre||'',precio:v.precio||'',costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''}))}));
   prodModoCalculo=p.tipo_precio==='medidas'?'medidas':(p.tipo_precio==='variantes'?'variantes':'cantidad');
   prodCatSel=p.categoria_id||'';
   fProdPrecioBaseRaw=(p.precio_base!=null?p.precio_base:'');
@@ -2639,7 +2661,7 @@ async function guardarProducto(){
     medida_tarifa:esMedidas?document.getElementById('prod-medida-tarifa').value.trim():'',
     costos_fijos:esMedidas?fProdCostosFijos.map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})):[],
     cobro_minimo:esMedidas?document.getElementById('prod-cobro-minimo').value.trim():'',
-    variantes:esVariantes?fProdVariantes.map(v=>({nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim()})):[],
+    variantes:esVariantes?fProdVariantes.map(v=>({nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()}))})):[],
     fecha_inicio:document.getElementById('prod-fecha-inicio').value,
     fecha_fin:document.getElementById('prod-fecha-fin').value,
     cantidad_minima:document.getElementById('prod-cantidad-minima').value.trim(),
@@ -2758,16 +2780,29 @@ function costoTotalInsumosFicha(insumos){
     return a+cant*unit;
   },0);
 }
+function costoTotalCostosArr(arr){
+  return(arr||[]).reduce((a,c)=>a+(parseInt(String(c.valor_calc||0).replace(/\D/g,''))||0),0);
+}
 function recalcularCostosAutomaticos(){
   fCostos=fCostos.filter(c=>!c._auto);
   fEnc.forEach(e=>{
     (e.items||[]).forEach(it=>{
-      if(!it._fichaSel||!it._fichaSel.insumos||!it._fichaSel.insumos.length)return;
-      const costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
-      if(costoUnit<=0)return;
+      if(!it._fichaSel)return;
       const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
       if(cantNum<=0)return;
-      fCostos.push({id:uid(),descripcion:'Insumos: '+it._fichaSel.nombre,cantidad:String(cantNum),valor_unitario:String(costoUnit),monto:String(cantNum*costoUnit),_auto:true});
+      let costoUnit=0, desc='';
+      if(it._fichaSel.tipo_precio==='variantes'){
+        const v=(it._fichaSel.variantes||[])[parseInt(it._varSel,10)];
+        if(!v)return;
+        costoUnit=costoTotalCostosArr(v.costos)+costoTotalInsumosFicha(it._fichaSel.insumos);
+        desc='Costos: '+it._fichaSel.nombre+' — '+v.nombre;
+      }else{
+        if(!it._fichaSel.insumos||!it._fichaSel.insumos.length)return;
+        costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
+        desc='Insumos: '+it._fichaSel.nombre;
+      }
+      if(costoUnit<=0)return;
+      fCostos.push({id:uid(),descripcion:desc,cantidad:String(cantNum),valor_unitario:String(costoUnit),monto:String(cantNum*costoUnit),_auto:true});
     });
   });
   renderCostos();
