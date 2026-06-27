@@ -924,14 +924,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: para pendones, lonas, vinilos — el precio sale del tamaño que pida el cliente.</div>
     </div>
 
-    <div class="msec"><span class="tri"></span>Insumos (opcional)</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Ejemplo: si esta camisa usa 2 metros de tela a $5.000 el metro, escribe Cantidad: 2, Unidad: metros, Costo por unidad: $5.000 — el Subtotal se calcula solo.</div>
-    <table class="items-table" id="prod-insumos-tabla">
-      <thead><tr><th>Nombre</th><th>Proveedor</th><th style="width:55px">Cantidad</th><th style="width:110px">Unidad</th><th style="width:100px">Costo por unidad</th><th style="width:80px">Subtotal</th><th style="width:55px">Variable</th><th style="width:26px"></th></tr></thead>
-      <tbody id="prod-insumos-body"></tbody>
-    </table>
-    <button class="btn-add-row" onclick="addInsumo()"><i class="ti ti-plus"></i>Agregar insumo</button>
-    <div style="font-size:11px;color:var(--muted);margin:8px 0" id="prod-costo-total-cap">Costo total: $0</div>
+    <div class="collapsible" style="margin:8px 0">
+      <div class="coll-head" onclick="toggleColl(this)">
+        <div class="coll-head-l"><i class="ti ti-receipt"></i><span id="prod-costo-total-cap">Costo total: $0</span></div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Insumos · ver composición</span><i class="ti ti-chevron-down coll-chevron"></i></div>
+      </div>
+      <div class="coll-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Ejemplo: si esta camisa usa 2 metros de tela a $5.000 el metro, escribe Cantidad: 2, Unidad: metros, Costo por unidad: $5.000 — el Subtotal se calcula solo.</div>
+        <table class="items-table" id="prod-insumos-tabla">
+          <thead><tr><th>Nombre</th><th>Proveedor</th><th style="width:55px">Cantidad</th><th style="width:110px">Unidad</th><th style="width:100px">Costo por unidad</th><th style="width:80px">Subtotal</th><th style="width:55px">Variable</th><th style="width:26px"></th></tr></thead>
+          <tbody id="prod-insumos-body"></tbody>
+        </table>
+        <button class="btn-add-row" onclick="addInsumo()"><i class="ti ti-plus"></i>Agregar insumo</button>
+      </div>
+    </div>
 
     <div id="prod-sec-margen-precio">
     <div class="msec"><span class="tri"></span>Margen y precio</div>
@@ -2197,6 +2203,12 @@ function setModoCalculo(modo){
     onEsReglaChange();
   }
 }
+function colapsarInsumos(){
+  const body=document.querySelector('#ovProd .coll-body');
+  if(!body)return;
+  body.classList.remove('open');
+  body.previousElementSibling?.querySelector('.coll-chevron')?.classList.remove('open');
+}
 function addCostoFijo(){fProdCostosFijos.push({id:uid(),nombre:'',valor:''});renderCostosFijos()}
 function remCostoFijo(id){fProdCostosFijos=fProdCostosFijos.filter(x=>x.id!==id);renderCostosFijos()}
 function setCostoFijo(id,k,v){const c=fProdCostosFijos.find(x=>x.id===id);if(c)c[k]=v}
@@ -2459,6 +2471,7 @@ function resetProdForm(){
   document.getElementById('prod-sec-regla').style.display='none';
   document.getElementById('prod-sec-combo').style.display='none';
   document.getElementById('prod-sec-promocional').style.display='none';
+  colapsarInsumos();
 }
 function abrirNuevoProducto(){
   editProdId=null;resetProdForm();
@@ -2511,6 +2524,7 @@ async function abrirEditarProducto(id){
   const camino=(p.tipo_precio==='combo')?'combo':(p.tipo_precio==='promocional')?'promocional':'simple';
   document.getElementById('prod-es-regla').checked=p.tipo_precio==='regla';
   elegirCaminoProducto(camino);
+  colapsarInsumos();
   document.getElementById('ovProd').classList.add('open');
 }
 function cerrarProducto(){document.getElementById('ovProd').classList.remove('open')}
