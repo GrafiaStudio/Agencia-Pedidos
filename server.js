@@ -165,6 +165,10 @@ try { db.exec("ALTER TABLE enc_items ADD COLUMN ficha_id TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN config TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN categoria TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN subcategoria TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE clientes ADD COLUMN nit TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE clientes ADD COLUMN email TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE clientes ADD COLUMN direccion TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE clientes ADD COLUMN contacto TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN stock_consumido TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_unidad TEXT DEFAULT 'm2'"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_tarifa TEXT DEFAULT ''"); } catch(e){}
@@ -420,6 +424,7 @@ function pedidoCompleto(p){
   });
   p.valor_sugerido=calcValorSugerido(encargos);
   p.valor_total=valorOficialPedido(p,p.valor_sugerido);
+  if(p.cliente_id){const cli=db.prepare('SELECT nit,email,direccion,contacto FROM clientes WHERE id=?').get(p.cliente_id);if(cli){p.cli_nit=cli.nit||'';p.cli_email=cli.email||'';p.cli_direccion=cli.direccion||'';p.cli_contacto=cli.contacto||'';}}
   return p;
 }
 
@@ -476,7 +481,10 @@ function restaurarStock(stockConsumidoJSON,wsId){
   });
 }
 
-function asegurarCliente(nombre,tel,cid,wsId){
+function asegurarCliente(nombre,tel,cid,wsId,extra){
+  extra=extra||{};
+  const campos={nit:extra.nit,email:extra.email,direccion:extra.direccion,contacto:extra.contacto};
+  const setExtra=(id)=>{Object.entries(campos).forEach(([k,v])=>{if(v!==undefined&&v!==null)db.prepare(`UPDATE clientes SET ${k}=? WHERE id=? AND workspace_id=?`).run(v,id,wsId);});};
   if(cid){
     const existe=db.prepare('SELECT id FROM clientes WHERE id=? AND workspace_id=?').get(cid,wsId);
     if(!existe)cid=null; // cliente_id de otro workspace (o inexistente): se ignora, no se usa a ciegas
@@ -484,11 +492,12 @@ function asegurarCliente(nombre,tel,cid,wsId){
   if(cid){
     if(nombre)db.prepare('UPDATE clientes SET nombre=? WHERE id=? AND workspace_id=?').run(nombre.trim(),cid,wsId);
     if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=? AND workspace_id=?').run(tel,cid,wsId);
+    setExtra(cid);
     return cid;
   }
   const ex=db.prepare('SELECT id FROM clientes WHERE lower(nombre)=lower(?) AND workspace_id=?').get(nombre.trim(),wsId);
-  if(ex){if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=? AND workspace_id=?').run(tel,ex.id,wsId);return ex.id}
-  const id=uid(); db.prepare('INSERT INTO clientes(id,nombre,tel,workspace_id)VALUES(?,?,?,?)').run(id,nombre.trim(),tel||'',wsId); return id;
+  if(ex){if(tel)db.prepare('UPDATE clientes SET tel=? WHERE id=? AND workspace_id=?').run(tel,ex.id,wsId);setExtra(ex.id);return ex.id}
+  const id=uid(); db.prepare('INSERT INTO clientes(id,nombre,tel,workspace_id)VALUES(?,?,?,?)').run(id,nombre.trim(),tel||'',wsId); setExtra(id); return id;
 }
 
 // ── LOGGING DE ERRORES (persistente, sobrevive reinicios de Railway) ──
@@ -773,7 +782,7 @@ app.post('/api/pedidos',(req,res)=>{
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid(); const ref=nextRef();
-    const cid=asegurarCliente(b.nombre,b.tel,b.cliente_id||null,req.wsId);
+    const cid=asegurarCliente(b.nombre,b.tel,b.cliente_id||null,req.wsId,{nit:b.cli_nit,email:b.cli_email,direccion:b.cli_direccion,contacto:b.cli_contacto});
     db.prepare(`INSERT INTO pedidos(id,ref,cliente_id,nombre,tel,urgente,entregado,cancelado,pendiente_pago,es_cotizacion,valor_final,valor_final_calc,fecha_pedido,fecha_entrega,notas,workspace_id)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(id,ref,cid,b.nombre.trim(),b.tel||'',b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,normVF(b.valor_final),normCalc(b.valor_final),hoy(req.wsId),b.fecha_entrega||'',b.notas||'',req.wsId);
@@ -796,7 +805,7 @@ app.put('/api/pedidos/:id',(req,res)=>{
     if(!p)return res.status(404).json({error:'No encontrado'});
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
-    const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id,req.wsId);
+    const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id,req.wsId,{nit:b.cli_nit,email:b.cli_email,direccion:b.cli_direccion,contacto:b.cli_contacto});
     // Log cambios de estado checkboxes
     if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado',req.wsId);
     if(b.cancelado&&!p.cancelado)addHist(pid,'Pedido cancelado',req.wsId);

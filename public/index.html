@@ -828,6 +828,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div><label>Teléfono / WhatsApp</label><input type="text" id="f-tel" placeholder="310 000 0000"></div>
     </div>
+    <div class="fg" style="display:grid;grid-template-columns:1fr 1fr 1.4fr 1.2fr;gap:14px">
+      <div><label>NIT / CC / RUT</label><input type="text" id="f-cli-nit" placeholder="Opcional"></div>
+      <div><label>Contacto</label><input type="text" id="f-cli-contacto" placeholder="Persona de contacto"></div>
+      <div><label>Dirección</label><input type="text" id="f-cli-direccion" placeholder="Opcional"></div>
+      <div><label>Email</label><input type="email" id="f-cli-email" placeholder="correo@ejemplo.com"></div>
+    </div>
 
     <!-- Detalles generales -->
     <div class="msec"><span class="tri"></span>Detalles del pedido</div>
@@ -3446,7 +3452,7 @@ function renderHist(hist){
 /* ══ MODAL ══ */
 function resetForm(){
   fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;fValorFinalRaw='';
-  ['f-nom','f-tel','f-fecha','f-notas','f-valor-final'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
+  ['f-nom','f-tel','f-fecha','f-notas','f-valor-final','f-cli-nit','f-cli-contacto','f-cli-direccion','f-cli-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
   ['ck-urg'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
   document.getElementById('f-estado-ciclo').value=CFG.estado_default_cotizacion?'cotizacion':'nuevo';
   document.getElementById('ac-drop').style.display='none';
@@ -3502,6 +3508,10 @@ async function abrirEditar(id){
   }
   document.getElementById('f-nom').value=p.nombre;
   document.getElementById('f-tel').value=p.tel||'';
+  document.getElementById('f-cli-nit').value=p.cli_nit||'';
+  document.getElementById('f-cli-contacto').value=p.cli_contacto||'';
+  document.getElementById('f-cli-direccion').value=p.cli_direccion||'';
+  document.getElementById('f-cli-email').value=p.cli_email||'';
   document.getElementById('f-fecha').value=p.fecha_entrega||'';
   document.getElementById('f-notas').value=p.notas||'';
   fValorFinalRaw=(p.valor_final!=null?p.valor_final:'');
@@ -3548,6 +3558,10 @@ async function guardar(){
     nombre,
     tel:document.getElementById('f-tel').value.trim(),
     cliente_id:editCliId,
+    cli_nit:document.getElementById('f-cli-nit').value.trim(),
+    cli_contacto:document.getElementById('f-cli-contacto').value.trim(),
+    cli_direccion:document.getElementById('f-cli-direccion').value.trim(),
+    cli_email:document.getElementById('f-cli-email').value.trim(),
     urgente:document.getElementById('ck-urg').checked,
     entregado:document.getElementById('f-estado-ciclo').value==='entregado',
     cancelado:document.getElementById('f-estado-ciclo').value==='cancelado',
