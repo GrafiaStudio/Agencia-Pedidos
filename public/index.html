@@ -271,7 +271,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .items-table tr:last-child td{border-bottom:none}
 .item-inp{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;font-family:'Montserrat',sans-serif;width:100%;background:var(--white);transition:border-color .12s}
 .item-inp:focus{border-color:var(--teal);outline:none}
-.item-icons{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
+.item-line{display:flex;align-items:flex-start;gap:8px}
+.item-chips{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;padding-top:5px}
+.enc-head2{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.enc-head2 span{color:var(--slate);font-family:'DM Mono',monospace}
+.item-icons{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:3px}
+.item-icons-below{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
 .item-icon{width:27px;height:27px;border-radius:50%;border:none;background:var(--line-lt);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:all .12s;flex-shrink:0}
 .item-icon:hover{background:rgba(91,127,166,.14);color:var(--teal-dk)}
 .item-icon.on{background:var(--teal-lt);color:var(--teal-dk)}
@@ -1486,9 +1491,11 @@ function enviarWhatsAppSoporte(){
 /* Calcular progreso encargos: cada etapa del proceso pesa un % del avance */
 const PROG_PESOS={Nuevo:0,Diseño:25,'En diseño':25,Aprobación:50,Producción:75,'En producción':75,Listo:100,Entregado:100,Cancelado:100};
 function calcProg(encs){
-  if(!encs||!encs.length)return 0;
-  const total=encs.reduce((a,e)=>a+(PROG_PESOS[e.estado||'Nuevo']??0),0);
-  return Math.round(total/encs.length);
+  if(!encs)return 0;
+  const items=encs.flatMap(e=>e.items||[]);
+  if(!items.length)return 0;
+  const total=items.reduce((a,it)=>a+(PROG_PESOS[it.estado||'Nuevo']??0),0);
+  return Math.round(total/items.length);
 }
 // Evaluador seguro de expresiones matemáticas para campos de valor monetario
 // (mismo comportamiento que evalExpr en server.js — debe mantenerse igual).
@@ -1732,9 +1739,9 @@ function estadoGeneral(p){
   if(p.cancelado)return'Cancelado';
   if(p.entregado)return'Entregado';
   if(p.es_cotizacion)return'Cotización';
-  const encs=p.encargos||[];
-  if(!encs.length)return'Nuevo';
-  const ests=encs.map(e=>e.estado||'Nuevo');
+  const items=(p.encargos||[]).flatMap(e=>e.items||[]);
+  if(!items.length)return'Nuevo';
+  const ests=items.map(it=>it.estado||'Nuevo');
   if(ests.every(e=>e==='Listo'||e==='Entregado'))return'Listo';
   if(ests.some(e=>e==='Producción'||e==='En producción'))return'Producción';
   if(ests.some(e=>e==='Aprobación'))return'Aprobación';
@@ -2391,15 +2398,7 @@ function renderEncs(){
   el.innerHTML=fEnc.map((enc,i)=>`
     <div class="enc-card" id="ec-${enc.id}">
       <button class="enc-del" onclick="remEnc('${enc.id}')"><i class="ti ti-x"></i></button>
-      <div class="enc-top">
-        <div class="enc-left">
-          <div class="enc-bignum">${String(enc.numero).padStart(2,'0')}</div>
-          <select class="enc-est-sel" style="width:88px;font-size:9px;text-align:center;padding:5px 18px 5px 5px" onchange="setEncEst('${enc.id}',this.value)">
-            ${ENC_ESTS.map(s=>`<option value="${s}"${enc.estado===s?' selected':''}>${s}</option>`).join('')}
-          </select>
-        </div>
-        <div style="flex:1"></div>
-      </div>
+      <div class="enc-head2">Lista de encargo <span>#${String(enc.numero).padStart(2,'0')}</span></div>
       <div class="enc-body">
         <table class="items-table" id="it-${enc.id}">
           <thead><tr><th style="width:62px">Cant.</th><th>Detalle / Especificación</th><th style="width:92px">V. Unitario</th><th style="width:92px;text-align:right">V. Total</th><th style="width:30px" title="Suministrado">✓</th><th style="width:26px"></th></tr></thead>
@@ -2431,20 +2430,20 @@ function renderItemsHTML(enc){
     return`
     <tr${it.suministrado?' style="opacity:.55"':''}>
       <td style="width:62px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"><div id="itstock-${it.id}" style="font-size:8px;font-weight:700;color:var(--red);margin-top:2px;display:${stockWarn?'block':'none'}">${stockWarn}</div></td>
-      <td><div class="ac-wrap"><textarea class="item-ta" id="itdet-${it.id}" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div>${(it._fichaSel&&it._fichaSel.tipo_precio==='medidas')?`
-        <div style="display:flex;gap:5px;align-items:center;margin-top:4px;flex-wrap:wrap">
+      <td><div class="item-line"><div class="ac-wrap" style="flex:1;min-width:120px"><textarea class="item-ta" id="itdet-${it.id}" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div>${chips?`<span class="item-chips">${chips}</span>`:''}<div class="item-icons">
+          <button type="button" class="item-icon estado-ic${itemEstAbierto.has(it.id)?' on':''}" style="background:${ECOL_MAP[it.estado||'Nuevo']}22;color:${ECOL_MAP[it.estado||'Nuevo']}" onclick="toggleItemEstado('${enc.id}','${it.id}')" title="Estado: ${it.estado||'Nuevo'}"><i class="ti ti-progress"></i></button>
+          ${tieneDetalle?`<button type="button" class="item-icon${abierto?' on':''}" onclick="toggleVarItem('${enc.id}','${it.id}')" title="${it._fichaSel.tipo_precio==='pliego'?'Hoja y extras':'Ver detalle / opciones'}"><i class="ti ti-adjustments-horizontal"></i></button>`:''}
+          <button type="button" class="item-icon${itemTagAbierto.has(it.id)?' on':''}" onclick="toggleItemTag('${enc.id}','${it.id}')" title="Etiquetas"><i class="ti ti-tag"></i></button>
+        </div></div>${(it._fichaSel&&it._fichaSel.tipo_precio==='medidas')?`
+        <div style="display:flex;gap:5px;align-items:center;margin-top:6px;flex-wrap:wrap">
           <input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._ancho||''}" placeholder="Ancho" oninput="setMedidaItem('${enc.id}','${it.id}','_ancho',this.value)">
           ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
           <span style="font-size:10px;color:var(--muted)">${SUF_UNIDAD[it._fichaSel.medida_unidad]||'m²'}</span>
           <span id="itmed-hint-${it.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk)"></span>
         </div>`:''}
-        <div class="item-icons">
-          ${tieneDetalle?`<button type="button" class="item-icon${abierto?' on':''}" onclick="toggleVarItem('${enc.id}','${it.id}')" title="${it._fichaSel.tipo_precio==='pliego'?'Hoja y extras':'Ver detalle / opciones'}"><i class="ti ti-adjustments-horizontal"></i></button>`:''}
-          <button type="button" class="item-icon${itemTagAbierto.has(it.id)?' on':''}" onclick="toggleItemTag('${enc.id}','${it.id}')" title="Etiquetas"><i class="ti ti-tag"></i></button>
-          ${chips}
-        </div>
         ${(it._fichaSel&&it._fichaSel.tipo_precio==='variantes'&&abierto)?`<div class="item-expand">${renderVarSelectsHTML(enc.id,it)}</div>`:''}
         ${(it._fichaSel&&it._fichaSel.tipo_precio==='pliego'&&abierto)?`<div class="item-expand">${renderHojaSelectsHTML(enc.id,it)}</div>`:''}
+        ${itemEstAbierto.has(it.id)?itemEstadoPickerHTML(enc,it):''}
         ${itemTagAbierto.has(it.id)?itemTagPickerHTML(enc,it):''}</td>
       <td style="width:92px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:92px;text-align:right;font-weight:700;color:var(--navy);font-size:12px;white-space:nowrap">${totItem?fCOP(totItem):'—'}</td>
@@ -2482,6 +2481,18 @@ function itemTagPickerHTML(enc,it){
     <div class="cat-row">${CATS.map(c=>`<button type="button" class="cat-btn${selCats.includes(c.id)?' sel':''}" onclick="toggleItemCat('${enc.id}','${it.id}','${c.id}')">${c.label}</button>`).join('')}</div>
     ${subs.length?`<div class="subcat-row" style="margin-top:7px">${subs.map(s=>`<button type="button" class="scat-btn${selSubs.includes(s)?' sel':''}" onclick="toggleItemSub('${enc.id}','${it.id}','${s}')">${s}</button>`).join('')}</div>`:''}
   </div>`;
+}
+let itemEstAbierto=new Set();
+function toggleItemEstado(encId,itemId){if(itemEstAbierto.has(itemId))itemEstAbierto.delete(itemId);else itemEstAbierto.add(itemId);renderEncItems(encId);}
+function setItemEstado(encId,itemId,est){
+  const e=fEnc.find(x=>x.id===encId);if(!e)return;
+  const it=e.items.find(i=>i.id===itemId);if(!it)return;
+  it.estado=est;itemEstAbierto.delete(itemId);
+  renderEncItems(encId);actualizarProgreso();
+}
+function itemEstadoPickerHTML(enc,it){
+  const cur=it.estado||'Nuevo';
+  return `<div class="item-tagpick"><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Estado de este ítem</div><div class="cat-row">${ENC_ESTS.map(s=>`<button type="button" class="cat-btn${cur===s?' sel':''}" style="${cur===s?`border-color:${ECOL_MAP[s]};background:${ECOL_MAP[s]}1e;color:${ECOL_MAP[s]}`:''}" onclick="setItemEstado('${enc.id}','${it.id}','${s}')">${s}</button>`).join('')}</div></div>`;
 }
 function autoTA(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'}
 function renderEncSubcats(id){
