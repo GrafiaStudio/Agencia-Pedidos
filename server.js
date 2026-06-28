@@ -166,6 +166,7 @@ try { db.exec("ALTER TABLE enc_items ADD COLUMN config TEXT DEFAULT ''"); } catc
 try { db.exec("ALTER TABLE enc_items ADD COLUMN categoria TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN subcategoria TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN estado TEXT DEFAULT 'Nuevo'"); } catch(e){}
+try { db.exec("ALTER TABLE enc_items ADD COLUMN nota TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE clientes ADD COLUMN nit TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE clientes ADD COLUMN email TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE clientes ADD COLUMN direccion TEXT DEFAULT ''"); } catch(e){}
@@ -442,7 +443,7 @@ function saveEncargos(pid,encargos,wsId){
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
       const cfg=(it._varPicks||it._ancho||it._alto||it._hojaSurf!==undefined&&it._hojaSurf!==''||it._hojaExtras)?JSON.stringify({varPicks:it._varPicks||null,ancho:it._ancho||'',alto:it._alto||'',hojaSurf:(it._hojaSurf!==undefined?it._hojaSurf:''),hojaExtras:it._hojaExtras||null}):'';
-      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,suministrado,config,categoria,subcategoria,estado,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,it.suministrado?1:0,cfg,it.categoria||'',it.subcategoria||'',it.estado||'Nuevo',j,wsId);
+      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,suministrado,config,categoria,subcategoria,estado,nota,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,it.suministrado?1:0,cfg,it.categoria||'',it.subcategoria||'',it.estado||'Nuevo',it.nota||'',j,wsId);
     });
   });
 }
