@@ -56,13 +56,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 /* TOPBAR */
 .topbar{background:var(--white);border-bottom:1.5px solid var(--line);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;box-shadow:var(--sh)}
 .topbar::after{content:'';position:absolute;left:0;right:0;bottom:-1.5px;height:2px;background:var(--grad);opacity:.85}
-.tb-title{font-size:15px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
+.tb-title{font-size:15px;font-weight:700;color:var(--navy);letter-spacing:-.02em}
 .tb-right{display:flex;align-items:center;gap:8px}
 .btn-new{display:flex;align-items:center;gap:5px;padding:9px 18px;border-radius:22px;border:none;background:var(--navy);color:white;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(34,43,70,.24);transition:all .13s;letter-spacing:.02em}
 .btn-new:hover{background:var(--navy2);transform:translateY(-1px)}
 .btn-new .tri{display:inline-block;width:7px;height:7px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%)}
-.icon-btn{width:34px;height:34px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--white);color:var(--slate);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .13s}
-.icon-btn:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-lt)}
+.icon-btn{width:36px;height:36px;border-radius:50%;border:none;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;transition:all .13s}
+.icon-btn:hover{color:var(--teal-dk);background:rgba(70,98,142,.1)}
 
 /* CONTENT */
 .content{padding:26px 30px}
@@ -76,7 +76,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .sc-mini.dark{background:var(--navy);border-color:var(--navy)}
 .sc-mini.dark .ico{background:rgba(255,255,255,.08);color:var(--teal)}
 .sc-mini.light .ico{background:var(--teal-lt);color:var(--teal-dk)}
-.sc-mini .num{font-size:23px;font-weight:800;line-height:1;letter-spacing:-.02em}
+.sc-mini .num{font-size:24px;font-weight:600;line-height:1;letter-spacing:-.02em}
 .sc-mini.dark .num{color:white}
 .sc-mini.light .num{color:var(--navy)}
 .sc-mini .lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
@@ -94,7 +94,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .sc::after{content:'';position:absolute;right:-8px;bottom:-8px;width:44px;height:44px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%);opacity:.07}
 .sc-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
 .sc.dk .sc-l{color:rgba(255,255,255,.35)}
-.sc-n{font-size:24px;font-weight:800;color:var(--navy);line-height:1}
+.sc-n{font-size:25px;font-weight:600;color:var(--navy);line-height:1}
 .sc.dk .sc-n{color:white}
 .sc.tl .sc-n{color:var(--teal-dk)}
 .sc.am .sc-n{color:#9B6500}
@@ -127,7 +127,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
 .pc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:7px}
 .pc-ref{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:2px;display:flex;align-items:center;gap:5px}
-.pc-name{font-size:14px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
+.pc-name{font-size:14px;font-weight:700;color:var(--navy);letter-spacing:-.01em}
 .pc-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .pc-right{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
 
@@ -182,12 +182,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .overlay.open{display:flex}
 .modal{background:var(--white);border-radius:var(--r-lg);width:92vw;max-width:1340px;box-shadow:var(--sh-lg);margin:auto;overflow:hidden}
 .modal.modal-sm{max-width:440px}
-.mhead{background:var(--navy);padding:20px 30px;display:flex;align-items:center;justify-content:space-between}
+.mhead{background:linear-gradient(135deg,#F4F8FC,#E8EFF8);padding:19px 30px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .mhead-l{flex:1}
-.mtitle{font-size:16px;font-weight:800;color:white;letter-spacing:-.01em}
-.mref{font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.3);margin-top:2px}
-.mclose{background:rgba(255,255,255,.1);border:none;cursor:pointer;color:rgba(255,255,255,.6);width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:background .13s;flex-shrink:0}
-.mclose:hover{background:rgba(255,255,255,.2);color:white}
+.mtitle{font-size:16px;font-weight:700;color:var(--navy);letter-spacing:-.01em}
+.mref{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px}
+.mclose{background:transparent;border:none;cursor:pointer;color:var(--muted);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;transition:all .13s;flex-shrink:0}
+.mclose:hover{background:rgba(70,98,142,.12);color:var(--navy)}
 .mbody{padding:26px 30px;max-height:calc(100vh - 132px);overflow-y:auto}
 .mfoot{padding:15px 30px;border-top:1.5px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:var(--line-lt)}
 
@@ -198,7 +198,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .fr4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
 
 /* Divisor sección */
-.msec{display:flex;align-items:center;gap:8px;margin:22px 0 12px;font-size:9px;font-weight:800;color:var(--navy2);text-transform:uppercase;letter-spacing:.1em}
+.msec{display:flex;align-items:center;gap:8px;margin:22px 0 12px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
 .msec::before,.msec::after{content:'';flex:1;height:1px;background:var(--line)}
 .msec .tri{display:inline-block;width:7px;height:7px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%)}
 .msec:first-child{margin-top:0}
@@ -232,17 +232,17 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .enc-card{border:1.5px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;background:var(--white);position:relative}
 .enc-top{display:grid;grid-template-columns:92px 1fr;gap:12px;align-items:start;margin-bottom:12px}
 .enc-left{display:flex;flex-direction:column;align-items:center;gap:7px;padding-top:4px}
-.enc-bignum{font-size:28px;font-weight:800;color:var(--navy);letter-spacing:-.03em;line-height:1}
+.enc-bignum{font-size:28px;font-weight:600;color:var(--slate);letter-spacing:-.03em;line-height:1}
 .enc-bignum::before{content:'#'}
 .enc-del{position:absolute;top:9px;right:9px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;transition:color .12s;z-index:2}
 .enc-del:hover{color:var(--red)}
 .enc-body{min-width:0}
 
 /* CATEGORIAS */
-.cat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px}
-.cat-btn{padding:7px 6px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--white);font-size:10px;font-weight:700;cursor:pointer;text-align:center;color:var(--slate);transition:all .12s;letter-spacing:.01em}
-.cat-btn:hover{border-color:var(--teal-lt);color:var(--teal-dk)}
-.cat-btn.sel{border-width:2px;border-color:var(--navy);background:var(--navy);color:white}
+.cat-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.cat-btn{padding:6px 13px;border-radius:20px;border:1.5px solid var(--line);background:var(--white);font-size:10px;font-weight:600;cursor:pointer;text-align:center;color:var(--slate);transition:all .12s}
+.cat-btn:hover{border-color:#C9D6E5;color:var(--teal-dk)}
+.cat-btn.sel{border-color:var(--teal);background:var(--teal-lt);color:var(--teal-dk);font-weight:700}
 .subcat-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
 .scat-btn{padding:4px 10px;border-radius:20px;border:1.5px solid var(--line);background:var(--white);font-size:10px;font-weight:600;cursor:pointer;color:var(--slate);transition:all .12s}
 .scat-btn.sel{border-color:var(--teal);background:var(--teal-lt);color:var(--teal-dk);font-weight:700}
@@ -353,7 +353,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .crear-card small{font-size:10px;font-weight:600;color:var(--muted);line-height:1.4}
 .b-tipo{background:var(--teal-lt);color:var(--teal-dk);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .cli-av{width:40px;height:40px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--teal);flex-shrink:0}
-.cli-name{font-size:13px;font-weight:800;color:var(--navy)}
+.cli-name{font-size:13px;font-weight:700;color:var(--navy)}
 .cli-sub{font-size:11px;color:var(--muted);margin-top:1px}
 .his-item{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:9px 12px;margin-bottom:6px;cursor:pointer;transition:border-color .12s;display:flex;align-items:center;justify-content:space-between}
 .his-item:hover{border-color:var(--teal-lt)}
@@ -810,7 +810,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div><label>Fecha de entrega</label><input type="date" id="f-fecha"></div>
       <div>
         <label>Valor final del pedido</label>
-        <input type="text" id="f-valor-final" placeholder="= sugerido" oninput="fValorFinalRaw=this.value;actualizarValorTotal()" onfocus="focusValorFinal(this)" onblur="blurValorFinal(this)" style="font-size:15px;font-weight:800;color:var(--navy)">
+        <input type="text" id="f-valor-final" placeholder="= sugerido" oninput="fValorFinalRaw=this.value;actualizarValorTotal()" onfocus="focusValorFinal(this)" onblur="blurValorFinal(this)" style="font-size:15px;font-weight:700;color:var(--navy)">
         <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
           <span id="vf-prev" style="font-size:10px;font-weight:700;color:var(--teal-dk);display:none"></span>
           <span id="valor-sugerido-cap" style="font-size:10px;color:var(--muted);font-weight:600">Valor sugerido: $0</span>
@@ -819,7 +819,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div>
         <label>Avance general</label>
-        <div id="prog-pct" style="font-size:19px;font-weight:800;color:var(--teal-dk);padding:6px 0">0%</div>
+        <div id="prog-pct" style="font-size:20px;font-weight:600;color:var(--teal-dk);padding:6px 0">0%</div>
       </div>
     </div>
 
@@ -1967,6 +1967,14 @@ function addEnc(){
   actualizarValorTotal();
 }
 function remEnc(id){fEnc=fEnc.filter(x=>x.id!==id);renderEncs();actualizarValorTotal()}
+function encCatLabelText(e){
+  const arr=[...new Set([...(e.categorias||[]).map(cid=>CATS.find(c=>c.id===cid)?.label||cid),...(e.subcategorias||[])])];
+  return arr.length?arr.join(', '):'Categoría (opcional)';
+}
+function refrescarEncCatLabel(id){
+  const e=fEnc.find(x=>x.id===id);const s=document.getElementById('enccatlbl-'+id);
+  if(e&&s)s.textContent=encCatLabelText(e);
+}
 function toggleEncCat(id,catId){
   const e=fEnc.find(x=>x.id===id);
   if(!e)return;
@@ -1975,7 +1983,11 @@ function toggleEncCat(id,catId){
   if(i>=0)e.categorias.splice(i,1);else e.categorias.push(catId);
   const subsValidas=new Set(e.categorias.flatMap(cid=>CATS.find(c=>c.id===cid)?.subs||[]));
   e.subcategorias=(e.subcategorias||[]).filter(s=>subsValidas.has(s));
-  renderEncs();
+  // actualizar en sitio (sin re-render total → el picker NO se pliega, se pueden marcar varias)
+  const row=document.querySelector('#enccat-'+id+' .cat-row');
+  if(row)row.querySelectorAll('.cat-btn').forEach((b,idx)=>{if(CATS[idx])b.classList.toggle('sel',e.categorias.includes(CATS[idx].id));});
+  renderEncSubcats(id);
+  refrescarEncCatLabel(id);
 }
 function toggleEncSub(id,sub){
   const e=fEnc.find(x=>x.id===id);
@@ -1984,6 +1996,7 @@ function toggleEncSub(id,sub){
   const i=e.subcategorias.indexOf(sub);
   if(i>=0)e.subcategorias.splice(i,1);else e.subcategorias.push(sub);
   renderEncSubcats(id);
+  refrescarEncCatLabel(id);
 }
 function setEncVal(id,k,v){
   const e=fEnc.find(x=>x.id===id);
@@ -2354,7 +2367,7 @@ function renderEncs(){
         </div>
         <div style="flex:1">
           <div onclick="const b=document.getElementById('enccat-${enc.id}');b.style.display=b.style.display==='none'?'block':'none'" style="cursor:pointer;font-size:10px;font-weight:700;color:var(--slate);padding:3px 0;user-select:none">
-            <i class="ti ti-tag" style="font-size:12px;color:var(--muted)"></i> ${(enc.categorias||[]).length?[...new Set([...(enc.categorias||[]).map(cid=>CATS.find(c=>c.id===cid)?.label||cid),...(enc.subcategorias||[])])].join(', '):'Categoría (opcional)'} <i class="ti ti-chevron-down" style="font-size:11px;color:var(--muted)"></i>
+            <i class="ti ti-tag" style="font-size:12px;color:var(--muted)"></i> <span id="enccatlbl-${enc.id}">${encCatLabelText(enc)}</span> <i class="ti ti-chevron-down" style="font-size:11px;color:var(--muted)"></i>
           </div>
           <div id="enccat-${enc.id}" style="display:none">
             <div class="cat-row" style="margin:4px 0 ${(enc.categorias||[]).length?'6px':'0'}">
