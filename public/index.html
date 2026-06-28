@@ -1621,24 +1621,31 @@ function tipoDocumento(p){
 }
 function lineasDocumento(p,fichasPorId){
   fichasPorId=fichasPorId||{};
-  return(p.encargos||[]).map(enc=>{
-    const partes=(enc.items||[]).map(it=>{
-      const base=`${(it.cantidad||'').trim()} ${(it.detalle||'').trim()}`.trim();
+  const lineas=[];
+  (p.encargos||[]).forEach(enc=>{
+    (enc.items||[]).forEach(it=>{
+      const cant=(it.cantidad||'').trim();
+      const det=(it.detalle||'').trim();
+      const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+      const totItem=cantNum*(evalExpr(it.valor_unitario)||0);
       const ficha=it.ficha_id?fichasPorId[it.ficha_id]:null;
-      if(!ficha||(ficha.tipo_precio!=='combo'&&ficha.tipo_precio!=='promocional')||!(ficha.componentes||[]).length)return base;
-      const cantItem=parseInt(String(it.cantidad||0).replace(/\D/g,''))||1;
-      const titulo=ficha.tipo_precio==='promocional'?`Promoción: ${ficha.nombre}`:ficha.nombre;
-      const sub=ficha.componentes.map(c=>{
-        const nombreComp=c.componente_ficha_id?(fichasPorId[c.componente_ficha_id]?.nombre||'(producto)'):(c.componente_nombre||'(ítem libre)');
-        const cantTotal=cantItem*c.cantidad_consumida;
-        const precioUnit=parseInt(String(c.precio_unitario_calc||0).replace(/\D/g,''))||0;
-        const precioTxt=ficha.combo_precio_modo==='individual'?` — ${fCOP(precioUnit)} c/u`:'';
-        return `   • ${cantTotal} ${nombreComp}${precioTxt}`;
-      }).join('\n');
-      return `${(it.cantidad||'').trim()} ${titulo}\n${sub}`;
-    }).filter(Boolean);
-    return{descripcion:partes.join('\n')||'(sin detalle)',monto:calcValorEncargoEfectivo(enc)};
+      if(ficha&&(ficha.tipo_precio==='combo'||ficha.tipo_precio==='promocional')&&(ficha.componentes||[]).length){
+        const cantItem=cantNum||1;
+        const titulo=ficha.tipo_precio==='promocional'?`Promoción: ${ficha.nombre}`:ficha.nombre;
+        const sub=ficha.componentes.map(c=>{
+          const nombreComp=c.componente_ficha_id?(fichasPorId[c.componente_ficha_id]?.nombre||'(producto)'):(c.componente_nombre||'(ítem libre)');
+          return `   • ${cantItem*c.cantidad_consumida} ${nombreComp}`;
+        }).join('\n');
+        lineas.push({descripcion:`${cant} ${titulo}\n${sub}`.trim(),monto:totItem});
+      }else{
+        let desc=`${cant} ${det}`.trim()||'(sin detalle)';
+        if(it.nota)desc+=`\n   ${it.nota}`;
+        lineas.push({descripcion:desc,monto:totItem});
+      }
+    });
   });
+  if(!lineas.length)lineas.push({descripcion:'(sin detalle)',monto:p.valor_total||0});
+  return lineas;
 }
 function calcularIVA(total,porcentaje){
   const subtotal=Math.round(total/(1+porcentaje/100));
@@ -2116,7 +2123,7 @@ function setItem(encId,itemId,k,v){
   const e=fEnc.find(x=>x.id===encId);
   const it=e&&e.items.find(i=>i.id===itemId);
   if(it){
-    if(k==='valor_unitario'&&it._autoPrecio&&it._fichaSel&&!it.precio_sugerido){it.precio_sugerido=String(evalExpr(it.valor_unitario)||'');}
+    if(k==='valor_unitario'&&it._fichaSel&&!it.precio_sugerido){const s=evalExpr(it.valor_unitario);if(s>0)it.precio_sugerido=String(s);}
     it[k]=v;
     if(k==='valor_unitario'){it._autoPrecio=false;_preciosEditados.add(itemId);}
     if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='escalonado'){
@@ -2173,9 +2180,9 @@ let _preciosEditados=new Set();
 function setItemTotal(encId,itemId,v){
   const e=fEnc.find(x=>x.id===encId);const it=e&&e.items.find(i=>i.id===itemId);if(!it)return;
   const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
-  const total=evalExpr(v);
+  const total=evalExpr(String(v||'').replace(/[$\s]/g,''));
   if(cant>0&&total!=null){
-    if(it._autoPrecio&&it._fichaSel&&!it.precio_sugerido){it.precio_sugerido=String(evalExpr(it.valor_unitario)||'');}
+    if(it._fichaSel&&!it.precio_sugerido){const s=evalExpr(it.valor_unitario);if(s>0)it.precio_sugerido=String(s);}
     it._autoPrecio=false;_preciosEditados.add(itemId);
     it.valor_unitario=String(Math.round(total/cant));
   }
