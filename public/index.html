@@ -276,6 +276,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .item-icon:hover{background:rgba(91,127,166,.14);color:var(--teal-dk)}
 .item-icon.on{background:var(--teal-lt);color:var(--teal-dk)}
 .item-expand{margin-top:8px}
+.var-partes{margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.var-parte{min-width:150px;background:var(--white);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.var-parte-hd{font-size:10px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px}
 .item-tagpick{margin-top:8px;padding:11px 12px;border-radius:13px;background:var(--line-lt)}
 .item-ta{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;font-family:'Montserrat',sans-serif;width:100%;background:var(--white);transition:border-color .12s;resize:none;overflow:hidden;min-height:28px;line-height:1.45}
 .item-ta:focus{border-color:var(--teal);outline:none;box-shadow:none}
@@ -2252,26 +2255,25 @@ function recalcVarItem(it){
 }
 function renderVarSelectsHTML(encId,it){
   const picks=it._varPicks||{};
-  let html='<div style="margin-top:5px;display:flex;flex-direction:column;gap:5px">';
+  let html='<div class="var-partes">';
   (it._fichaSel.variantes||[]).forEach(parte=>{
+    html+=`<div class="var-parte"><div class="var-parte-hd">${parte.nombre}</div>`;
     if(parte.hijos&&parte.hijos.length){
       if(parte.multi){
         const mapa=(picks[parte.id]&&typeof picks[parte.id]==='object')?picks[parte.id]:{};
-        html+=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">${parte.nombre}</span>
-          ${parte.hijos.map(op=>`<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px"><input class="item-inp" type="number" min="0" style="width:46px" value="${parseInt(mapa[op.id],10)||''}" placeholder="0" oninput="setVarPickMulti('${encId}','${it.id}','${parte.id}','${op.id}',this.value)"> ${op.nombre} (${fCOP(varPrecioBaseFE(op))})</span>`).join('')}
-        </div>`;
+        html+=`<div style="display:flex;flex-direction:column;gap:5px">${parte.hijos.map(op=>`<label style="display:flex;align-items:center;gap:6px;font-size:10px"><input class="item-inp" type="number" min="0" style="width:44px" value="${parseInt(mapa[op.id],10)||''}" placeholder="0" oninput="setVarPickMulti('${encId}','${it.id}','${parte.id}','${op.id}',this.value)"><span>${op.nombre} <span style="color:var(--muted)">(${fCOP(varPrecioBaseFE(op))})</span></span></label>`).join('')}</div>`;
       }else{
         const val=picks[parte.id]||'';
-        html+=`<div style="display:flex;gap:6px;align-items:center"><span style="font-size:10px;font-weight:700;color:var(--slate);min-width:72px">${parte.nombre}</span>
-          <select class="item-inp" style="width:auto;min-width:150px" onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.value)">
+        html+=`<select class="item-inp" style="width:100%" onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.value)">
             <option value="">— ninguno —</option>
             ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre} — ${fCOP(varPrecioBaseFE(h))}</option>`).join('')}
-          </select></div>`;
+          </select>`;
       }
     }else{
       const on=!!picks[parte.id];
-      html+=`<label class="ck-box" style="display:inline-flex;gap:6px"><input type="checkbox" ${on?'checked':''} onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.checked?'1':'')"><span style="font-size:11px">${parte.nombre} — ${fCOP(varPrecioBaseFE(parte))}</span></label>`;
+      html+=`<label class="ck-box" style="display:inline-flex;gap:6px"><input type="checkbox" ${on?'checked':''} onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.checked?'1':'')"><span style="font-size:10px">${fCOP(varPrecioBaseFE(parte))}</span></label>`;
     }
+    html+='</div>';
   });
   html+='</div>';
   return html;
