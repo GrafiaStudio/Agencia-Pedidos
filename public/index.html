@@ -2118,7 +2118,7 @@ function setItem(encId,itemId,k,v){
   if(it){
     if(k==='valor_unitario'&&it._autoPrecio&&it._fichaSel&&!it.precio_sugerido){it.precio_sugerido=String(evalExpr(it.valor_unitario)||'');}
     it[k]=v;
-    if(k==='valor_unitario')it._autoPrecio=false;
+    if(k==='valor_unitario'){it._autoPrecio=false;_preciosEditados.add(itemId);}
     if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='escalonado'){
       const cantNum=parseInt(String(v||0).replace(/\D/g,''))||0;
       const precio=detectarPrecioEscalonado(it._fichaSel.rangos,cantNum);
@@ -2169,17 +2169,28 @@ function updateItemTotalCell(encId,itemId){
   const el=document.getElementById('ittot-'+itemId);
   if(el&&document.activeElement!==el)el.value=tot?displayMoneyVal(String(tot)):'';
 }
+let _preciosEditados=new Set();
 function setItemTotal(encId,itemId,v){
   const e=fEnc.find(x=>x.id===encId);const it=e&&e.items.find(i=>i.id===itemId);if(!it)return;
   const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
   const total=evalExpr(v);
   if(cant>0&&total!=null){
     if(it._autoPrecio&&it._fichaSel&&!it.precio_sugerido){it.precio_sugerido=String(evalExpr(it.valor_unitario)||'');}
-    it._autoPrecio=false;
+    it._autoPrecio=false;_preciosEditados.add(itemId);
     it.valor_unitario=String(Math.round(total/cant));
   }
   actualizarValorTotal();
   renderEncItems(encId);
+}
+function collectPrecioEdits(){
+  const out=[];
+  fEnc.forEach(e=>(e.items||[]).forEach(it=>{
+    if(_preciosEditados.has(it.id)){
+      const sug=evalExpr(it.precio_sugerido)||0,uni=evalExpr(it.valor_unitario)||0;
+      if(sug>0&&uni!==sug)out.push({detalle:(it.detalle||'ítem').slice(0,60),sugerido:fCOP(sug),nuevo:fCOP(uni)});
+    }
+  }));
+  return out;
 }
 let _acItemResults={};
 function detectarPrecioEscalonado(rangos,cantidad){
@@ -3689,12 +3700,14 @@ async function guardar(){
     encargos:fEnc,
     pagos:fPag,
     costos:fCostos.map(c=>({...c,auto:c._auto?1:0})),
+    precio_edits:collectPrecioEdits(),
   };
   const errExpr=validarExpresionesBody(body);
   if(errExpr){toast(errExpr,false);return}
   try{
     if(editId){await api('PUT',`/pedidos/${editId}`,body);toast('Pedido actualizado ✓')}
     else{await api('POST','/pedidos',body);toast('Pedido creado ✓')}
+    _preciosEditados.clear();
     cerrar();
     await Promise.all([cargarStats(),cargarPedidos()]);
   }catch(e){toast('Error: '+e.message,false);console.error(e)}
