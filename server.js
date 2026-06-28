@@ -185,6 +185,19 @@ try { db.exec("ALTER TABLE fichas_producto ADD COLUMN precio_pliego_calc TEXT");
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN pliego_superficies TEXT DEFAULT '[]'"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN pliego_extras TEXT DEFAULT '[]'"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN codigo TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN inventario_item_id TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN inventario_cantidad_consumida TEXT DEFAULT ''"); } catch(e){}
+db.exec(`CREATE TABLE IF NOT EXISTS items_inventario(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT,
+  nombre TEXT NOT NULL,
+  descripcion TEXT DEFAULT '',
+  unidad_medida TEXT DEFAULT 'unidad',
+  stock_actual REAL,
+  stock_minimo REAL,
+  activo INTEGER DEFAULT 1,
+  creado TEXT DEFAULT(datetime('now','localtime'))
+)`);
 
 // ── FICHAS DE PRODUCTO (Fase 2A+2B del documento maestro, sin combos) ──
 db.exec(`CREATE TABLE IF NOT EXISTS fichas_producto(
@@ -450,9 +463,10 @@ function saveEncargos(pid,encargos,wsId){
 }
 function descontarStock(pid,wsId){
   const encargos=db.prepare('SELECT id FROM encargos WHERE pedido_id=?').all(pid);
-  const consumo={};
+  const consumoFicha={}; // stock propio del producto (retrocompat)
+  const consumoInv={};   // ítem de inventario compartido (CORR 003/005)
   function acumular(fichaId,cantidad){
-    const ficha=db.prepare('SELECT stock_actual FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
+    const ficha=db.prepare('SELECT stock_actual,inventario_item_id,inventario_cantidad_consumida FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
     if(!ficha)return;
     const comps=db.prepare('SELECT componente_ficha_id,cantidad_consumida FROM combo_composicion WHERE ficha_id=?').all(fichaId);
     if(comps.length){
@@ -462,17 +476,28 @@ function descontarStock(pid,wsId){
       });
       return;
     }
+    if(ficha.inventario_item_id){
+      const inv=db.prepare('SELECT stock_actual FROM items_inventario WHERE id=? AND workspace_id=?').get(ficha.inventario_item_id,wsId);
+      if(!inv||inv.stock_actual==null)return;
+      const factor=parseFloat(ficha.inventario_cantidad_consumida)||1;
+      consumoInv[ficha.inventario_item_id]=(consumoInv[ficha.inventario_item_id]||0)+cantidad*factor;
+      return;
+    }
     if(ficha.stock_actual==null)return;
-    consumo[fichaId]=(consumo[fichaId]||0)+cantidad;
+    consumoFicha[fichaId]=(consumoFicha[fichaId]||0)+cantidad;
   }
   encargos.forEach(enc=>{
     const items=db.prepare('SELECT cantidad,ficha_id FROM enc_items WHERE encargo_id=? AND ficha_id IS NOT NULL').all(enc.id);
     items.forEach(it=>acumular(it.ficha_id,toNum(it.cantidad)));
   });
   const resultado=[];
-  Object.entries(consumo).forEach(([fichaId,cantidad])=>{
+  Object.entries(consumoFicha).forEach(([fichaId,cantidad])=>{
     db.prepare('UPDATE fichas_producto SET stock_actual=stock_actual-? WHERE id=?').run(cantidad,fichaId);
-    resultado.push({ficha_id:fichaId,cantidad});
+    resultado.push({tipo:'ficha',id:fichaId,cantidad});
+  });
+  Object.entries(consumoInv).forEach(([invId,cantidad])=>{
+    db.prepare('UPDATE items_inventario SET stock_actual=stock_actual-? WHERE id=?').run(cantidad,invId);
+    resultado.push({tipo:'inv',id:invId,cantidad});
   });
   return resultado;
 }
@@ -480,7 +505,12 @@ function restaurarStock(stockConsumidoJSON,wsId){
   let lista=[];
   try{lista=JSON.parse(stockConsumidoJSON||'[]')}catch(e){lista=[]}
   lista.forEach(item=>{
-    db.prepare('UPDATE fichas_producto SET stock_actual=stock_actual+? WHERE id=? AND workspace_id=?').run(item.cantidad,item.ficha_id,wsId);
+    if(item.tipo==='inv'){
+      db.prepare('UPDATE items_inventario SET stock_actual=stock_actual+? WHERE id=? AND workspace_id=?').run(item.cantidad,item.id,wsId);
+    }else{
+      const fid=item.id||item.ficha_id; // formato viejo: {ficha_id,cantidad}
+      db.prepare('UPDATE fichas_producto SET stock_actual=stock_actual+? WHERE id=? AND workspace_id=?').run(item.cantidad,fid,wsId);
+    }
   });
 }
 
@@ -1182,6 +1212,7 @@ app.post('/api/productos',(req,res)=>{
     guardarInsumos(id,b.insumos,req.wsId);
     guardarComposicion(id,b.componentes,req.wsId);
     guardarVariantes(id,b.variantes,req.wsId);
+    db.prepare('UPDATE fichas_producto SET inventario_item_id=?,inventario_cantidad_consumida=? WHERE id=? AND workspace_id=?').run(b.inventario_item_id||'',b.inventario_cantidad_consumida!=null?String(b.inventario_cantidad_consumida):'',id,req.wsId);
     res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(id)));
   }catch(e){logError('POST /api/productos',e);res.status(500).json({error:e.message})}
 });
@@ -1198,12 +1229,44 @@ app.put('/api/productos/:id',(req,res)=>{
     if(b.insumos!==undefined)guardarInsumos(fid,b.insumos,req.wsId);
     if(b.componentes!==undefined)guardarComposicion(fid,b.componentes,req.wsId);
     if(b.variantes!==undefined)guardarVariantes(fid,b.variantes,req.wsId);
+    if(b.inventario_item_id!==undefined||b.inventario_cantidad_consumida!==undefined)db.prepare('UPDATE fichas_producto SET inventario_item_id=?,inventario_cantidad_consumida=? WHERE id=? AND workspace_id=?').run(b.inventario_item_id||'',b.inventario_cantidad_consumida!=null?String(b.inventario_cantidad_consumida):'',fid,req.wsId);
     res.json(fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=?').get(fid)));
   }catch(e){logError('PUT /api/productos/:id',e);res.status(500).json({error:e.message})}
 });
 
 app.delete('/api/productos/:id',(req,res)=>{
   const r=db.prepare('DELETE FROM fichas_producto WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'No encontrado'});
+  res.json({ok:true});
+});
+
+// ── ÍTEMS DE INVENTARIO (CORR 003/005: inventario separado del producto) ──
+app.get('/api/inventario-items',(req,res)=>{
+  res.json(db.prepare('SELECT * FROM items_inventario WHERE workspace_id=? ORDER BY nombre').all(req.wsId));
+});
+app.post('/api/inventario-items',(req,res)=>{
+  const b=req.body||{};
+  if(!b.nombre||!String(b.nombre).trim())return res.status(400).json({error:'Nombre requerido'});
+  const id=uid();
+  const sa=(b.stock_actual===''||b.stock_actual==null)?null:Number(b.stock_actual);
+  const sm=(b.stock_minimo===''||b.stock_minimo==null)?null:Number(b.stock_minimo);
+  db.prepare('INSERT INTO items_inventario(id,workspace_id,nombre,descripcion,unidad_medida,stock_actual,stock_minimo,activo)VALUES(?,?,?,?,?,?,?,?)')
+    .run(id,req.wsId,String(b.nombre).trim(),b.descripcion||'',b.unidad_medida||'unidad',Number.isFinite(sa)?sa:null,Number.isFinite(sm)?sm:null,b.activo===0?0:1);
+  res.json(db.prepare('SELECT * FROM items_inventario WHERE id=?').get(id));
+});
+app.put('/api/inventario-items/:id',(req,res)=>{
+  const b=req.body||{};
+  const ex=db.prepare('SELECT * FROM items_inventario WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!ex)return res.status(404).json({error:'No encontrado'});
+  const sa=(b.stock_actual===''||b.stock_actual==null)?null:Number(b.stock_actual);
+  const sm=(b.stock_minimo===''||b.stock_minimo==null)?null:Number(b.stock_minimo);
+  db.prepare('UPDATE items_inventario SET nombre=?,descripcion=?,unidad_medida=?,stock_actual=?,stock_minimo=?,activo=? WHERE id=? AND workspace_id=?')
+    .run(b.nombre!=null?String(b.nombre).trim():ex.nombre,b.descripcion!=null?b.descripcion:ex.descripcion,b.unidad_medida||ex.unidad_medida,b.stock_actual!==undefined?(Number.isFinite(sa)?sa:null):ex.stock_actual,b.stock_minimo!==undefined?(Number.isFinite(sm)?sm:null):ex.stock_minimo,b.activo===0?0:1,req.params.id,req.wsId);
+  res.json(db.prepare('SELECT * FROM items_inventario WHERE id=?').get(req.params.id));
+});
+app.delete('/api/inventario-items/:id',(req,res)=>{
+  db.prepare("UPDATE fichas_producto SET inventario_item_id='' WHERE inventario_item_id=? AND workspace_id=?").run(req.params.id,req.wsId);
+  const r=db.prepare('DELETE FROM items_inventario WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});
   res.json({ok:true});
 });
