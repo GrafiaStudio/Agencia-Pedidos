@@ -2538,8 +2538,8 @@ function renderItemsHTML(enc){
           <button type="button" class="item-icon${it.nota?' on':''}${itemNotaAbierto.has(it.id)?' open':''}" onclick="toggleItemNota('${enc.id}','${it.id}')" title="Nota adicional del ítem"><i class="ti ti-note"></i></button>
         </div></div>${(it._fichaSel&&it._fichaSel.tipo_precio==='medidas'&&abierto)?`
         <div class="item-expand" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-          <input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._ancho||''}" placeholder="Ancho" oninput="setMedidaItem('${enc.id}','${it.id}','_ancho',this.value)">
-          ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
+          <input class="item-inp" style="width:74px" type="number" step="0.01" min="0" value="${it._ancho||''}" placeholder="Ancho ${it._fichaSel.medida_unidad==='cm2'?'(cm)':'(m)'}" oninput="setMedidaItem('${enc.id}','${it.id}','_ancho',this.value)">
+          ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:74px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto ${it._fichaSel.medida_unidad==='cm2'?'(cm)':'(m)'}" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
           <span style="font-size:10px;color:var(--muted)">${SUF_UNIDAD[it._fichaSel.medida_unidad]||'m²'}</span>
           <span id="itmed-hint-${it.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk)"></span>
         </div>`:''}
