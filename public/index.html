@@ -13,7 +13,7 @@
   --grad:linear-gradient(150deg,var(--yellow),var(--magenta));
   --teal:#5B7FA6;--teal-lt:#EAF1F8;--teal-dk:#3E5C82;
   --slate:#5E708A;--muted:#93A3B9;
-  --line:#E5ECF4;--line-lt:#F5F8FB;--bg:#E7EEF6;--white:#fff;
+  --line:#E5ECF4;--line-lt:#F5F8FB;--bg:#E6EDF6;--white:#FCFDFE;
   --amber:#F5A623;--amber-lt:#FEF4E3;
   --red:#E5484D;--red-lt:#FDEAEA;
   --green:#2BAD72;--green-lt:#E4F7EE;
@@ -49,8 +49,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .nav-item i{font-size:15px;flex-shrink:0}
 .nav-item:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.8)}
 .nav-item.active{background:rgba(124,160,200,.22);color:#A9C6E8}
-.nb{margin-left:auto;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;background:var(--red);color:white;min-width:18px;text-align:center}
-.nb.g{background:var(--teal)}
+.nb{margin-left:auto;font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(255,255,255,.14);color:rgba(255,255,255,.85);min-width:18px;text-align:center}
+.nb.g{background:rgba(255,255,255,.14)}
+.nb.urg{background:var(--red);color:#fff}
 .sb-footer{padding:10px;border-top:1px solid rgba(255,255,255,.07)}
 
 /* TOPBAR */
@@ -148,19 +149,19 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
 /* Tags de categoría */
 .tags{display:flex;gap:3px;flex-wrap:wrap;margin:4px 0 2px}
-.ttag{font-size:8px;font-weight:800;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em}
-.tc-purple{background:var(--purple-lt);color:#4A3CB8}
-.tc-amber{background:var(--amber-lt);color:#9B6500}
-.tc-orange{background:var(--orange-lt);color:#C24A1A}
-.tc-teal{background:var(--teal-lt);color:var(--teal-dk)}
-.tc-green{background:var(--green-lt);color:#1A6B45}
-.tc-slate{background:var(--line-lt);color:var(--slate)}
-.tc-red{background:var(--red-lt);color:#C13338}
-.tc-pink{background:#FCE4F1;color:#C2185B}
-.tc-blue{background:#E3EEFC;color:#1957B0}
-.tc-yellow{background:#FEF6D8;color:#8A6D00}
-.tc-brown{background:#F2E8E0;color:#6B4226}
-.tc-indigo{background:#E6E9FB;color:#3949AB}
+.ttag{font-size:8px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;color:#fff}
+.tc-purple{background:#897FD0}
+.tc-amber{background:#D29A3C}
+.tc-orange{background:#D9774F}
+.tc-teal{background:#4E96AC}
+.tc-green{background:#57A175}
+.tc-slate{background:#7E8DA3}
+.tc-red{background:#D26368}
+.tc-pink{background:#CB6B9C}
+.tc-blue{background:#5786CC}
+.tc-yellow{background:#BFA03C}
+.tc-brown{background:#9C7E69}
+.tc-indigo{background:#6B79BE}
 
 /* Fecha alerta */
 .fa-red{color:var(--red);font-size:10px;font-weight:700}
@@ -279,22 +280,23 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .es-cancelado{color:var(--muted);border-color:#ccc;background:#f5f5f5}
 
 /* BOTÓN AGREGAR ENCARGO */
-.btn-add-enc{width:100%;padding:10px;border:2px dashed var(--teal-lt);border-radius:var(--r);background:transparent;color:var(--teal-dk);font-size:11px;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .13s;letter-spacing:.02em}
-.btn-add-enc:hover{background:var(--teal-lt)}
+.btn-add-enc{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border:none;border-radius:20px;background:transparent;color:var(--teal-dk);font-size:11px;font-weight:700;cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .13s;letter-spacing:.02em}
+.btn-add-enc:hover{background:var(--teal-lt);box-shadow:var(--sh)}
 
 /* RESUMEN FINANCIERO pedido */
 .fin-row-total{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:var(--r-sm);background:var(--navy);color:white;font-size:12px;font-weight:700;margin-bottom:10px}
 
 /* PAGOS */
-.pago-item{border:1.5px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:7px;background:var(--line-lt);position:relative}
-.pago-del{position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px}
+.pago-item{border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-bottom:8px;background:var(--white);position:relative}
+.pago-grid{display:grid;grid-template-columns:150px 140px 150px 1fr;gap:12px;align-items:end;padding-right:22px}
+.pago-del{position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px}
 .pago-del:hover{color:var(--red)}
 .pago-res-box{border-radius:var(--r-sm);overflow:hidden;border:1.5px solid var(--teal-lt);margin-top:8px}
 .pr-row{display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;font-weight:600;border-bottom:1px solid var(--teal-lt)}
 .pr-row:last-child{border:none;background:var(--teal-lt);color:var(--teal-dk);font-weight:800}
 
-.btn-add-g{width:100%;padding:7px;border:1.5px dashed var(--line);border-radius:var(--r-sm);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;font-family:'Montserrat',sans-serif;display:flex;align-items:center;justify-content:center;gap:5px;transition:background .12s}
-.btn-add-g:hover{background:var(--line-lt)}
+.btn-add-g{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:none;border-radius:20px;background:transparent;color:var(--teal-dk);font-size:11px;font-weight:600;cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .13s}
+.btn-add-g:hover{background:var(--line-lt);box-shadow:var(--sh)}
 
 /* REGISTRO INTERNO colapsable */
 .collapsible{border:1.5px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
@@ -424,6 +426,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   .cat-row{grid-template-columns:repeat(3,1fr)}
   .checks-row{grid-template-columns:1fr 1fr}
   .cfg-mp-grid{grid-template-columns:1fr 1fr}
+  .pago-grid{grid-template-columns:1fr 1fr}
   .cli-grid{grid-template-columns:1fr}
   .reg-stats{grid-template-columns:1fr 1fr}
   .mbody{padding:14px;max-height:calc(100vh - 130px)}
@@ -470,7 +473,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="clientes" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
     <button class="nav-item" data-view="registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
     <button class="nav-item" data-view="productos" onclick="showView('productos')"><i class="ti ti-box"></i>Productos</button>
-    <button class="nav-item" data-view="inventario" onclick="showView('inventario')"><i class="ti ti-boxes"></i>Inventario</button>
+    <button class="nav-item" data-view="inventario" onclick="showView('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
     <button class="nav-item" onclick="filtroRapido('pendiente')"><i class="ti ti-clock"></i>Pendientes</button>
@@ -773,7 +776,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   <div class="mhead"><div class="mhead-l"><div class="mtitle">Más</div></div><button class="mclose" onclick="cerrarMas()"><i class="ti ti-x"></i></button></div>
   <div class="mbody">
     <button class="mas-item" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
-    <button class="mas-item" onclick="irDesdeMas('inventario')"><i class="ti ti-boxes"></i>Inventario</button>
+    <button class="mas-item" onclick="irDesdeMas('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="mas-item" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
     <button class="mas-item" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
@@ -1665,9 +1668,10 @@ function showView(v){
 /* ══ STATS ══ */
 async function cargarStats(){
   const s=await api('GET','/stats');
-  document.getElementById('sb-act').textContent=s.activos||0;
-  document.getElementById('sb-urg').textContent=s.urgentes||0;
-  document.getElementById('sb-cot').textContent=s.cotizaciones||0;
+  const setNB=(id,n,urg)=>{const el=document.getElementById(id);if(!el)return;n=n||0;el.textContent=n;el.style.display=n>0?'':'none';el.classList.toggle('urg',!!urg&&n>0);};
+  setNB('sb-act',s.activos);
+  setNB('sb-urg',s.urgentes,true);
+  setNB('sb-cot',s.cotizaciones);
   document.getElementById('stats').innerHTML=`
     <div class="sc-mini dark">
       <div class="ico"><i class="ti ti-clipboard-list"></i></div>
@@ -3183,9 +3187,9 @@ function renderPagos(){
   document.getElementById('pag-lista').innerHTML=fPag.map(pg=>`
     <div class="pago-item">
       <button class="pago-del" onclick="remPago('${pg.id}')"><i class="ti ti-x"></i></button>
-      <div class="fr3 fg">
-        <div><label>Monto</label><input type="text" value="${displayMoneyVal(pg.monto)}" placeholder="$ 0" oninput="setPagVal('${pg.id}','monto',this.value)" onfocus="focusPagVal(this,'${pg.id}')" onblur="blurPagVal(this,'${pg.id}')"><div id="pagprev-${pg.id}" style="font-size:9px;font-weight:700;color:var(--teal-dk);margin-top:2px;display:none"></div></div>
+      <div class="pago-grid">
         <div><label>Fecha</label><input type="date" value="${pg.fecha}" oninput="setPagVal('${pg.id}','fecha',this.value)"></div>
+        <div><label>Monto</label><input type="text" value="${displayMoneyVal(pg.monto)}" placeholder="$ 0" oninput="setPagVal('${pg.id}','monto',this.value)" onfocus="focusPagVal(this,'${pg.id}')" onblur="blurPagVal(this,'${pg.id}')"><div id="pagprev-${pg.id}" style="font-size:9px;font-weight:700;color:var(--teal-dk);margin-top:2px;display:none"></div></div>
         <div><label>Forma</label>
           <select onchange="setPagVal('${pg.id}','tipo',this.value)">
             ${METODOS_PAGO_CATALOGO.filter(m=>CFG.metodos_pago.includes(m.key)||m.key===pg.tipo).map(m=>
@@ -3193,8 +3197,8 @@ function renderPagos(){
             ).join('')}
           </select>
         </div>
+        <div><label>Nota</label><input type="text" value="${pg.nota||''}" placeholder="Opcional…" oninput="setPagVal('${pg.id}','nota',this.value)"></div>
       </div>
-      <div><label>Nota</label><input type="text" value="${pg.nota||''}" placeholder="Opcional…" oninput="setPagVal('${pg.id}','nota',this.value)"></div>
     </div>`).join('');
   renderPagRes();
 }
