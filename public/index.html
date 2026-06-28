@@ -8,25 +8,25 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 :root{
-  --navy:#1A1E3A;--navy2:#232749;
-  --magenta:#E8197A;--yellow:#F5C842;
+  --navy:#222B46;--navy2:#2E3858;
+  --magenta:#4A6FA5;--yellow:#9DBBDC;
   --grad:linear-gradient(150deg,var(--yellow),var(--magenta));
-  --teal:#0BB5B0;--teal-lt:#E3F8F7;--teal-dk:#078A86;
-  --slate:#5A6A80;--muted:#8A9EAD;
-  --line:#E2EBF2;--line-lt:#F4F8FA;--bg:#EFF3F8;--white:#fff;
+  --teal:#5B7FA6;--teal-lt:#EAF1F8;--teal-dk:#3E5C82;
+  --slate:#5E708A;--muted:#93A3B9;
+  --line:#E5ECF4;--line-lt:#F5F8FB;--bg:#E7EEF6;--white:#fff;
   --amber:#F5A623;--amber-lt:#FEF4E3;
   --red:#E5484D;--red-lt:#FDEAEA;
   --green:#2BAD72;--green-lt:#E4F7EE;
   --purple:#7B6EF6;--purple-lt:#EEEAFF;
   --orange:#F07140;--orange-lt:#FEF0E8;
   --r:13px;--r-sm:9px;--r-lg:22px;
-  --sh:0 3px 16px rgba(26,30,58,.07);--sh-lg:0 16px 50px rgba(26,30,58,.18);
+  --sh:0 4px 20px rgba(74,98,142,.10);--sh-lg:0 14px 42px rgba(74,98,142,.20);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--navy);font-size:13px;min-height:100vh}
 input,textarea,select,button{font-family:'Montserrat',sans-serif;font-size:12px;color:var(--navy)}
 input,textarea,select{width:100%;border:1.5px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;background:var(--white);outline:none;transition:border-color .15s,box-shadow .15s}
-input:focus,textarea:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(11,181,176,.1)}
+input:focus,textarea:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(91,127,166,.15)}
 textarea{resize:vertical;min-height:52px;line-height:1.5}
 select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238A9EAD' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:28px}
 label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:.06em;text-transform:uppercase}
@@ -46,7 +46,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r-sm);color:rgba(255,255,255,.45);font-size:11px;font-weight:600;cursor:pointer;transition:all .13s;margin-bottom:1px;border:none;background:none;width:100%;text-align:left}
 .nav-item i{font-size:15px;flex-shrink:0}
 .nav-item:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.8)}
-.nav-item.active{background:rgba(11,181,176,.18);color:var(--teal)}
+.nav-item.active{background:rgba(124,160,200,.22);color:#A9C6E8}
 .nb{margin-left:auto;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;background:var(--red);color:white;min-width:18px;text-align:center}
 .nb.g{background:var(--teal)}
 .sb-footer{padding:10px;border-top:1px solid rgba(255,255,255,.07)}
@@ -56,7 +56,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .topbar::after{content:'';position:absolute;left:0;right:0;bottom:-1.5px;height:2px;background:var(--grad);opacity:.85}
 .tb-title{font-size:15px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
 .tb-right{display:flex;align-items:center;gap:8px}
-.btn-new{display:flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--r-sm);border:none;background:var(--navy);color:white;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(26,30,58,.22);transition:all .13s;letter-spacing:.02em}
+.btn-new{display:flex;align-items:center;gap:5px;padding:9px 18px;border-radius:22px;border:none;background:var(--navy);color:white;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(34,43,70,.24);transition:all .13s;letter-spacing:.02em}
 .btn-new:hover{background:var(--navy2);transform:translateY(-1px)}
 .btn-new .tri{display:inline-block;width:7px;height:7px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%)}
 .icon-btn{width:34px;height:34px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--white);color:var(--slate);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .13s}
@@ -68,7 +68,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
 /* STATS minimal */
 .stats{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
-.sc-mini{display:flex;align-items:center;gap:12px;background:var(--white);border:1.5px solid var(--line);border-radius:var(--r);padding:12px 20px;position:relative;overflow:hidden;flex:0 0 auto;min-width:210px}
+.sc-mini{display:flex;align-items:center;gap:13px;background:var(--white);border:1px solid transparent;border-radius:var(--r-lg);padding:16px 22px;position:relative;overflow:hidden;flex:0 0 auto;min-width:220px;box-shadow:var(--sh)}
 .sc-mini::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--grad)}
 .sc-mini .ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
 .sc-mini.dark{background:var(--navy);border-color:var(--navy)}
@@ -112,10 +112,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .search-b input{padding-left:30px;max-width:200px;font-size:11px}
 
 /* PEDIDO CARDS */
-.cards{display:flex;flex-direction:column;gap:6px}
-.pcard{background:var(--white);border-radius:var(--r);border:1.5px solid var(--line);padding:13px 16px;cursor:pointer;transition:all .13s;position:relative;overflow:hidden}
+.cards{display:flex;flex-direction:column;gap:10px}
+.pcard{background:var(--white);border-radius:var(--r-lg);border:1px solid transparent;padding:16px 20px;cursor:pointer;transition:all .16s ease;position:relative;overflow:hidden;box-shadow:var(--sh)}
 .pcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent;transition:background .13s;border-radius:3px 0 0 3px}
-.pcard:hover{border-color:#C4D4DF;box-shadow:var(--sh)}
+.pcard:hover{box-shadow:var(--sh-lg);transform:translateY(-2px)}
 .pcard:hover::before{background:var(--teal)}
 .pcard.urg{border-color:#F5C0C2}.pcard.urg::before{background:var(--red)}
 .pcard.done{opacity:.5;background:var(--line-lt)}.pcard.done::before{background:#aaa}
@@ -131,7 +131,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
 /* Chips de estado encargo */
 .enc-summary{display:flex;gap:4px;flex-wrap:wrap;margin:5px 0 2px}
-.esc{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid}
+.esc{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;border:none}
 
 /* Badges */
 .badge{font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;letter-spacing:.03em}
@@ -202,9 +202,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .msec:first-child{margin-top:0}
 
 /* Checkboxes especiales */
-.checks-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
-.ck-box{display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 8px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:var(--white);cursor:pointer;transition:all .13s;user-select:none}
-.ck-box input[type=checkbox]{width:14px;height:14px;flex-shrink:0;cursor:pointer}
+.checks-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.ck-box{display:inline-flex;align-items:center;gap:7px;padding:7px 15px;border-radius:22px;border:1.5px solid var(--line);background:var(--white);cursor:pointer;transition:all .14s;user-select:none}
+.ck-box:hover{border-color:#C9D6E5;background:var(--line-lt)}
+.ck-box input[type=checkbox]{width:13px;height:13px;flex-shrink:0;cursor:pointer;accent-color:var(--teal)}
 .ck-box label{font-size:10px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;white-space:nowrap}
 .ck-box:has(input:checked).ck-urg{border-color:var(--red);background:var(--red-lt)}
 .ck-box:has(input:checked).ck-urg label{color:var(--red)}
@@ -264,7 +265,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .enc-val-inp{width:120px;font-weight:700;font-size:12px}
 
 .btn-add-row{display:flex;align-items:center;gap:4px;padding:5px 10px;border:1.5px dashed var(--teal-lt);border-radius:var(--r-sm);background:transparent;color:var(--teal-dk);font-size:10px;font-weight:700;cursor:pointer;transition:background .12s;font-family:'Montserrat',sans-serif}
-.btn-add-row:hover{background:rgba(11,181,176,.07)}
+.btn-add-row:hover{background:rgba(91,127,166,.08)}
 
 /* ENCARGO ESTADO chips color */
 .es-nuevo{color:#8A9EAD;border-color:#8A9EAD;background:#F0F4F6}
@@ -329,9 +330,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .arch-add:hover{background:#C2F0EE}
 
 /* BUTTONS */
-.btn-ghost{padding:8px 14px;border-radius:var(--r-sm);border:1.5px solid var(--line);background:transparent;color:var(--slate);font-size:11px;font-weight:700;cursor:pointer;transition:all .12s}
-.btn-ghost:hover{background:var(--line-lt)}
-.btn-pri{padding:8px 18px;border-radius:var(--r-sm);border:none;background:var(--navy);color:white;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 2px 7px rgba(26,30,58,.2);transition:background .13s}
+.btn-ghost{padding:9px 18px;border-radius:22px;border:1.5px solid var(--line);background:transparent;color:var(--slate);font-size:11px;font-weight:700;cursor:pointer;transition:all .12s}
+.btn-ghost:hover{background:var(--line-lt);border-color:#C9D6E5}
+.btn-pri{padding:9px 20px;border-radius:22px;border:none;background:var(--navy);color:white;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;box-shadow:0 3px 12px rgba(34,43,70,.22);transition:all .13s}
 .btn-pri:hover{background:var(--navy2)}
 .btn-danger{padding:8px 12px;border-radius:var(--r-sm);border:1.5px solid #F5C0C2;background:transparent;color:var(--red);font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .12s}
 .btn-danger:hover{background:var(--red-lt)}
@@ -937,7 +938,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-variantes" onchange="setModoCalculo('variantes')"><label for="prod-modo-variantes">Por variantes (tamaños/versiones)</label></div>
         <div class="ck-box" style="display:inline-flex"><input type="radio" name="prod-modo" id="prod-modo-pliego" onchange="setModoCalculo('pliego')"><label for="prod-modo-pliego">Por hoja / imposición</label></div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Por cantidad: un precio (o tramos según cuántas unidades). Por medidas: el precio sale del tamaño (pendones, lonas). Por variantes: varias versiones, el cliente elige (retablos). Por hoja: para tarjetas/volantes — defines en qué hojas imprimes (Carta, A4, A3…) cuántas piezas rinde cada una y su precio; el sistema calcula las hojas necesarias. Más extras opcionales (doble lado, corte, acabados).</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px" id="prod-modo-calc-hint">Un precio fijo, o tramos según cuántas unidades pida el cliente.</div>
     </div>
 
     <div class="collapsible" style="margin:8px 0">
@@ -999,7 +1000,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <div id="prod-sec-pliego" style="display:none">
       <div class="msec"><span class="tri"></span>Hojas / superficies de impresión</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">En cuáles imprimes (Carta, Oficio, A4, A3, o una medida propia como "50×30"), cuántas piezas rinde cada una y su precio. Al cotizar eliges la hoja y el sistema calcula cuántas necesitas. Ej: A4 rinde 8 tarjetas a $1.000 la hoja → 100 tarjetas = 13 hojas.</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Define cada hoja, cuántas piezas rinde y su precio. Ej: A4 rinde 8 tarjetas a $1.000 → 100 tarjetas = 13 hojas.</div>
       <table class="items-table" id="prod-hoja-sup-tabla">
         <thead><tr><th>Hoja / tamaño</th><th style="width:90px">Piezas que rinde</th><th style="width:110px">Precio de la hoja</th><th style="width:26px"></th></tr></thead>
         <tbody id="prod-hoja-sup-body"></tbody>
@@ -1025,7 +1026,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div class="ck-box" style="display:inline-flex;margin-bottom:10px"><input type="checkbox" id="prod-es-regla" onchange="onEsReglaChange()"><label for="prod-es-regla">Es una promoción "Lleva N, paga M"</label></div>
       <div id="prod-sec-tramos">
         <div class="msec"><span class="tri"></span>Tramos adicionales por cantidad (opcional)</div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Si agregas un tramo "Desde 1", ese pasa a ser tu precio por unidad — ya no necesitas llenar "Precio base" arriba. El último tramo aplica también a cualquier cantidad mayor (ej: si tu último tramo es "Desde 24" a $21.000, pedir 50 también cuesta $21.000 c/u).</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Un tramo "Desde 1" reemplaza el precio base. El último tramo cubre cualquier cantidad mayor (ej: "Desde 24" a $21.000 → pedir 50 también cuesta $21.000 c/u).</div>
         <table class="items-table" id="prod-rangos-tabla">
           <thead><tr><th style="width:80px">Desde</th><th style="width:80px">Hasta</th><th>Precio por unidad</th><th style="width:26px"></th></tr></thead>
           <tbody id="prod-rangos-body"></tbody>
@@ -2492,8 +2493,15 @@ function renderHojaExtras(){
 }
 let prodModoCalculo='cantidad';
 const SUF_UNIDAD={m2:'m²',m:'m',cm2:'cm²'};
+const MODO_CALC_HINTS={
+  cantidad:'Un precio fijo, o tramos según cuántas unidades pida el cliente.',
+  medidas:'El precio sale del tamaño (ancho × alto). Ideal para pendones y lonas.',
+  variantes:'Varias versiones y el cliente elige (tallas, tamaños de retablo…).',
+  pliego:'Para tarjetas o volantes: defines en qué hoja imprimes y cuántas rinde.'
+};
 function setModoCalculo(modo){
   prodModoCalculo=modo;
+  const _h=document.getElementById('prod-modo-calc-hint'); if(_h&&MODO_CALC_HINTS[modo])_h.textContent=MODO_CALC_HINTS[modo];
   const esMed=modo==='medidas', esVar=modo==='variantes', esCant=modo==='cantidad', esPli=modo==='pliego';
   document.getElementById('prod-sec-medidas').style.display=esMed?'block':'none';
   document.getElementById('prod-sec-variantes').style.display=esVar?'block':'none';
