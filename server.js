@@ -827,7 +827,7 @@ app.post('/api/pedidos',(req,res)=>{
       db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),id);
     }
     addHist(id,'Pedido creado',req.wsId);
-    (b.precio_edits||[]).forEach(ed=>addHist(id,`Precio editado en "${ed.detalle}": sugerido ${ed.sugerido} → ${ed.nuevo}`,req.wsId));
+    (b.precio_edits||[]).forEach(ed=>addHist(id,`PAM · Precio ajustado manualmente en "${ed.detalle}": sugerido ${ed.sugerido} → final ${ed.nuevo}${ed.dif?' (dif '+ed.dif+')':''}`,req.wsId));
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
   }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
 });

@@ -625,14 +625,16 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div id="view-inventario" class="view">
       <div class="toolbar">
         <div class="search-b" style="flex:1;max-width:300px"><i class="ti ti-search"></i>
-          <input type="text" id="inv-s" placeholder="Buscar producto…" oninput="cargarInventario(this.value)" style="max-width:100%">
+          <input type="text" id="inv-s" placeholder="Buscar ítem…" oninput="renderInventario(this.value)" style="max-width:100%">
         </div>
+        <button class="btn-new" onclick="nuevoItemInv()"><i class="ti ti-plus"></i> Nuevo ítem</button>
       </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;max-width:760px">Ítems físicos de inventario (ej. "TSHIRT XL", "Vaso blanco 11oz", "Lona 1m"). En cada producto eliges cuál de estos descuenta — varios productos pueden descontar el mismo ítem.</div>
       <table class="items-table" id="inv-tabla">
-        <thead><tr><th>Producto</th><th>Categoría</th><th style="width:120px">Stock actual</th><th style="width:120px">Stock mínimo</th><th style="width:90px"></th></tr></thead>
+        <thead><tr><th>Ítem de inventario</th><th style="width:110px">Unidad</th><th style="width:120px">Stock actual</th><th style="width:120px">Stock mínimo</th><th style="width:90px">Estado</th><th style="width:40px"></th></tr></thead>
         <tbody id="inv-body"></tbody>
       </table>
-      <div class="empty" id="inv-empty" style="display:none"><i class="ti ti-box-off"></i><p>Sin productos con seguimiento de inventario</p></div>
+      <div class="empty" id="inv-empty" style="display:none"><i class="ti ti-box-off"></i><p>Aún no hay ítems de inventario — crea el primero</p></div>
     </div>
 
     <!-- CONFIGURACIÓN -->
@@ -1015,6 +1017,14 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="fr2 fg" style="margin-top:10px;align-items:end">
       <div><label>Categoría (informativa)</label><select id="prod-cat-sel" onchange="setProdCat(this.value)"></select></div>
       <div style="display:flex;align-items:center;padding-bottom:8px"><div class="ck-box" style="display:inline-flex"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div></div>
+    </div>
+    <div class="fr2 fg">
+      <div><label>Vincular con inventario (opcional)</label>
+        <select id="prod-inv-item" onchange="onProdInvChange()"><option value="">— No descuenta inventario —</option></select>
+        <div style="font-size:9.5px;color:var(--muted);margin-top:3px">Al confirmar un pedido descuenta del ítem físico elegido. Varios productos pueden usar el mismo.</div>
+      </div>
+      <div id="prod-inv-cant-wrap" style="display:none"><label>Cantidad que consume por unidad</label>
+        <input type="text" id="prod-inv-cant" placeholder="Ej: 1 · acepta decimales (0.7)"></div>
     </div>
 
     <div id="prod-modo-calc-wrap" style="display:none">
@@ -1957,43 +1967,48 @@ function renderProductos(){
     }).join('');
   }
 }
-function grupoStock(p){return (p.stock_actual!=null&&p.stock_minimo!=null&&p.stock_actual<=p.stock_minimo)?0:(p.stock_actual!=null?1:2)}
-async function cargarInventario(q=''){
-  const p=q?`?q=${encodeURIComponent(q)}`:'';
-  productos=await api('GET',`/productos${p}`);
-  const lista=productos.filter(x=>x.tipo_precio!=='combo'&&x.tipo_precio!=='promocional');
-  lista.sort((a,b)=>grupoStock(a)-grupoStock(b)||a.nombre.localeCompare(b.nombre));
-  const el=document.getElementById('inv-body');
-  const vacio=document.getElementById('inv-empty');
-  if(!lista.length){el.innerHTML='';vacio.style.display='block';return}
-  vacio.style.display='none';
-  el.innerHTML=lista.map(p=>{
-    const cat=CATS.find(c=>c.id===p.categoria_id);
-    const bajo=grupoStock(p)===0;
+let invItems=[];
+async function cargarInventario(){
+  try{invItems=await api('GET','/inventario-items');}catch(e){invItems=[];}
+  renderInventario((document.getElementById('inv-s')||{}).value||'');
+}
+function renderInventario(q){
+  q=(q||'').toLowerCase();
+  const lista=invItems.filter(x=>!q||(x.nombre||'').toLowerCase().includes(q));
+  lista.sort((a,b)=>{const ba=(a.stock_minimo!=null&&a.stock_actual!=null&&a.stock_actual<=a.stock_minimo)?0:1;const bb=(b.stock_minimo!=null&&b.stock_actual!=null&&b.stock_actual<=b.stock_minimo)?0:1;return ba-bb||(a.nombre||'').localeCompare(b.nombre||'');});
+  const el=document.getElementById('inv-body');const vacio=document.getElementById('inv-empty');
+  if(!el)return;
+  if(!lista.length){el.innerHTML='';if(vacio)vacio.style.display='block';return}
+  if(vacio)vacio.style.display='none';
+  el.innerHTML=lista.map(it=>{
+    const bajo=it.stock_minimo!=null&&it.stock_actual!=null&&it.stock_actual<=it.stock_minimo;
     return`<tr>
-      <td>${p.nombre}</td>
-      <td>${cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:'—'}</td>
-      <td><input class="item-inp" type="number" min="0" value="${p.stock_actual??''}" placeholder="Sin seguimiento" onblur="guardarStockInventario('${p.id}','stock_actual',this.value)"></td>
-      <td><input class="item-inp" type="number" min="0" value="${p.stock_minimo??''}" placeholder="Opcional" onblur="guardarStockInventario('${p.id}','stock_minimo',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${escHtml(it.nombre||'')}" onblur="guardarItemInv('${it.id}','nombre',this.value)"></td>
+      <td><input class="item-inp" type="text" value="${escHtml(it.unidad_medida||'')}" placeholder="unidad" onblur="guardarItemInv('${it.id}','unidad_medida',this.value)"></td>
+      <td><input class="item-inp" type="number" step="0.01" value="${it.stock_actual??''}" placeholder="Sin seguimiento" onblur="guardarItemInv('${it.id}','stock_actual',this.value)"></td>
+      <td><input class="item-inp" type="number" step="0.01" value="${it.stock_minimo??''}" placeholder="Opcional" onblur="guardarItemInv('${it.id}','stock_minimo',this.value)"></td>
       <td>${bajo?'<span class="b-pend">Stock bajo</span>':''}</td>
+      <td><button class="item-del" onclick="eliminarItemInv('${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
 }
-async function guardarStockInventario(fichaId,campo,valor){
-  const p=productos.find(x=>x.id===fichaId);
-  if(!p)return;
-  const nuevo=valor===''?null:parseInt(valor,10);
-  if(nuevo!=null&&(!Number.isInteger(nuevo)||nuevo<0)){
-    toast('Stock no válido',false);
-    cargarInventario(document.getElementById('inv-s').value);
-    return;
-  }
-  if((p[campo]??null)===nuevo)return;
-  try{
-    await api('PUT',`/productos/${fichaId}`,{...p,[campo]:nuevo});
-    toast('Stock actualizado ✓');
-  }catch(e){toast(e.message,false)}
-  cargarInventario(document.getElementById('inv-s').value);
+async function nuevoItemInv(){
+  try{const nuevo=await api('POST','/inventario-items',{nombre:'Nuevo ítem',unidad_medida:'unidad'});invItems.push(nuevo);renderInventario('');toast('Ítem creado — edita su nombre y stock');}
+  catch(e){toast('Error: '+e.message,false)}
+}
+async function guardarItemInv(id,campo,valor){
+  const it=invItems.find(x=>x.id===id);if(!it)return;
+  let v=valor;
+  if(campo==='stock_actual'||campo==='stock_minimo'){v=valor===''?null:Number(valor);if(v!=null&&(!Number.isFinite(v)||v<0)){toast('Valor no válido',false);renderInventario((document.getElementById('inv-s')||{}).value||'');return}}
+  if((it[campo]??null)===v)return;
+  it[campo]=v;
+  try{await api('PUT','/inventario-items/'+id,{nombre:it.nombre,unidad_medida:it.unidad_medida,stock_actual:it.stock_actual,stock_minimo:it.stock_minimo});renderInventario((document.getElementById('inv-s')||{}).value||'');}
+  catch(e){toast('Error al guardar',false)}
+}
+async function eliminarItemInv(id){
+  if(!confirm('¿Eliminar este ítem de inventario? Los productos vinculados quedarán sin vínculo.'))return;
+  try{await api('DELETE','/inventario-items/'+id);invItems=invItems.filter(x=>x.id!==id);renderInventario((document.getElementById('inv-s')||{}).value||'');}
+  catch(e){toast('Error al eliminar',false)}
 }
 
 // Almacena cliente actual para el modal
@@ -2194,7 +2209,7 @@ function collectPrecioEdits(){
   fEnc.forEach(e=>(e.items||[]).forEach(it=>{
     if(_preciosEditados.has(it.id)){
       const sug=evalExpr(it.precio_sugerido)||0,uni=evalExpr(it.valor_unitario)||0;
-      if(sug>0&&uni!==sug)out.push({detalle:(it.detalle||'ítem').slice(0,60),sugerido:fCOP(sug),nuevo:fCOP(uni)});
+      if(sug>0&&uni!==sug){const dif=uni-sug;out.push({detalle:(it.detalle||'ítem').slice(0,60),sugerido:fCOP(sug),nuevo:fCOP(uni),dif:(dif>=0?'+':'-')+fCOP(Math.abs(dif))});}
     }
   }));
   return out;
@@ -2548,7 +2563,7 @@ function renderItemsHTML(enc){
         ${itemEstAbierto.has(it.id)?itemEstadoPickerHTML(enc,it):''}
         ${itemTagAbierto.has(it.id)?itemTagPickerHTML(enc,it):''}
         ${itemNotaAbierto.has(it.id)?`<div class="item-expand"><input class="item-inp" type="text" value="${escHtml(it.nota||'')}" placeholder="Nota: ej. 20 talla S · 10 talla XL…" oninput="setItemNota('${enc.id}','${it.id}',this.value)"></div>`:(it.nota?`<div class="item-nota">${escHtml(it.nota)}</div>`:'')}</td>
-      <td style="width:92px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div>${editado?`<div class="it-editado" title="Precio editado a mano — sugerido ${fCOP(sug)}"><i class="ti ti-pencil"></i> editado</div>`:''}</td>
+      <td style="width:92px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div>${editado?`<div class="it-editado" title="PAM · Precio Ajustado Manualmente — el sistema sugería ${fCOP(sug)}, se cobró ${fCOP(evalExpr(it.valor_unitario)||0)}. El cálculo original no se perdió."><i class="ti ti-pencil"></i> PAM</div>`:''}</td>
       <td style="width:96px"><input class="item-inp" id="ittot-${it.id}" type="text" value="${totItem?displayMoneyVal(String(totItem)):''}" placeholder="$ 0" style="text-align:right;font-weight:700;color:var(--navy)" onchange="setItemTotal('${enc.id}','${it.id}',this.value)" title="Total del ítem — editable (precio negociado)"></td>
       <td style="width:26px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
@@ -3070,6 +3085,9 @@ function renderRangos(){
 }
 function resetProdForm(){
   fProdInsumos=[];fProdRangos=[];fProdComponentes=[];fProdPrecioBaseRaw='';prodCatSel='';
+  const _ii=document.getElementById('prod-inv-item');if(_ii)_ii.value='';
+  const _ic=document.getElementById('prod-inv-cant');if(_ic)_ic.value='';
+  const _iw=document.getElementById('prod-inv-cant-wrap');if(_iw)_iw.style.display='none';
   fProdComboModo='global';
   prodCaminoActual='simple';
   prodModoCalculo='cantidad';
@@ -3126,7 +3144,22 @@ function abrirNuevoProducto(){
   document.getElementById('prod-tit').textContent='Nuevo producto';
   document.getElementById('prod-btn-del').style.display='none';
   document.getElementById('prod-btn-cambiar-tipo').style.display='inline-flex';
+  populateProdInvSelect('');
   document.getElementById('ovProd').classList.add('open');
+}
+async function populateProdInvSelect(selectedId){
+  const sel=document.getElementById('prod-inv-item');if(!sel)return;
+  if(!invItems||!invItems.length){try{invItems=await api('GET','/inventario-items');}catch(e){invItems=[];}}
+  sel.innerHTML='<option value="">— No descuenta inventario —</option>'+invItems.map(it=>`<option value="${it.id}">${escHtml(it.nombre)}${it.stock_actual!=null?' (stock '+it.stock_actual+')':''}</option>`).join('');
+  sel.value=selectedId||'';
+  onProdInvChange();
+}
+function onProdInvChange(){
+  const sel=document.getElementById('prod-inv-item'),wrap=document.getElementById('prod-inv-cant-wrap');
+  if(!sel||!wrap)return;
+  wrap.style.display=sel.value?'block':'none';
+  const cant=document.getElementById('prod-inv-cant');
+  if(sel.value&&cant&&!cant.value)cant.value='1';
 }
 async function abrirEditarProducto(id){
   const p=await api('GET',`/productos/${id}`);
@@ -3151,6 +3184,8 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-activo').checked=!!p.activo;
   fProdStockActual=p.stock_actual??null;
   fProdStockMinimo=p.stock_minimo??null;
+  document.getElementById('prod-inv-cant').value=p.inventario_cantidad_consumida||'';
+  await populateProdInvSelect(p.inventario_item_id||'');
   document.getElementById('prod-regla-lleva').value=p.regla_lleva??'';
   document.getElementById('prod-regla-paga').value=p.regla_paga??'';
   document.getElementById('prod-fecha-inicio').value=p.fecha_inicio||'';
@@ -3264,6 +3299,8 @@ async function guardarProducto(){
     activo:document.getElementById('prod-activo').checked,
     stock_actual:fProdStockActual,
     stock_minimo:fProdStockMinimo,
+    inventario_item_id:document.getElementById('prod-inv-item').value||'',
+    inventario_cantidad_consumida:(document.getElementById('prod-inv-cant').value||'').trim(),
     regla_lleva:document.getElementById('prod-regla-lleva').value===''?null:parseInt(document.getElementById('prod-regla-lleva').value,10),
     regla_paga:document.getElementById('prod-regla-paga').value===''?null:parseInt(document.getElementById('prod-regla-paga').value,10),
     insumos:fProdInsumos,
