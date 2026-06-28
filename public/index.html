@@ -825,7 +825,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <!-- Detalles generales -->
     <div class="msec"><span class="tri"></span>Detalles del pedido</div>
-    <div class="fr3 fg">
+    <div class="fg" style="display:grid;grid-template-columns:1.1fr 1.2fr .7fr 1fr;gap:16px">
       <div><label>Fecha de entrega</label><input type="date" id="f-fecha"></div>
       <div>
         <label>Valor final del pedido</label>
@@ -840,15 +840,21 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <label>Avance general</label>
         <div id="prog-pct" style="font-size:20px;font-weight:600;color:var(--teal-dk);padding:6px 0">0%</div>
       </div>
+      <div>
+        <label>Estado del pedido</label>
+        <select id="f-estado-ciclo">
+          <option value="nuevo">Nuevo / en curso</option>
+          <option value="entregado">Entregado</option>
+          <option value="cancelado">Cancelado</option>
+          <option value="cotizacion">Cotización</option>
+        </select>
+      </div>
     </div>
 
-    <!-- Checkboxes -->
+    <!-- Chips independientes -->
     <div class="checks-row fg">
       <div class="ck-box ck-urg"><input type="checkbox" id="ck-urg"><label for="ck-urg">Urgente</label></div>
-      <div class="ck-box ck-ent"><input type="checkbox" id="ck-ent"><label for="ck-ent">Entregado</label></div>
-      <div class="ck-box ck-can"><input type="checkbox" id="ck-can"><label for="ck-can">Cancelado</label></div>
-      <div class="ck-box ck-pnd"><input type="checkbox" id="ck-pnd"><label for="ck-pnd">Pendiente</label></div>
-      <div class="ck-box ck-cot"><input type="checkbox" id="ck-cot"><label for="ck-cot">Cotización</label></div>
+      <div class="ck-box ck-pnd"><input type="checkbox" id="ck-pnd"><label for="ck-pnd">Pendiente de pago</label></div>
     </div>
 
     <div class="fg"><label>Anotaciones generales</label><textarea id="f-notas" placeholder="Observaciones del pedido…" style="min-height:44px"></textarea></div>
@@ -3410,8 +3416,8 @@ function renderHist(hist){
 function resetForm(){
   fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;fValorFinalRaw='';
   ['f-nom','f-tel','f-fecha','f-notas','f-valor-final'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
-  ['ck-urg','ck-ent','ck-can','ck-pnd','ck-cot'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
-  document.getElementById('ck-cot').checked=!!CFG.estado_default_cotizacion;
+  ['ck-urg','ck-pnd'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
+  document.getElementById('f-estado-ciclo').value=CFG.estado_default_cotizacion?'cotizacion':'nuevo';
   document.getElementById('ac-drop').style.display='none';
   document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: $0';
   document.getElementById('valor-ajustado').style.display='none';
@@ -3470,10 +3476,8 @@ async function abrirEditar(id){
   fValorFinalRaw=(p.valor_final!=null?p.valor_final:'');
   document.getElementById('f-valor-final').value=displayMoneyVal(fValorFinalRaw);
   document.getElementById('ck-urg').checked=!!p.urgente;
-  document.getElementById('ck-ent').checked=!!p.entregado;
-  document.getElementById('ck-can').checked=!!p.cancelado;
   document.getElementById('ck-pnd').checked=!!p.pendiente_pago;
-  document.getElementById('ck-cot').checked=!!p.es_cotizacion;
+  document.getElementById('f-estado-ciclo').value=p.cancelado?'cancelado':(p.entregado?'entregado':(p.es_cotizacion?'cotizacion':'nuevo'));
   document.getElementById('m-tit').textContent=p.nombre;
   document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido)+validezCotHTML(p);
   document.getElementById('btn-pdf').style.display=p.cancelado?'none':'inline-flex';
@@ -3515,10 +3519,10 @@ async function guardar(){
     tel:document.getElementById('f-tel').value.trim(),
     cliente_id:editCliId,
     urgente:document.getElementById('ck-urg').checked,
-    entregado:document.getElementById('ck-ent').checked,
-    cancelado:document.getElementById('ck-can').checked,
+    entregado:document.getElementById('f-estado-ciclo').value==='entregado',
+    cancelado:document.getElementById('f-estado-ciclo').value==='cancelado',
     pendiente_pago:document.getElementById('ck-pnd').checked,
-    es_cotizacion:document.getElementById('ck-cot').checked,
+    es_cotizacion:document.getElementById('f-estado-ciclo').value==='cotizacion',
     fecha_entrega:document.getElementById('f-fecha').value,
     notas:document.getElementById('f-notas').value.trim(),
     valor_final:(fValorFinalRaw||'').trim(),
