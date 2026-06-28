@@ -271,6 +271,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .items-table tr:last-child td{border-bottom:none}
 .item-inp{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;font-family:'Montserrat',sans-serif;width:100%;background:var(--white);transition:border-color .12s}
 .item-inp:focus{border-color:var(--teal);outline:none}
+.item-tagrow{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
+.item-tagrow>i{font-size:13px;color:var(--muted);flex-shrink:0}
+.item-tagrow select{width:auto;min-width:118px;font-size:10px;padding:5px 24px 5px 10px;border-radius:18px;background-color:var(--line-lt)}
 .item-ta{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;font-family:'Montserrat',sans-serif;width:100%;background:var(--white);transition:border-color .12s;resize:none;overflow:hidden;min-height:28px;line-height:1.45}
 .item-ta:focus{border-color:var(--teal);outline:none;box-shadow:none}
 .item-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px;transition:color .12s}
@@ -1765,7 +1768,7 @@ function renderLista(){
     const val=p.valor_total||0;
     const eg=estadoGeneral(p);
     const egCol=EG_COL[eg]||'#8A9EAD';
-    const cats=[...new Set((p.encargos||[]).flatMap(e=>e.categorias||[]))];
+    const cats=[...new Set([...(p.encargos||[]).flatMap(e=>e.categorias||[]),...(p.encargos||[]).flatMap(e=>(e.items||[]).map(it=>it.categoria).filter(Boolean))])];
     const tags=cats.map(c=>{const cat=CATS.find(x=>x.id===c);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
     const isDone=p.entregado,isCan=p.cancelado,isUrg=p.urgente&&!isDone&&!isCan;
     const nEnc=(p.encargos||[]).length;
@@ -2437,12 +2440,39 @@ function renderItemsHTML(enc){
         <div style="margin-top:3px"><button type="button" class="btn-ghost" style="font-size:10px;padding:1px 6px" onclick="toggleVarItem('${enc.id}','${it.id}')"><i class="ti ti-chevron-${varItemPlegados.has(it.id)?'right':'down'}"></i> opciones</button></div>
         <div style="display:${varItemPlegados.has(it.id)?'none':'block'}">${renderVarSelectsHTML(enc.id,it)}</div>`:''}${(it._fichaSel&&it._fichaSel.tipo_precio==='pliego')?`
         <div style="margin-top:3px"><button type="button" class="btn-ghost" style="font-size:10px;padding:1px 6px" onclick="toggleVarItem('${enc.id}','${it.id}')"><i class="ti ti-chevron-${varItemPlegados.has(it.id)?'right':'down'}"></i> hoja / extras</button></div>
-        <div style="display:${varItemPlegados.has(it.id)?'none':'block'}">${renderHojaSelectsHTML(enc.id,it)}</div>`:''}</td>
+        <div style="display:${varItemPlegados.has(it.id)?'none':'block'}">${renderHojaSelectsHTML(enc.id,it)}</div>`:''}${itemTagHTML(enc,it)}</td>
       <td style="width:100px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
       <td style="width:34px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
       <td style="width:30px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
+}
+function itemTagHTML(enc,it){
+  const cat=CATS.find(c=>c.id===it.categoria);
+  const subs=(cat&&cat.subs)?cat.subs:[];
+  return `<div class="item-tagrow">
+    <i class="ti ti-tag"></i>
+    <select onchange="setItemCat('${enc.id}','${it.id}',this.value)">
+      <option value="">Sin etiqueta</option>
+      ${CATS.map(c=>`<option value="${c.id}"${it.categoria===c.id?' selected':''}>${c.label}</option>`).join('')}
+    </select>
+    ${subs.length?`<select onchange="setItemSub('${enc.id}','${it.id}',this.value)">
+      <option value="">— subetiqueta —</option>
+      ${subs.map(s=>`<option value="${s}"${it.subcategoria===s?' selected':''}>${s}</option>`).join('')}
+    </select>`:''}
+  </div>`;
+}
+function setItemCat(encId,itemId,catId){
+  const e=fEnc.find(x=>x.id===encId);if(!e)return;
+  const it=e.items.find(i=>i.id===itemId);if(!it)return;
+  it.categoria=catId;
+  const cat=CATS.find(c=>c.id===catId);
+  if(!cat||!cat.subs||!cat.subs.includes(it.subcategoria))it.subcategoria='';
+  renderEncItems(encId);
+}
+function setItemSub(encId,itemId,sub){
+  const e=fEnc.find(x=>x.id===encId);if(!e)return;
+  const it=e.items.find(i=>i.id===itemId);if(it)it.subcategoria=sub;
 }
 function autoTA(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'}
 function renderEncSubcats(id){
