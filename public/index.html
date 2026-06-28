@@ -535,6 +535,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" onclick="filtroRapido('cotizacion')"><i class="ti ti-file-invoice"></i>Cotizaciones<span class="nb" id="sb-cot">0</span></button>
   </nav>
   <div class="sb-footer">
+    <button class="nav-item" data-view="archivo" onclick="showView('archivo')"><i class="ti ti-archive"></i>Archivo</button>
     <button class="nav-item" data-view="ayuda" onclick="showView('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="nav-item" data-view="configuracion" onclick="showView('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
     <button class="nav-item" onclick="abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
@@ -635,6 +636,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <tbody id="inv-body"></tbody>
       </table>
       <div class="empty" id="inv-empty" style="display:none"><i class="ti ti-box-off"></i><p>Aún no hay ítems de inventario — crea el primero</p></div>
+    </div>
+
+    <!-- ARCHIVO -->
+    <div id="view-archivo" class="view">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;max-width:780px">Pedidos, clientes y productos archivados. No están activos pero su información se conserva — puedes restaurarlos o eliminarlos definitivamente.</div>
+      <div id="arch-content"></div>
     </div>
 
     <!-- CONFIGURACIÓN -->
@@ -852,7 +859,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <button class="btn-ghost" id="btn-print" style="display:none" onclick="imprimirPedido()"><i class="ti ti-printer"></i>Imprimir</button>
       <button class="btn-ghost" id="btn-pdf" style="display:none" onclick="generarPdfPedido()"><i class="ti ti-download"></i>Descargar PDF</button>
       <button class="btn-ghost" id="btn-wa" style="display:none" onclick="compartirPedido()"><i class="ti ti-share"></i>Compartir</button>
-      <button class="btn-danger" id="btn-del" style="display:none" onclick="eliminarPed()"><i class="ti ti-trash"></i>Eliminar</button>
+      <button class="btn-danger" id="btn-del" style="display:none" onclick="archivarPed()"><i class="ti ti-archive"></i>Archivar</button>
       <button class="mclose" onclick="cerrar()"><i class="ti ti-x"></i></button>
     </div>
   </div>
@@ -891,7 +898,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div>
         <label>Marcación</label>
-        <select id="f-estado-ciclo">
+        <select id="f-estado-ciclo" onchange="aplicarVistaCotizacion()">
           <option value="nuevo">Pedido en curso</option>
           <option value="entregado">Entregado</option>
           <option value="cancelado">Cancelado</option>
@@ -916,11 +923,17 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="btn-add-enc" onclick="addEnc()"><i class="ti ti-plus"></i> Agregar encargo</button>
 
     <!-- PAGOS -->
+    <div id="sec-pagos">
     <div class="msec"><span class="tri"></span>Pagos y abonos</div>
     <div id="pag-lista"></div>
     <button class="btn-add-g" onclick="addPago()"><i class="ti ti-plus"></i> Registrar pago / abono</button>
+    </div>
+
+    <!-- Aviso cotización (sin contabilidad) -->
+    <div id="sec-cotiz-aviso" style="display:none;margin-top:8px;padding:12px 14px;border-radius:13px;background:var(--purple-lt);color:#4A3CB8;font-size:11px"><i class="ti ti-info-circle"></i> Es una cotización: solo información. No tiene pagos, saldos ni registro de costos. Cuando reciba un abono se convertirá en pedido automáticamente.</div>
 
     <!-- REGISTRO DE COSTOS (interno · al final del lado izquierdo, no expuesto en la columna del cliente) -->
+    <div id="sec-registro">
     <div class="msec" style="margin-top:16px"><span class="tri"></span>Registro de costos · interno</div>
     <div class="collapsible">
       <div class="coll-head" onclick="toggleColl(this)">
@@ -932,6 +945,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <button class="btn-add-g" onclick="addCosto()"><i class="ti ti-plus"></i> Agregar costo</button>
         <div id="costos-res" style="margin-top:8px"></div>
       </div>
+    </div>
     </div>
 
     </div><!-- /ped-main -->
@@ -970,7 +984,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 <!-- MODAL CLIENTE -->
 <div class="overlay" id="ovCli">
 <div class="modal" style="max-width:480px">
-  <div class="mhead"><div class="mhead-l"><div class="mtitle" id="cli-nom"></div></div><button class="mclose" onclick="cerrarCli()"><i class="ti ti-x"></i></button></div>
+  <div class="mhead"><div class="mhead-l"><div class="mtitle" id="cli-nom"></div></div><div class="mhead-actions"><button class="btn-danger" onclick="archivarCli()"><i class="ti ti-archive"></i>Archivar</button><button class="mclose" onclick="cerrarCli()"><i class="ti ti-x"></i></button></div></div>
   <div class="mbody" id="cli-body"></div>
 </div>
 </div>
@@ -1168,7 +1182,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     </div>
   </div>
   <div class="mfoot">
-    <button class="btn-danger" id="prod-btn-del" style="display:none" onclick="eliminarProducto()"><i class="ti ti-trash"></i>Eliminar</button>
+    <button class="btn-danger" id="prod-btn-del" style="display:none" onclick="archivarProducto()"><i class="ti ti-archive"></i>Archivar</button>
     <div style="display:flex;gap:7px;margin-left:auto">
       <button class="btn-ghost" onclick="cerrarProducto()">Cancelar</button>
       <button class="btn-pri" onclick="guardarProducto()"><i class="ti ti-device-floppy"></i>Guardar</button>
@@ -1774,7 +1788,7 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',inventario:'Inventario',ayuda:'Ayuda y About'};
+  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
   document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,productos:4,inventario:4,ayuda:4,configuracion:4}[v]??0]?.classList.add('active');
@@ -1783,6 +1797,7 @@ function showView(v){
   if(v==='configuracion')pintarConfiguracion();
   if(v==='productos')cargarProductos();
   if(v==='inventario')cargarInventario();
+  if(v==='archivo')cargarArchivo();
 }
 
 /* ══ STATS ══ */
@@ -2009,6 +2024,32 @@ async function eliminarItemInv(id){
   if(!confirm('¿Eliminar este ítem de inventario? Los productos vinculados quedarán sin vínculo.'))return;
   try{await api('DELETE','/inventario-items/'+id);invItems=invItems.filter(x=>x.id!==id);renderInventario((document.getElementById('inv-s')||{}).value||'');}
   catch(e){toast('Error al eliminar',false)}
+}
+async function cargarArchivo(){
+  let data; try{data=await api('GET','/archivo');}catch(e){data={pedidos:[],clientes:[],productos:[]};}
+  const cont=document.getElementById('arch-content');if(!cont)return;
+  const seccion=(titulo,items,tipo,fmt)=>{
+    if(!items||!items.length)return '';
+    return `<div class="ped-side-card" style="margin-bottom:14px;max-width:780px"><div class="msec" style="margin-top:0"><span class="tri"></span>${titulo} (${items.length})</div>`+
+      items.map(it=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-lt)">
+        <div style="flex:1;min-width:0;font-size:12px">${fmt(it)}</div>
+        <button class="btn-ghost" style="padding:5px 12px;font-size:10px" onclick="restaurarArch('${tipo}','${it.id}')"><i class="ti ti-arrow-back-up"></i> Restaurar</button>
+        <button class="item-del" title="Eliminar definitivamente" onclick="eliminarArch('${tipo}','${it.id}')"><i class="ti ti-trash"></i></button>
+      </div>`).join('')+`</div>`;
+  };
+  const html=
+    seccion('Pedidos',data.pedidos,'pedido',p=>`<b>#${p.ref||''}</b> ${escHtml(p.nombre||'')} <span style="color:var(--muted);font-size:10px">· ${fd(p.fecha_pedido)}</span>`)+
+    seccion('Clientes',data.clientes,'cliente',c=>`<b>${escHtml(c.nombre||'')}</b> <span style="color:var(--muted);font-size:10px"> ${escHtml(c.tel||'')}</span>`)+
+    seccion('Productos',data.productos,'producto',p=>`<b>${escHtml(p.nombre||'')}</b> <span style="color:var(--muted);font-size:10px;font-family:'DM Mono',monospace"> ${escHtml(p.codigo||'')}</span>`);
+  cont.innerHTML=html||'<div class="empty"><i class="ti ti-archive"></i><p>El archivo está vacío</p></div>';
+}
+async function restaurarArch(tipo,id){
+  try{await api('POST','/restaurar',{tipo,id});toast('Restaurado ✓');cargarArchivo();try{cargarStats()}catch(e){}}catch(e){toast('Error',false)}
+}
+async function eliminarArch(tipo,id){
+  if(!confirm('¿Eliminar definitivamente? Esta acción no se puede deshacer.'))return;
+  const ep=tipo==='pedido'?'/pedidos/':tipo==='cliente'?'/clientes/':'/productos/';
+  try{await api('DELETE',ep+id);toast('Eliminado definitivamente');cargarArchivo();}catch(e){toast('Error al eliminar',false)}
 }
 
 // Almacena cliente actual para el modal
@@ -3391,7 +3432,11 @@ function renderProgresoCard(prog){
 }
 
 /* ══ PAGOS ══ */
-function addPago(){fPag.push({id:uid(),monto:'',fecha:hoy(),tipo:'efectivo',nota:''});renderPagos()}
+function addPago(){
+  const sel=document.getElementById('f-estado-ciclo');
+  if(sel&&sel.value==='cotizacion'){sel.value='nuevo';aplicarVistaCotizacion();toast('La cotización pasó a pedido (recibió un abono)');}
+  fPag.push({id:uid(),monto:'',fecha:hoy(),tipo:'efectivo',nota:''});renderPagos();
+}
 function remPago(id){fPag=fPag.filter(x=>x.id!==id);renderPagos()}
 function setPagVal(id,k,v){const p=fPag.find(x=>x.id===id);if(p)p[k]=v;if(k==='monto'){renderPagRes();previewPago(id,v)}}
 function previewPago(id,v){
@@ -3433,6 +3478,11 @@ function renderPagos(){
 }
 function renderPagRes(){
   const val=valorOficialModal();
+  const esCotiz=(document.getElementById('f-estado-ciclo')||{}).value==='cotizacion';
+  if(esCotiz){
+    document.getElementById('pag-res').innerHTML=`<div class="pago-res-box"><div class="pr-row" style="background:var(--purple-lt);color:#4A3CB8;font-weight:800"><span>Valor cotizado</span><span>${fCOP(val)}</span></div></div>`;
+    return;
+  }
   const pag=fPag.reduce((a,p)=>a+(evalExpr(p.monto)||0),0);
   const saldo=Math.max(0,val-pag);
   document.getElementById('pag-res').innerHTML=`
@@ -3441,6 +3491,14 @@ function renderPagRes(){
       <div class="pr-row"><span>Pagado</span><span style="color:var(--green);font-weight:700">${fCOP(pag)}</span></div>
       <div class="pr-row"><span>Saldo</span><span style="color:${saldo<=0?'var(--green)':'var(--red)'}">${fCOP(saldo)}</span></div>
     </div>`;
+}
+function aplicarVistaCotizacion(){
+  const esCotiz=(document.getElementById('f-estado-ciclo')||{}).value==='cotizacion';
+  const sp=document.getElementById('sec-pagos'),sr=document.getElementById('sec-registro'),sa=document.getElementById('sec-cotiz-aviso');
+  if(sp)sp.style.display=esCotiz?'none':'block';
+  if(sr)sr.style.display=esCotiz?'none':'block';
+  if(sa)sa.style.display=esCotiz?'block':'none';
+  renderPagRes();
 }
 
 /* ══ COSTOS ══ */
@@ -3647,7 +3705,7 @@ function abrirNuevo(){
   ['btn-del','btn-pdf','btn-wa','btn-print'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
   // Empezar con un encargo vacío
   addEnc();
-  renderPagos();renderCostos();renderArchivos();
+  renderPagos();renderCostos();renderArchivos();aplicarVistaCotizacion();
   document.getElementById('hist-list').innerHTML='<div style="font-size:10px;color:var(--muted)">El historial se generará al guardar.</div>';
   document.getElementById('ovP').classList.add('open');
   setTimeout(()=>document.getElementById('f-nom').focus(),180);
@@ -3693,6 +3751,7 @@ async function abrirEditar(id){
   document.getElementById('f-valor-final').value=displayMoneyVal(fValorFinalRaw);
   document.getElementById('ck-urg').checked=!!p.urgente;
   document.getElementById('f-estado-ciclo').value=p.cancelado?'cancelado':(p.entregado?'entregado':(p.es_cotizacion?'cotizacion':'nuevo'));
+  aplicarVistaCotizacion();
   document.getElementById('m-tit').textContent=p.nombre;
   document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido)+validezCotHTML(p);
   document.getElementById('btn-pdf').style.display=p.cancelado?'none':'inline-flex';
@@ -3765,6 +3824,21 @@ async function eliminarPed(){
   if(!editId||!confirm('¿Eliminar este pedido?'))return;
   try{await api('DELETE',`/pedidos/${editId}`);toast('Pedido eliminado');cerrar();await Promise.all([cargarStats(),cargarPedidos()]);}
   catch(e){toast('Error al eliminar',false)}
+}
+async function archivarPed(){
+  if(!editId||!confirm('¿Archivar este pedido? No estará activo pero se podrá restaurar desde Archivo.'))return;
+  try{await api('POST','/archivar',{tipo:'pedido',id:editId});toast('Pedido archivado');cerrar();await Promise.all([cargarStats(),cargarPedidos()]);}
+  catch(e){toast('Error al archivar',false)}
+}
+async function archivarProducto(){
+  if(!editProdId||!confirm('¿Archivar este producto? Se podrá restaurar desde Archivo.'))return;
+  try{await api('POST','/archivar',{tipo:'producto',id:editProdId});toast('Producto archivado');cerrarProducto();cargarProductos();}
+  catch(e){toast('Error al archivar',false)}
+}
+async function archivarCli(){
+  if(!_cliActual||!confirm('¿Archivar este cliente? Se podrá restaurar desde Archivo.'))return;
+  try{await api('POST','/archivar',{tipo:'cliente',id:_cliActual.id});toast('Cliente archivado');cerrarCli();cargarClientes();}
+  catch(e){toast('Error al archivar',false)}
 }
 
 /* ══ EXPORT ══ */

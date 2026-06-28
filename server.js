@@ -168,6 +168,9 @@ try { db.exec("ALTER TABLE enc_items ADD COLUMN subcategoria TEXT DEFAULT ''"); 
 try { db.exec("ALTER TABLE enc_items ADD COLUMN estado TEXT DEFAULT 'Nuevo'"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN nota TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN precio_sugerido TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN archivado INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE clientes ADD COLUMN archivado INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN archivado INTEGER DEFAULT 0"); } catch(e){}
 try { db.exec("ALTER TABLE clientes ADD COLUMN nit TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE clientes ADD COLUMN email TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE clientes ADD COLUMN direccion TEXT DEFAULT ''"); } catch(e){}
@@ -790,7 +793,7 @@ app.use('/api',(req,res,next)=>{
 // ── PEDIDOS ──
 app.get('/api/pedidos',(req,res)=>{
   const{estado,urgente,q}=req.query;
-  let sql='SELECT * FROM pedidos WHERE workspace_id=?'; const params=[req.wsId];
+  let sql='SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0'; const params=[req.wsId];
   if(urgente==='1'){sql+=' AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0'}
   else if(estado==='cotizacion'){sql+=' AND es_cotizacion=1'}
   else if(estado==='entregado'){sql+=' AND entregado=1'}
@@ -900,7 +903,7 @@ app.delete('/api/archivos/:id',(req,res)=>{
 
 // Clientes
 app.get('/api/clientes',(req,res)=>{
-  const{q}=req.query; let sql='SELECT * FROM clientes WHERE workspace_id=?'; const params=[req.wsId];
+  const{q}=req.query; let sql='SELECT * FROM clientes WHERE workspace_id=? AND archivado=0'; const params=[req.wsId];
   if(q){sql+=' AND(nombre LIKE ? OR tel LIKE ?)';params.push(`%${q}%`,`%${q}%`)}
   sql+=' ORDER BY nombre';
   const clientes=db.prepare(sql).all(...params);
@@ -944,7 +947,7 @@ app.get('/api/stats',(req,res)=>{
 // Export CSV
 app.get('/api/export/csv',(req,res)=>{
   const{estado}=req.query;
-  let sql='SELECT * FROM pedidos WHERE workspace_id=?'; const params=[req.wsId];
+  let sql='SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0'; const params=[req.wsId];
   if(estado==='entregado')sql+=' AND entregado=1';
   else if(estado==='cancelado')sql+=' AND cancelado=1';
   else if(estado&&estado!=='todos')sql+=' AND entregado=0 AND cancelado=0';
@@ -965,7 +968,7 @@ app.get('/api/export/csv',(req,res)=>{
 
 // Registros financieros
 app.get('/api/registros/utilidades',(req,res)=>{
-  const pedidos=db.prepare('SELECT * FROM pedidos WHERE workspace_id=?').all(req.wsId).map(pedidoCompleto);
+  const pedidos=db.prepare('SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0').all(req.wsId).map(pedidoCompleto);
   const rows=pedidos.map(p=>{
     const ing=p.valor_total||0;
     const cos=(p.costos||[]).reduce((a,c)=>a+toNum(c.monto_calc),0);
@@ -1121,7 +1124,7 @@ app.delete('/api/etiquetas/:id',(req,res)=>{
 
 // ── PRODUCTOS (fichas de producto) ──
 app.get('/api/productos',(req,res)=>{
-  const{q,activo}=req.query; let sql='SELECT * FROM fichas_producto WHERE workspace_id=?'; const params=[req.wsId];
+  const{q,activo}=req.query; let sql='SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0'; const params=[req.wsId];
   if(q){sql+=' AND (nombre LIKE ? OR codigo LIKE ?)';params.push(`%${q}%`,`%${q}%`)}
   if(activo==='1'){sql+=' AND activo=1'}
   sql+=' ORDER BY nombre';
@@ -1274,6 +1277,37 @@ app.delete('/api/inventario-items/:id',(req,res)=>{
   const r=db.prepare('DELETE FROM items_inventario WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});
   res.json({ok:true});
+});
+
+app.delete('/api/clientes/:id',(req,res)=>{
+  const r=db.prepare('DELETE FROM clientes WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'No encontrado'});
+  res.json({ok:true});
+});
+// ── ARCHIVO (Archivar en vez de eliminar) ──
+const ARCH_TABLAS={pedido:'pedidos',cliente:'clientes',producto:'fichas_producto'};
+app.post('/api/archivar',(req,res)=>{
+  const{tipo,id}=req.body||{}; const tabla=ARCH_TABLAS[tipo];
+  if(!tabla||!id)return res.status(400).json({error:'Tipo o id inválido'});
+  if(tipo==='pedido'){const p=db.prepare('SELECT stock_consumido FROM pedidos WHERE id=? AND workspace_id=?').get(id,req.wsId);if(p&&p.stock_consumido){restaurarStock(p.stock_consumido,req.wsId);db.prepare('UPDATE pedidos SET stock_consumido=NULL WHERE id=?').run(id);}}
+  const r=db.prepare(`UPDATE ${tabla} SET archivado=1 WHERE id=? AND workspace_id=?`).run(id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'No encontrado'});
+  res.json({ok:true});
+});
+app.post('/api/restaurar',(req,res)=>{
+  const{tipo,id}=req.body||{}; const tabla=ARCH_TABLAS[tipo];
+  if(!tabla||!id)return res.status(400).json({error:'Tipo o id inválido'});
+  const r=db.prepare(`UPDATE ${tabla} SET archivado=0 WHERE id=? AND workspace_id=?`).run(id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'No encontrado'});
+  if(tipo==='pedido'){const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(id,req.wsId);if(p&&!p.es_cotizacion&&!p.cancelado){const consumo=descontarStock(id,req.wsId);db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),id);}}
+  res.json({ok:true});
+});
+app.get('/api/archivo',(req,res)=>{
+  res.json({
+    pedidos:db.prepare('SELECT id,ref,nombre,fecha_pedido,valor_final FROM pedidos WHERE workspace_id=? AND archivado=1 ORDER BY creado DESC').all(req.wsId),
+    clientes:db.prepare('SELECT id,nombre,tel FROM clientes WHERE workspace_id=? AND archivado=1 ORDER BY nombre').all(req.wsId),
+    productos:db.prepare('SELECT id,nombre,codigo FROM fichas_producto WHERE workspace_id=? AND archivado=1 ORDER BY nombre').all(req.wsId)
+  });
 });
 
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
