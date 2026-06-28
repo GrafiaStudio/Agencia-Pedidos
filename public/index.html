@@ -1639,6 +1639,7 @@ function lineasDocumento(p,fichasPorId){
       const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
       const totItem=cantNum*(evalExpr(it.valor_unitario)||0);
       const ficha=it.ficha_id?fichasPorId[it.ficha_id]:null;
+      const unit=evalExpr(it.valor_unitario)||0;
       if(ficha&&(ficha.tipo_precio==='combo'||ficha.tipo_precio==='promocional')&&(ficha.componentes||[]).length){
         const cantItem=cantNum||1;
         const titulo=ficha.tipo_precio==='promocional'?`Promoción: ${ficha.nombre}`:ficha.nombre;
@@ -1646,15 +1647,15 @@ function lineasDocumento(p,fichasPorId){
           const nombreComp=c.componente_ficha_id?(fichasPorId[c.componente_ficha_id]?.nombre||'(producto)'):(c.componente_nombre||'(ítem libre)');
           return `   • ${cantItem*c.cantidad_consumida} ${nombreComp}`;
         }).join('\n');
-        lineas.push({descripcion:`${cant} ${titulo}\n${sub}`.trim(),monto:totItem});
+        lineas.push({cant,descripcion:`${titulo}\n${sub}`.trim(),unit,monto:totItem});
       }else{
-        let desc=`${cant} ${det}`.trim()||'(sin detalle)';
+        let desc=det||'(sin detalle)';
         if(it.nota)desc+=`\n   ${it.nota}`;
-        lineas.push({descripcion:desc,monto:totItem});
+        lineas.push({cant,descripcion:desc,unit,monto:totItem});
       }
     });
   });
-  if(!lineas.length)lineas.push({descripcion:'(sin detalle)',monto:p.valor_total||0});
+  if(!lineas.length)lineas.push({cant:'',descripcion:'(sin detalle)',unit:0,monto:p.valor_total||0});
   return lineas;
 }
 function calcularIVA(total,porcentaje){
@@ -1701,9 +1702,11 @@ async function construirPdfPedido(){
   y+=4;
   doc.autoTable({
     startY:y,
-    head:[['Descripción','Valor']],
-    body:lineasDocumento(p,fichasPorId).map(l=>[l.descripcion,fCOP(l.monto)]),
-    styles:{fontSize:9}
+    head:[['Cant.','Detalle','V. Unitario','V. Total']],
+    body:lineasDocumento(p,fichasPorId).map(l=>[l.cant||'',l.descripcion,l.unit?fCOP(l.unit):'',fCOP(l.monto)]),
+    styles:{fontSize:9},
+    columnStyles:{0:{cellWidth:14,halign:'center'},2:{cellWidth:28,halign:'right'},3:{cellWidth:28,halign:'right'}},
+    headStyles:{halign:'left'}
   });
   let finalY=doc.lastAutoTable.finalY+8;
   doc.setFontSize(11);
