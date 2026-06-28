@@ -114,7 +114,23 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .search-b i{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
 .search-b input{padding-left:30px;max-width:200px;font-size:11px}
 
-/* PEDIDO CARDS */
+/* PEDIDOS TABLA (guia4) */
+.ped-table-wrap{overflow-x:auto;border-radius:var(--r-lg)}
+.ped-table{width:100%;min-width:780px;border-collapse:separate;border-spacing:0;background:linear-gradient(180deg,#FDFEFF 0%,#F4F8FC 100%);border-radius:var(--r-lg);box-shadow:var(--sh);overflow:hidden}
+.ped-table thead th{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;text-align:left;padding:13px 18px;border-bottom:1px solid var(--line);white-space:nowrap}
+.ped-table tbody td{padding:13px 18px;border-bottom:1px solid var(--line-lt);vertical-align:middle}
+.ped-table tbody tr{cursor:pointer;transition:background .12s}
+.ped-table tbody tr:hover{background:rgba(91,127,166,.06)}
+.ped-table tbody tr:last-child td{border-bottom:none}
+.ped-table tbody tr.r-done,.ped-table tbody tr.r-canc{opacity:.5}
+.pt-ref{font-family:'DM Mono',monospace;font-weight:600;font-size:12px;color:var(--navy);white-space:nowrap}
+.pt-date{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap}
+.pt-name{font-size:13px;font-weight:700;color:var(--navy)}
+.pt-tel{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap}
+.pt-total{font-size:14px;font-weight:700;color:var(--navy);text-align:right;white-space:nowrap}
+.pt-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;flex-shrink:0}
+
+/* PEDIDO CARDS (legacy) */
 .cards{display:flex;flex-direction:column;gap:10px}
 .pcard{background:linear-gradient(180deg,#FDFEFF 0%,#F3F7FC 100%);border-radius:var(--r-lg);border:1px solid transparent;padding:16px 20px;cursor:pointer;transition:all .16s ease;position:relative;overflow:hidden;box-shadow:var(--sh)}
 .pcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent;transition:background .13s;border-radius:3px 0 0 3px}
@@ -1739,46 +1755,41 @@ function renderLista(){
   const el=document.getElementById('lista');
   if(!pedidos.length){el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i><p>Sin pedidos aquí</p></div>';return}
   const EG_COL={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb',Cotización:'#7B6EF6'};
-  el.innerHTML=pedidos.map(p=>{
-    const prog=calcProg(p.encargos);
+  const rows=pedidos.map(p=>{
     const val=p.valor_total||0;
     const eg=estadoGeneral(p);
     const egCol=EG_COL[eg]||'#8A9EAD';
     const cats=[...new Set((p.encargos||[]).flatMap(e=>e.categorias||[]))];
     const tags=cats.map(c=>{const cat=CATS.find(x=>x.id===c);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
-    const isDone=p.entregado,isCan=p.cancelado,isCot=p.es_cotizacion,isUrg=p.urgente&&!isDone&&!isCan,isPend=p.pendiente_pago&&!isDone&&!isCan;
-    const encSummary=buildEncSummary(p.encargos||[]);
-    return`<div class="pcard ${isUrg?'urg':''} ${isDone?'done':''} ${isCan?'canc':''} ${isCot&&!isDone&&!isCan?'cot':''} ${isPend&&!isDone&&!isCan?'pend':''}" onclick="abrirEditar('${p.id}')">
-      <div class="pc-top">
-        <div style="flex:1;min-width:0">
-          <div class="pc-ref">
-            <span style="font-weight:800">#${p.ref}</span>
-            <span>· ${fd(p.fecha_pedido)}</span>
-            ${isUrg?'<span class="b-urg">⚡ URGENTE</span>':''}
-            ${isPend?'<span class="b-pend">⏳ Pendiente</span>':''}
-            ${isCot?`<span class="b-cot">📋 COTIZACIÓN${validezCotHTML(p)}</span>`:''}
-          </div>
-          <div class="pc-name">${p.nombre}</div>
-          <div class="pc-sub">${p.tel||''}${(p.encargos||[]).length>1?` · ${(p.encargos||[]).length} encargos`:''}</div>
-          ${tags?`<div class="tags">${tags}</div>`:''}
-          ${encSummary?`<div class="enc-summary">${encSummary}</div>`:''}
-        </div>
-        <div class="pc-right">
-          <div style="display:flex;align-items:center;gap:5px">
-            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${egCol}"></span>
-            <span style="font-size:11px;font-weight:700;color:var(--slate)">${eg}</span>
-          </div>
-          <div class="valor-total-badge">${val?fCOP(val):''}</div>
-          ${faHTML(p)}
-          ${pagoHTML(p)}
-        </div>
-      </div>
-      ${(p.encargos||[]).length?`<div class="prog-wrap">
-        <div class="prog-bar"><div class="prog-fill" style="width:${prog}%"></div></div>
-        <div class="prog-lbl"><span>${(p.encargos||[]).filter(e=>e.estado==='Listo'||e.estado==='Entregado').length} de ${(p.encargos||[]).length} listos</span><span>${prog}%</span></div>
-      </div>`:''}
-    </div>`;
+    const isDone=p.entregado,isCan=p.cancelado,isUrg=p.urgente&&!isDone&&!isCan;
+    const nEnc=(p.encargos||[]).length;
+    return`<tr class="${isDone?'r-done':''} ${isCan?'r-canc':''}" onclick="abrirEditar('${p.id}')">
+      <td><div class="pt-ref">${isUrg?'<span style="color:var(--red)">⚡</span> ':''}#${p.ref}</div><div class="pt-date">${fd(p.fecha_pedido)}</div></td>
+      <td><div class="pt-name">${p.nombre}</div>${p.tel?`<div class="pt-tel">${p.tel}</div>`:''}</td>
+      <td><div class="tags" style="margin:0">${tags||'<span style="color:var(--muted);font-size:10px">—</span>'}</div>${nEnc?`<div class="pt-date">${nEnc} ${nEnc===1?'encargo':'encargos'}</div>`:''}</td>
+      <td>${pagoHTML(p)||''}<div style="display:flex;align-items:center;margin-top:4px"><span class="pt-dot" style="background:${egCol}"></span><span style="font-size:11px;font-weight:600;color:var(--slate)">${eg}</span></div></td>
+      <td>${entregaCell(p)}</td>
+      <td class="pt-total">${val?fCOP(val):'—'}</td>
+      <td style="text-align:center;color:var(--muted);width:30px"><i class="ti ti-dots-vertical"></i></td>
+    </tr>`;
   }).join('');
+  el.innerHTML=`<div class="ped-table-wrap"><table class="ped-table">
+    <thead><tr><th>Pedido</th><th>Cliente</th><th>Categorías</th><th>Estado</th><th>Entrega</th><th style="text-align:right">Total</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+function entregaCell(p){
+  if(!p.fecha_entrega)return '<span style="color:var(--muted)">—</span>';
+  const hoyD=new Date();hoyD.setHours(0,0,0,0);
+  const entD=new Date(p.fecha_entrega+'T00:00:00');
+  const d=Math.round((entD-hoyD)/86400000);
+  let lbl,col;
+  if(p.entregado||p.cancelado){lbl=fd(p.fecha_entrega);col='var(--muted)';}
+  else if(d<0){lbl='Vencido '+Math.abs(d)+'d';col='var(--red)';}
+  else if(d===0){lbl='Hoy';col='var(--green)';}
+  else if(d===1){lbl='Mañana';col='var(--amber)';}
+  else if(d<=7){lbl='En '+d+'d';col='var(--amber)';}
+  else{lbl=fd(p.fecha_entrega);col='var(--slate)';}
+  return `<span style="color:${col};font-weight:600;font-size:11px;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-calendar" style="font-size:13px"></i>${lbl}</span><div class="pt-date">${fd(p.fecha_entrega)}</div>`;
 }
 
 function buildEncSummary(encs){
