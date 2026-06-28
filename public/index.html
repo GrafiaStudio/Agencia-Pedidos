@@ -301,6 +301,8 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .var-parte-hd{font-size:10px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px}
 .item-tagpick{margin-top:8px;padding:11px 12px;border-radius:13px;background:var(--line-lt)}
 .item-nota{font-size:10px;color:var(--muted);margin-top:5px;padding-left:3px;line-height:1.45;font-style:italic}
+.it-editado{display:inline-flex;align-items:center;gap:3px;font-size:8.5px;font-weight:700;color:#9B6500;background:var(--amber-lt);padding:1px 6px;border-radius:10px;margin-top:3px;float:right}
+.it-editado i{font-size:10px}
 .prog-stages{margin-top:11px;display:flex;flex-direction:column;gap:6px}
 .prog-stage{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--slate)}
 .prog-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
@@ -2114,6 +2116,7 @@ function setItem(encId,itemId,k,v){
   const e=fEnc.find(x=>x.id===encId);
   const it=e&&e.items.find(i=>i.id===itemId);
   if(it){
+    if(k==='valor_unitario'&&it._autoPrecio&&it._fichaSel&&!it.precio_sugerido){it.precio_sugerido=String(evalExpr(it.valor_unitario)||'');}
     it[k]=v;
     if(k==='valor_unitario')it._autoPrecio=false;
     if(k==='cantidad'&&it._autoPrecio&&it._fichaSel&&it._fichaSel.tipo_precio==='escalonado'){
@@ -2164,7 +2167,19 @@ function updateItemTotalCell(encId,itemId){
   const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
   const tot=cant*(evalExpr(it.valor_unitario)||0);
   const el=document.getElementById('ittot-'+itemId);
-  if(el)el.textContent=tot?fCOP(tot):'—';
+  if(el&&document.activeElement!==el)el.value=tot?displayMoneyVal(String(tot)):'';
+}
+function setItemTotal(encId,itemId,v){
+  const e=fEnc.find(x=>x.id===encId);const it=e&&e.items.find(i=>i.id===itemId);if(!it)return;
+  const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+  const total=evalExpr(v);
+  if(cant>0&&total!=null){
+    if(it._autoPrecio&&it._fichaSel&&!it.precio_sugerido){it.precio_sugerido=String(evalExpr(it.valor_unitario)||'');}
+    it._autoPrecio=false;
+    it.valor_unitario=String(Math.round(total/cant));
+  }
+  actualizarValorTotal();
+  renderEncItems(encId);
 }
 let _acItemResults={};
 function detectarPrecioEscalonado(rangos,cantidad){
@@ -2467,7 +2482,7 @@ function renderEncs(){
       <div class="enc-head2">Lista de encargo <span>#${String(enc.numero).padStart(2,'0')}</span></div>
       <div class="enc-body">
         <table class="items-table" id="it-${enc.id}">
-          <thead><tr><th style="width:62px">Cant.</th><th>Detalle / Especificación</th><th style="width:92px">V. Unitario</th><th style="width:92px;text-align:right">V. Total</th><th style="width:30px" title="Suministrado">✓</th><th style="width:26px"></th></tr></thead>
+          <thead><tr><th style="width:62px">Cant.</th><th>Detalle / Especificación</th><th style="width:92px">V. Unitario</th><th style="width:96px;text-align:right">V. Total</th><th style="width:26px"></th></tr></thead>
           <tbody>${renderItemsHTML(enc)}</tbody>
         </table>
         <button class="btn-add-row" style="margin:4px 0 10px" onclick="addItem('${enc.id}')"><i class="ti ti-plus"></i>Agregar fila</button>
@@ -2492,9 +2507,11 @@ function renderItemsHTML(enc){
     const tieneDetalle=it._fichaSel&&['variantes','pliego','medidas'].includes(it._fichaSel.tipo_precio);
     const abierto=!varItemPlegados.has(it.id);
     const totItem=cantNum*(evalExpr(it.valor_unitario)||0);
+    const sug=it.precio_sugerido?(evalExpr(it.precio_sugerido)||0):null;
+    const editado=sug!=null&&sug>0&&(evalExpr(it.valor_unitario)||0)!==sug;
     const chips=itemCats(it).map(cid=>{const cat=CATS.find(c=>c.id===cid);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
     return`
-    <tr${it.suministrado?' style="opacity:.55"':''}>
+    <tr>
       <td style="width:62px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"><div id="itstock-${it.id}" style="font-size:8px;font-weight:700;color:var(--red);margin-top:2px;display:${stockWarn?'block':'none'}">${stockWarn}</div></td>
       <td><div class="item-line"><div class="ac-wrap" style="flex:1;min-width:120px"><textarea class="item-ta" id="itdet-${it.id}" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div>${chips?`<span class="item-chips">${chips}</span>`:''}<div class="item-icons">
           <button type="button" class="item-icon estado-ic${itemEstAbierto.has(it.id)?' on':''}" style="background:${ECOL_MAP[it.estado||'Nuevo']}22;color:${ECOL_MAP[it.estado||'Nuevo']}" onclick="toggleItemEstado('${enc.id}','${it.id}')" title="Estado: ${it.estado||'Nuevo'}"><i class="ti ti-progress"></i></button>
@@ -2513,9 +2530,8 @@ function renderItemsHTML(enc){
         ${itemEstAbierto.has(it.id)?itemEstadoPickerHTML(enc,it):''}
         ${itemTagAbierto.has(it.id)?itemTagPickerHTML(enc,it):''}
         ${itemNotaAbierto.has(it.id)?`<div class="item-expand"><input class="item-inp" type="text" value="${escHtml(it.nota||'')}" placeholder="Nota: ej. 20 talla S · 10 talla XL…" oninput="setItemNota('${enc.id}','${it.id}',this.value)"></div>`:(it.nota?`<div class="item-nota">${escHtml(it.nota)}</div>`:'')}</td>
-      <td style="width:92px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
-      <td id="ittot-${it.id}" style="width:92px;text-align:right;font-weight:700;color:var(--navy);font-size:12px;white-space:nowrap">${totItem?fCOP(totItem):'—'}</td>
-      <td style="width:30px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
+      <td style="width:92px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div>${editado?`<div class="it-editado" title="Precio editado a mano — sugerido ${fCOP(sug)}"><i class="ti ti-pencil"></i> editado</div>`:''}</td>
+      <td style="width:96px"><input class="item-inp" id="ittot-${it.id}" type="text" value="${totItem?displayMoneyVal(String(totItem)):''}" placeholder="$ 0" style="text-align:right;font-weight:700;color:var(--navy)" onchange="setItemTotal('${enc.id}','${it.id}',this.value)" title="Total del ítem — editable (precio negociado)"></td>
       <td style="width:26px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
