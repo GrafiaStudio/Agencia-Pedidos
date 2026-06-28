@@ -1725,13 +1725,19 @@ async function imprimirPedido(){const r=await construirPdfPedido();if(!r)return;
 async function compartirPedido(){
   const r=await construirPdfPedido();if(!r)return;const p=r.p;
   const texto=`Hola${p.nombre?' '+p.nombre.split(' ')[0]:''}, te comparto tu ${r.tipo.toLowerCase()} #${p.ref}${CFG.nombre_negocio?' de '+CFG.nombre_negocio:''}. Total: ${fCOP(p.valor_total||0)}.`;
-  try{
-    const file=new File([r.doc.output('blob')],r.filename,{type:'application/pdf'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:texto,title:`${r.tipo} #${p.ref}`});return;}
-  }catch(e){if(e&&e.name==='AbortError')return;}
+  const esMovil=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  // En móvil: compartir nativo con el archivo PDF adjunto (va directo a WhatsApp/correo del teléfono)
+  if(esMovil&&navigator.canShare){
+    try{
+      const file=new File([r.doc.output('blob')],r.filename,{type:'application/pdf'});
+      if(navigator.canShare({files:[file]})){await navigator.share({files:[file],text:texto,title:`${r.tipo} #${p.ref}`});return;}
+    }catch(e){if(e&&e.name==='AbortError')return;}
+  }
+  // En escritorio: descargar el PDF y abrir WhatsApp Web con el texto (para adjuntar el PDF)
   r.doc.save(r.filename);
-  if(p.tel){window.open(`https://wa.me/${normalizarTelWa(p.tel)}?text=${encodeURIComponent(texto+' (adjunto el PDF que acabo de descargar)')}`,'_blank');}
-  else{toast('PDF descargado. Adjúntalo al compartir.',true);}
+  const url=p.tel?`https://wa.me/${normalizarTelWa(p.tel)}?text=${encodeURIComponent(texto)}`:'https://web.whatsapp.com/';
+  window.open(url,'_blank');
+  toast('PDF descargado — adjúntalo en el chat de WhatsApp',true);
 }
 function enviarWhatsAppPedido(){
   const p=window._pedidoActualDoc;
@@ -2151,7 +2157,14 @@ function setItem(encId,itemId,k,v){
       recalcularCostosAutomaticos();
     }
   }
-  if(k==='cantidad'||k==='valor_unitario')actualizarValorTotal();
+  if(k==='cantidad'||k==='valor_unitario'){actualizarValorTotal();updateItemTotalCell(encId,itemId);}
+}
+function updateItemTotalCell(encId,itemId){
+  const e=fEnc.find(x=>x.id===encId);const it=e&&e.items.find(i=>i.id===itemId);if(!it)return;
+  const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
+  const tot=cant*(evalExpr(it.valor_unitario)||0);
+  const el=document.getElementById('ittot-'+itemId);
+  if(el)el.textContent=tot?fCOP(tot):'—';
 }
 let _acItemResults={};
 function detectarPrecioEscalonado(rangos,cantidad){
@@ -2501,7 +2514,7 @@ function renderItemsHTML(enc){
         ${itemTagAbierto.has(it.id)?itemTagPickerHTML(enc,it):''}
         ${itemNotaAbierto.has(it.id)?`<div class="item-expand"><input class="item-inp" type="text" value="${escHtml(it.nota||'')}" placeholder="Nota: ej. 20 talla S · 10 talla XL…" oninput="setItemNota('${enc.id}','${it.id}',this.value)"></div>`:(it.nota?`<div class="item-nota">${escHtml(it.nota)}</div>`:'')}</td>
       <td style="width:92px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:8.5px;font-weight:700;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div></td>
-      <td style="width:92px;text-align:right;font-weight:700;color:var(--navy);font-size:12px;white-space:nowrap">${totItem?fCOP(totItem):'—'}</td>
+      <td id="ittot-${it.id}" style="width:92px;text-align:right;font-weight:700;color:var(--navy);font-size:12px;white-space:nowrap">${totItem?fCOP(totItem):'—'}</td>
       <td style="width:30px;text-align:center"><input type="checkbox" title="Suministrado" ${it.suministrado?'checked':''} onchange="setItem('${enc.id}','${it.id}','suministrado',this.checked)"></td>
       <td style="width:26px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
