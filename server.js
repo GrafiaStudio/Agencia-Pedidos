@@ -621,6 +621,7 @@ function precioOficialFicha(ficha,precioSugerido){
 }
 function fichaCompleta(f){
   if(!f)return null;
+  if(f.inventario_item_id){const inv=db.prepare('SELECT nombre,stock_actual,stock_minimo FROM items_inventario WHERE id=?').get(f.inventario_item_id);if(inv){f.inventario_stock=inv.stock_actual;f.inventario_nombre=inv.nombre;f.inventario_stock_minimo=inv.stock_minimo;}}
   f.insumos=db.prepare('SELECT * FROM ficha_insumos WHERE ficha_id=? ORDER BY orden').all(f.id);
   f.componentes=db.prepare('SELECT * FROM combo_composicion WHERE ficha_id=? ORDER BY orden').all(f.id);
   f.variantes=arbolVariantes(db.prepare('SELECT * FROM ficha_variantes WHERE ficha_id=? ORDER BY orden').all(f.id));

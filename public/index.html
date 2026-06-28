@@ -2173,7 +2173,7 @@ function setItem(encId,itemId,k,v){
     if(k==='cantidad'){
       const stockEl=document.getElementById('itstock-'+itemId);
       if(stockEl){
-        const stockDisp=(it._fichaSel&&it._fichaSel.stock_actual!=null)?it._fichaSel.stock_actual:null;
+        const stockDisp=stockDispItem(it);
         const cantNum2=parseInt(String(v||0).replace(/\D/g,''))||0;
         if(stockDisp!=null&&cantNum2>stockDisp){
           stockEl.textContent=`Stock insuficiente (quedan ${stockDisp})`;
@@ -2535,9 +2535,14 @@ function renderEncs(){
     </div>`).join('');
   setTimeout(()=>document.querySelectorAll('.item-ta').forEach(t=>autoTA(t)),0);
 }
+function stockDispItem(it){
+  const f=it._fichaSel;if(!f)return null;
+  if(f.inventario_item_id&&f.inventario_stock!=null){const factor=parseFloat(f.inventario_cantidad_consumida)||1;return Math.floor(f.inventario_stock/factor);}
+  return f.stock_actual!=null?f.stock_actual:null;
+}
 function renderItemsHTML(enc){
   return(enc.items||[]).map((it,j)=>{
-    const stockDisp=(it._fichaSel&&it._fichaSel.stock_actual!=null)?it._fichaSel.stock_actual:null;
+    const stockDisp=stockDispItem(it);
     const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
     const stockWarn=(stockDisp!=null&&cantNum>stockDisp)?`Stock insuficiente (quedan ${stockDisp})`:'';
     const tieneDetalle=it._fichaSel&&['variantes','pliego','medidas'].includes(it._fichaSel.tipo_precio);
