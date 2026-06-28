@@ -214,12 +214,14 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 #ovP .mhead{background:var(--white);border-bottom:1px solid var(--line);flex-shrink:0}
 #ovP .mbody{flex:1;max-height:none;overflow-y:auto;padding:24px 30px}
 #ovP .mfoot{flex-shrink:0;background:var(--white)}
-.ped-grid{display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start;max-width:1500px;margin:0 auto}
+.ped-grid{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
 .ped-main{min-width:0}
 .ped-side{min-width:0;display:flex;flex-direction:column;gap:14px;position:sticky;top:0}
 .ped-side-card{background:linear-gradient(180deg,#FDFEFF,#F3F7FC);border:1px solid transparent;border-radius:var(--r-lg);box-shadow:var(--sh);padding:15px 17px}
 @media(max-width:1100px){.ped-grid{grid-template-columns:1fr}.ped-side{position:static}}
-@media(max-width:768px){#ovP{left:0}#ovP .mbody{padding:16px}}
+@media(max-width:768px){#ovP{left:0}#ovP .mbody{padding:16px}.mhead-actions .btn-ghost span,.mhead-actions .btn-danger span{display:none}}
+.mhead-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.mhead-actions .btn-ghost,.mhead-actions .btn-danger{padding:8px 14px;font-size:11px}
 
 /* Form helpers */
 .fg{margin-bottom:15px}
@@ -299,6 +301,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .var-parte-hd{font-size:10px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px}
 .item-tagpick{margin-top:8px;padding:11px 12px;border-radius:13px;background:var(--line-lt)}
 .item-nota{font-size:10px;color:var(--muted);margin-top:5px;padding-left:3px;line-height:1.45;font-style:italic}
+.prog-stages{margin-top:11px;display:flex;flex-direction:column;gap:6px}
+.prog-stage{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--slate)}
+.prog-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.prog-stage-n{margin-left:auto;font-weight:700;color:var(--navy)}
 .item-icon.open{background:var(--teal-lt);color:var(--teal-dk)}
 .item-ta{border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11px;font-family:'Montserrat',sans-serif;width:100%;background:var(--white);transition:border-color .12s;resize:none;overflow:hidden;min-height:28px;line-height:1.45}
 .item-ta:focus{border-color:var(--teal);outline:none;box-shadow:none}
@@ -838,7 +844,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div class="mtitle" id="m-tit">Nuevo pedido</div>
       <div class="mref" id="m-ref"></div>
     </div>
-    <button class="mclose" onclick="cerrar()"><i class="ti ti-x"></i></button>
+    <div class="mhead-actions">
+      <button class="btn-ghost" id="btn-print" style="display:none" onclick="imprimirPedido()"><i class="ti ti-printer"></i>Imprimir</button>
+      <button class="btn-ghost" id="btn-pdf" style="display:none" onclick="generarPdfPedido()"><i class="ti ti-download"></i>Descargar PDF</button>
+      <button class="btn-ghost" id="btn-wa" style="display:none" onclick="compartirPedido()"><i class="ti ti-share"></i>Compartir</button>
+      <button class="btn-danger" id="btn-del" style="display:none" onclick="eliminarPed()"><i class="ti ti-trash"></i>Eliminar</button>
+      <button class="mclose" onclick="cerrar()"><i class="ti ti-x"></i></button>
+    </div>
   </div>
   <div class="mbody">
    <div class="ped-grid">
@@ -904,12 +916,30 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div id="pag-lista"></div>
     <button class="btn-add-g" onclick="addPago()"><i class="ti ti-plus"></i> Registrar pago / abono</button>
 
+    <!-- REGISTRO DE COSTOS (interno · al final del lado izquierdo, no expuesto en la columna del cliente) -->
+    <div class="msec" style="margin-top:16px"><span class="tri"></span>Registro de costos · interno</div>
+    <div class="collapsible">
+      <div class="coll-head" onclick="toggleColl(this)">
+        <div class="coll-head-l"><i class="ti ti-lock"></i>Costos del pedido (uso interno)</div>
+        <i class="ti ti-chevron-down coll-chevron"></i>
+      </div>
+      <div class="coll-body">
+        <div id="costos-lista"></div>
+        <button class="btn-add-g" onclick="addCosto()"><i class="ti ti-plus"></i> Agregar costo</button>
+        <div id="costos-res" style="margin-top:8px"></div>
+      </div>
+    </div>
+
     </div><!-- /ped-main -->
 
     <div class="ped-side">
       <div class="ped-side-card">
         <div class="msec" style="margin-top:0"><span class="tri"></span>Resumen del pedido</div>
         <div id="pag-res"></div>
+      </div>
+      <div class="ped-side-card">
+        <div class="msec" style="margin-top:0"><span class="tri"></span>Progreso del pedido</div>
+        <div id="prog-card"></div>
       </div>
       <div class="ped-side-card">
         <div class="msec" style="margin-top:0"><span class="tri"></span>Archivos de referencia</div>
@@ -920,27 +950,11 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <div class="msec" style="margin-top:0"><span class="tri"></span>Historial</div>
         <div class="hist-list" id="hist-list"></div>
       </div>
-      <div class="ped-side-card">
-        <div class="collapsible">
-          <div class="coll-head" onclick="toggleColl(this)">
-            <div class="coll-head-l"><i class="ti ti-lock"></i>Registro</div>
-            <i class="ti ti-chevron-down coll-chevron"></i>
-          </div>
-          <div class="coll-body">
-            <div id="costos-lista"></div>
-            <button class="btn-add-g" onclick="addCosto()"><i class="ti ti-plus"></i> Agregar costo</button>
-            <div id="costos-res" style="margin-top:8px"></div>
-          </div>
-        </div>
-      </div>
     </div><!-- /ped-side -->
 
    </div><!-- /ped-grid -->
   </div>
   <div class="mfoot">
-    <button class="btn-danger" id="btn-del" style="display:none" onclick="eliminarPed()"><i class="ti ti-trash"></i>Eliminar</button>
-    <button class="btn-ghost" id="btn-pdf" style="display:none" onclick="generarPdfPedido()"><i class="ti ti-file-text"></i>Generar PDF</button>
-    <button class="btn-ghost" id="btn-wa" style="display:none" onclick="enviarWhatsAppPedido()"><i class="ti ti-brand-whatsapp"></i>Enviar por WhatsApp</button>
     <div style="display:flex;gap:7px;margin-left:auto">
       <button class="btn-ghost" onclick="cerrar()">Cancelar</button>
       <button class="btn-pri" onclick="guardar()"><i class="ti ti-device-floppy"></i>Guardar</button>
@@ -1640,11 +1654,11 @@ function mensajeWhatsApp(p,tipo){
   }
   return msg;
 }
-async function generarPdfPedido(){
+async function construirPdfPedido(){
   const p=window._pedidoActualDoc;
-  if(!p)return;
+  if(!p)return null;
   const tipo=tipoDocumento(p);
-  if(!tipo){toast('No se puede generar un documento de un pedido cancelado',false);return}
+  if(!tipo){toast('No se puede generar un documento de un pedido cancelado',false);return null}
   const fichaIds=[...new Set((p.encargos||[]).flatMap(e=>(e.items||[]).map(it=>it.ficha_id).filter(Boolean)))];
   const fichasPorId={};
   if(fichaIds.length){
@@ -1704,7 +1718,20 @@ async function generarPdfPedido(){
     const labels=CFG.metodos_pago.map(m=>METODOS_PAGO_CATALOGO.find(x=>x.key===m)?.label||m).join(', ');
     doc.text('Métodos de pago aceptados: '+labels,14,finalY);
   }
-  doc.save(`${tipo.replace(/\s+/g,'_')}_${p.ref}.pdf`);
+  return {doc,tipo,p,filename:`${tipo.replace(/\s+/g,'_')}_${p.ref}.pdf`};
+}
+async function generarPdfPedido(){const r=await construirPdfPedido();if(r)r.doc.save(r.filename);}
+async function imprimirPedido(){const r=await construirPdfPedido();if(!r)return;try{r.doc.autoPrint();}catch(e){}window.open(r.doc.output('bloburl'),'_blank');}
+async function compartirPedido(){
+  const r=await construirPdfPedido();if(!r)return;const p=r.p;
+  const texto=`Hola${p.nombre?' '+p.nombre.split(' ')[0]:''}, te comparto tu ${r.tipo.toLowerCase()} #${p.ref}${CFG.nombre_negocio?' de '+CFG.nombre_negocio:''}. Total: ${fCOP(p.valor_total||0)}.`;
+  try{
+    const file=new File([r.doc.output('blob')],r.filename,{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:texto,title:`${r.tipo} #${p.ref}`});return;}
+  }catch(e){if(e&&e.name==='AbortError')return;}
+  r.doc.save(r.filename);
+  if(p.tel){window.open(`https://wa.me/${normalizarTelWa(p.tel)}?text=${encodeURIComponent(texto+' (adjunto el PDF que acabo de descargar)')}`,'_blank');}
+  else{toast('PDF descargado. Adjúntalo al compartir.',true);}
 }
 function enviarWhatsAppPedido(){
   const p=window._pedidoActualDoc;
@@ -2449,7 +2476,7 @@ function renderItemsHTML(enc){
     const stockDisp=(it._fichaSel&&it._fichaSel.stock_actual!=null)?it._fichaSel.stock_actual:null;
     const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
     const stockWarn=(stockDisp!=null&&cantNum>stockDisp)?`Stock insuficiente (quedan ${stockDisp})`:'';
-    const tieneDetalle=it._fichaSel&&(it._fichaSel.tipo_precio==='variantes'||it._fichaSel.tipo_precio==='pliego');
+    const tieneDetalle=it._fichaSel&&['variantes','pliego','medidas'].includes(it._fichaSel.tipo_precio);
     const abierto=!varItemPlegados.has(it.id);
     const totItem=cantNum*(evalExpr(it.valor_unitario)||0);
     const chips=itemCats(it).map(cid=>{const cat=CATS.find(c=>c.id===cid);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
@@ -2461,8 +2488,8 @@ function renderItemsHTML(enc){
           ${tieneDetalle?`<button type="button" class="item-icon${abierto?' on':''}" onclick="toggleVarItem('${enc.id}','${it.id}')" title="${it._fichaSel.tipo_precio==='pliego'?'Hoja y extras':'Ver detalle / opciones'}"><i class="ti ti-adjustments-horizontal"></i></button>`:''}
           <button type="button" class="item-icon${itemTagAbierto.has(it.id)?' on':''}" onclick="toggleItemTag('${enc.id}','${it.id}')" title="Etiquetas"><i class="ti ti-tag"></i></button>
           <button type="button" class="item-icon${it.nota?' on':''}${itemNotaAbierto.has(it.id)?' open':''}" onclick="toggleItemNota('${enc.id}','${it.id}')" title="Nota adicional del ítem"><i class="ti ti-note"></i></button>
-        </div></div>${(it._fichaSel&&it._fichaSel.tipo_precio==='medidas')?`
-        <div style="display:flex;gap:5px;align-items:center;margin-top:6px;flex-wrap:wrap">
+        </div></div>${(it._fichaSel&&it._fichaSel.tipo_precio==='medidas'&&abierto)?`
+        <div class="item-expand" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
           <input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._ancho||''}" placeholder="Ancho" oninput="setMedidaItem('${enc.id}','${it.id}','_ancho',this.value)">
           ${it._fichaSel.medida_unidad!=='m'?`<span style="font-size:11px;color:var(--muted)">×</span><input class="item-inp" style="width:64px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto" oninput="setMedidaItem('${enc.id}','${it.id}','_alto',this.value)">`:''}
           <span style="font-size:10px;color:var(--muted)">${SUF_UNIDAD[it._fichaSel.medida_unidad]||'m²'}</span>
@@ -3257,7 +3284,21 @@ function actualizarValorTotal(){
 }
 function actualizarProgreso(){
   const prog=calcProg(fEnc);
-  document.getElementById('prog-pct').textContent=prog+'%';
+  const pct=document.getElementById('prog-pct');
+  if(pct)pct.textContent=prog+'%';
+  renderProgresoCard(prog);
+}
+function renderProgresoCard(prog){
+  const el=document.getElementById('prog-card');
+  if(!el)return;
+  const items=fEnc.flatMap(e=>e.items||[]);
+  if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--muted)">Agrega ítems para ver el progreso.</div>';return}
+  const cnt={};items.forEach(it=>{const s=it.estado||'Nuevo';cnt[s]=(cnt[s]||0)+1});
+  const filas=ENC_ESTS.map(s=>cnt[s]?`<div class="prog-stage"><span class="prog-dot" style="background:${ECOL_MAP[s]}"></span><span>${s}</span><span class="prog-stage-n">${cnt[s]}</span></div>`:'').join('');
+  el.innerHTML=`
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px"><span style="font-size:26px;font-weight:600;color:var(--teal-dk);line-height:1">${prog}%</span><span style="font-size:10px;color:var(--muted)">${items.length} ítem${items.length!==1?'s':''}</span></div>
+    <div class="prog-bar" style="height:6px"><div class="prog-fill" style="width:${prog}%"></div></div>
+    <div class="prog-stages">${filas}</div>`;
 }
 
 /* ══ PAGOS ══ */
@@ -3514,7 +3555,7 @@ function abrirNuevo(){
   editId=null;resetForm();
   document.getElementById('m-tit').textContent='Nuevo pedido';
   document.getElementById('m-ref').textContent='';
-  document.getElementById('btn-del').style.display='none';
+  ['btn-del','btn-pdf','btn-wa','btn-print'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
   // Empezar con un encargo vacío
   addEnc();
   renderPagos();renderCostos();renderArchivos();
@@ -3566,7 +3607,8 @@ async function abrirEditar(id){
   document.getElementById('m-tit').textContent=p.nombre;
   document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido)+validezCotHTML(p);
   document.getElementById('btn-pdf').style.display=p.cancelado?'none':'inline-flex';
-  document.getElementById('btn-wa').style.display=(p.cancelado||!p.tel)?'none':'inline-flex';
+  document.getElementById('btn-print').style.display=p.cancelado?'none':'inline-flex';
+  document.getElementById('btn-wa').style.display=p.cancelado?'none':'inline-flex';
   window._pedidoActualDoc=p;
   document.getElementById('btn-del').style.display='flex';
   renderEncs();renderPagos();renderCostos();renderArchivos();renderHist(p.historial);
