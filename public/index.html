@@ -35,7 +35,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
 /* LAYOUT */
 .layout{display:flex;min-height:100vh}
-.sidebar{width:220px;flex-shrink:0;background:linear-gradient(165deg,#2D3960 0%,#1E2742 58%,#232C4A 100%);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50;overflow-y:auto}
+.sidebar{width:220px;flex-shrink:0;background:linear-gradient(180deg,#3D4C7A 0%,#232C4C 52%,#161B2E 100%);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50;overflow-y:auto}
 .main{margin-left:220px;flex:1}
 
 /* SIDEBAR */
@@ -292,7 +292,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .enc-head2 span{color:var(--slate);font-family:'DM Mono',monospace}
 .item-icons{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:3px}
 .item-icons-below{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
-.item-icon{width:27px;height:27px;border-radius:50%;border:none;background:var(--line-lt);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:all .12s;flex-shrink:0}
+.item-icon{width:23px;height:23px;border-radius:50%;border:none;background:var(--line-lt);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;transition:all .12s;flex-shrink:0}
 .item-icon:hover{background:rgba(91,127,166,.14);color:var(--teal-dk)}
 .item-icon.on{background:var(--teal-lt);color:var(--teal-dk)}
 .item-expand{margin-top:8px}
@@ -1009,14 +1009,11 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <div id="prod-paso-form" style="display:none">
     <button class="btn-ghost" id="prod-btn-cambiar-tipo" style="margin-bottom:10px" onclick="document.getElementById('prod-paso-tipo').style.display='block';document.getElementById('prod-paso-form').style.display='none'"><i class="ti ti-arrow-left"></i>Cambiar tipo</button>
-    <div class="fr2 fg">
+    <div class="fg" style="display:grid;grid-template-columns:118px 1.5fr 1fr auto;gap:14px;align-items:end">
+      <div><label>Código</label><input type="text" id="prod-codigo" placeholder="Auto" style="font-family:'DM Mono',monospace;text-transform:uppercase"></div>
       <div><label>Nombre del producto</label><input type="text" id="prod-nombre" placeholder="Ej: Retablo 10x15cm"></div>
-      <div><label>Código (opcional)</label><input type="text" id="prod-codigo" placeholder="Ej: RET-1015" style="font-family:'DM Mono',monospace;text-transform:uppercase"></div>
-    </div>
-
-    <div class="fr2 fg" style="margin-top:10px;align-items:end">
-      <div><label>Categoría (informativa)</label><select id="prod-cat-sel" onchange="setProdCat(this.value)"></select></div>
-      <div style="display:flex;align-items:center;padding-bottom:8px"><div class="ck-box" style="display:inline-flex"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div></div>
+      <div><label>Categoría</label><select id="prod-cat-sel" onchange="setProdCat(this.value)"></select></div>
+      <div style="padding-bottom:1px"><div class="ck-box" style="display:inline-flex"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div></div>
     </div>
     <div class="fr2 fg">
       <div><label>Vincular con inventario (opcional)</label>
@@ -1068,7 +1065,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <label>Precio base</label>
         <input type="text" id="prod-precio-base" placeholder="= sugerido" oninput="fProdPrecioBaseRaw=this.value" onfocus="focusProdPrecioBase(this)" onblur="blurProdPrecioBase(this)" style="font-size:14px;font-weight:800;color:var(--navy)">
         <div id="prod-precio-sugerido-cap" style="font-size:10px;color:var(--muted);font-weight:600;margin-top:4px;display:none">Precio sugerido: $0</div>
-        <div id="prod-precio-base-auto-cap" style="font-size:13px;font-weight:800;color:var(--navy);display:none"></div>
+        <div id="prod-precio-base-auto-cap" style="color:var(--navy);display:none;padding:6px 0"></div>
       </div>
     </div>
     </div>
@@ -3033,7 +3030,7 @@ function actualizarVisibilidadPrecioBase(){
     input.style.display='none';
     sugCap.style.display='none';
     cap.style.display='block';
-    cap.textContent='Precio por unidad: '+fCOP(precioParaUno)+' (lo define tu primer tramo, "Desde 1")';
+    cap.innerHTML='<b style="font-size:15px">'+fCOP(precioParaUno)+'</b> <span style="font-weight:600;color:var(--slate)">/ unidad</span><div style="font-size:9.5px;color:var(--muted);margin-top:2px">lo define tu primer tramo, "Desde 1"</div>';
   }else{
     input.style.display='block';
     cap.style.display='none';
