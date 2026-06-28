@@ -849,15 +849,18 @@ app.put('/api/pedidos/:id',(req,res)=>{
     if(b.encargos!==undefined)saveEncargos(pid,b.encargos,req.wsId);
     if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(req.wsId),pg.tipo||'efectivo',pg.nota||'',req.wsId));}
     if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,cantidad,valor_unitario,valor_unitario_calc,monto,monto_calc,auto,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.cantidad||'',c.valor_unitario||'',normCalc(c.valor_unitario),c.monto||'',normCalc(c.monto),c.auto?1:0,req.wsId));}
+    // ── Re-sincronización de stock al editar ──
+    const ahoraCotiz=(b.es_cotizacion!==undefined?!!b.es_cotizacion:!!p.es_cotizacion);
+    const ahoraCancel=(b.cancelado!==undefined?!!b.cancelado:!!p.cancelado);
     let stockConsumidoActual=p.stock_consumido;
-    if(!b.es_cotizacion&&p.es_cotizacion&&!stockConsumidoActual){
+    if(ahoraCotiz||ahoraCancel){
+      // Cotización o cancelado: no debe consumir. Restaurar lo que hubiera consumido.
+      if(stockConsumidoActual){restaurarStock(stockConsumidoActual,req.wsId);db.prepare('UPDATE pedidos SET stock_consumido=NULL WHERE id=?').run(pid);}
+    }else{
+      // Pedido activo: re-sincronizar (deshacer lo viejo + descontar las cantidades actuales)
+      if(stockConsumidoActual)restaurarStock(stockConsumidoActual,req.wsId);
       const consumo=descontarStock(pid,req.wsId);
-      stockConsumidoActual=JSON.stringify(consumo);
-      db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(stockConsumidoActual,pid);
-    }
-    if(b.cancelado&&!p.cancelado&&stockConsumidoActual){
-      restaurarStock(stockConsumidoActual,req.wsId);
-      db.prepare('UPDATE pedidos SET stock_consumido=NULL WHERE id=?').run(pid);
+      db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),pid);
     }
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
   }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}
