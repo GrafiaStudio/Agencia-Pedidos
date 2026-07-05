@@ -1134,11 +1134,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div class="msec"><span class="tri"></span>Costos fijos adicionales (opcional)</div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Se suman una vez a cada pieza, sin importar el tamaño. Ej: diseño, mensajería.</div>
-      <table class="items-table" id="prod-costos-fijos-tabla">
-        <thead><tr><th>Concepto</th><th style="width:120px">Valor</th><th style="width:26px"></th></tr></thead>
-        <tbody id="prod-costos-fijos-body"></tbody>
-      </table>
-      <button class="btn-add-row" onclick="addCostoFijo()"><i class="ti ti-plus"></i>Agregar costo fijo</button>
+      <div id="prod-costos-fijos-body"></div>
       <div class="fg" style="margin-top:12px"><label>Cobro mínimo (opcional)</label><input type="text" id="prod-cobro-minimo" placeholder="Ej: 50000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Si el cálculo da menos que esto, se cobra esto. Para trabajos muy chicos.</div></div>
     </div>
 
@@ -1171,11 +1167,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div id="prod-sec-tramos">
         <div class="msec"><span class="tri"></span>Tramos adicionales por cantidad (opcional)</div>
         <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Un tramo "Desde 1" reemplaza el precio base. El último tramo cubre cualquier cantidad mayor (ej: "Desde 24" a $21.000 → pedir 50 también cuesta $21.000 c/u).</div>
-        <table class="items-table" id="prod-rangos-tabla">
-          <thead><tr><th style="width:80px">Desde</th><th style="width:80px">Hasta</th><th>Precio por unidad</th><th style="width:26px"></th></tr></thead>
-          <tbody id="prod-rangos-body"></tbody>
-        </table>
-        <button class="btn-add-row" onclick="addRango()"><i class="ti ti-plus"></i>Agregar tramo</button>
+        <div id="prod-rangos-body"></div>
       </div>
     </div>
 
@@ -3025,12 +3017,12 @@ function addCostoFijo(){fProdCostosFijos.push({id:uid(),nombre:'',valor:''});ren
 function remCostoFijo(id){fProdCostosFijos=fProdCostosFijos.filter(x=>x.id!==id);renderCostosFijos()}
 function setCostoFijo(id,k,v){const c=fProdCostosFijos.find(x=>x.id===id);if(c)c[k]=v}
 function renderCostosFijos(){
-  document.getElementById('prod-costos-fijos-body').innerHTML=fProdCostosFijos.map(c=>`
-    <tr>
-      <td><input class="item-inp" type="text" value="${c.nombre||''}" placeholder="Ej: Diseño" oninput="setCostoFijo('${c.id}','nombre',this.value)"></td>
-      <td><input class="item-inp" type="text" value="${c.valor||''}" placeholder="$ 0" oninput="setCostoFijo('${c.id}','valor',this.value)"></td>
-      <td style="width:26px"><button class="item-del" onclick="remCostoFijo('${c.id}')"><i class="ti ti-x"></i></button></td>
-    </tr>`).join('');
+  document.getElementById('prod-costos-fijos-body').innerHTML='<div class="var-chips">'+fProdCostosFijos.map(c=>`
+    <div class="var-chip">
+      <input class="chip-inp" type="text" value="${String(c.nombre||'').replace(/"/g,'&quot;')}" placeholder="Concepto" oninput="setCostoFijo('${c.id}','nombre',this.value)">
+      <input class="chip-inp chip-val" type="text" value="${String(c.valor||'').replace(/"/g,'&quot;')}" placeholder="$ 0" oninput="setCostoFijo('${c.id}','valor',this.value)">
+      <button class="chip-x" onclick="remCostoFijo('${c.id}')"><i class="ti ti-x"></i></button>
+    </div>`).join('')+'<button class="chip-add" onclick="addCostoFijo()"><i class="ti ti-plus"></i>Agregar costo fijo</button></div>';
 }
 let _acComboResults={};
 let fProdComboModo='global';
@@ -3234,13 +3226,15 @@ function blurRangoPrecio(el,id){
   el.value=displayMoneyVal(r&&r.precio);
 }
 function renderRangos(){
-  document.getElementById('prod-rangos-body').innerHTML=fProdRangos.map(r=>`
-    <tr>
-      <td><input class="item-inp" type="text" value="${r.desde||''}" placeholder="1" oninput="setRango('${r.id}','desde',this.value)"></td>
-      <td><input class="item-inp" type="text" value="${r.hasta||''}" placeholder="Sin límite" oninput="setRango('${r.id}','hasta',this.value)"></td>
-      <td><input class="item-inp" type="text" value="${displayMoneyVal(r.precio)}" placeholder="$ 0" oninput="setRango('${r.id}','precio',this.value)" onfocus="focusRangoPrecio(this,'${r.id}')" onblur="blurRangoPrecio(this,'${r.id}')"></td>
-      <td style="width:26px"><button class="item-del" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button></td>
-    </tr>`).join('');
+  document.getElementById('prod-rangos-body').innerHTML='<div class="var-chips">'+fProdRangos.map(r=>`
+    <div class="var-chip">
+      <span class="chip-lbl">De</span>
+      <input class="chip-inp chip-sm" type="text" value="${String(r.desde||'').replace(/"/g,'&quot;')}" placeholder="1" oninput="setRango('${r.id}','desde',this.value)">
+      <span class="chip-lbl">a</span>
+      <input class="chip-inp chip-sm" type="text" value="${String(r.hasta||'').replace(/"/g,'&quot;')}" placeholder="+" oninput="setRango('${r.id}','hasta',this.value)">
+      <input class="chip-inp chip-val" type="text" value="${displayMoneyVal(r.precio)}" placeholder="$ 0" oninput="setRango('${r.id}','precio',this.value)" onfocus="focusRangoPrecio(this,'${r.id}')" onblur="blurRangoPrecio(this,'${r.id}')">
+      <button class="chip-x" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button>
+    </div>`).join('')+'<button class="chip-add" onclick="addRango()"><i class="ti ti-plus"></i>Agregar tramo</button></div>';
   actualizarVisibilidadPrecioBase();
 }
 function resetProdForm(){
