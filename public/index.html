@@ -529,7 +529,6 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="inventario" onclick="showView('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
-    <button class="nav-item" onclick="filtroRapido('pendiente')"><i class="ti ti-clock"></i>Pendientes</button>
     <button class="nav-item" onclick="filtroRapido('entregado')"><i class="ti ti-circle-check"></i>Entregados</button>
     <button class="nav-item" onclick="filtroRapido('cancelado')"><i class="ti ti-ban"></i>Cancelados</button>
     <button class="nav-item" onclick="filtroRapido('cotizacion')"><i class="ti ti-file-invoice"></i>Cotizaciones<span class="nb" id="sb-cot">0</span></button>
@@ -902,12 +901,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
           <option value="nuevo">Pedido en curso</option>
           <option value="entregado">Entregado</option>
           <option value="cancelado">Cancelado</option>
-          <option value="cotizacion">Cotización</option>
         </select>
       </div>
       <div>
-        <label>Prioridad</label>
+        <label>Marcas</label>
         <div class="ck-box ck-urg" style="margin-top:1px"><input type="checkbox" id="ck-urg"><label for="ck-urg">Urgente</label></div>
+        <div class="ck-box" style="margin-top:4px"><input type="checkbox" id="ck-cotiz" onchange="toggleCotiz()"><label for="ck-cotiz">Cotización</label></div>
       </div>
       <div>
         <label>Avance</label>
@@ -3463,8 +3462,8 @@ function renderProgresoCard(prog){
 
 /* ══ PAGOS ══ */
 function addPago(){
-  const sel=document.getElementById('f-estado-ciclo');
-  if(sel&&sel.value==='cotizacion'){sel.value='nuevo';aplicarVistaCotizacion();toast('La cotización pasó a pedido (recibió un abono)');}
+  const ck=document.getElementById('ck-cotiz');
+  if(ck&&ck.checked){ck.checked=false;aplicarVistaCotizacion();toast('La cotización pasó a pedido (recibió un abono)');}
   const nid=uid();fPag.push({id:nid,monto:'',fecha:hoy(),tipo:'efectivo',nota:''});_pagosNuevos.add(nid);renderPagos();
 }
 function remPago(id){fPag=fPag.filter(x=>x.id!==id);renderPagos()}
@@ -3508,7 +3507,7 @@ function renderPagos(){
 }
 function renderPagRes(){
   const val=valorOficialModal();
-  const esCotiz=(document.getElementById('f-estado-ciclo')||{}).value==='cotizacion';
+  const esCotiz=esCotizacionModal();
   if(esCotiz){
     document.getElementById('pag-res').innerHTML=`<div class="pago-res-box"><div class="pr-row" style="background:var(--purple-lt);color:#4A3CB8;font-weight:800"><span>Valor cotizado</span><span>${fCOP(val)}</span></div></div>`;
     return;
@@ -3522,8 +3521,17 @@ function renderPagRes(){
       <div class="pr-row"><span>Saldo</span><span style="color:${saldo<=0?'var(--green)':'var(--red)'}">${fCOP(saldo)}</span></div>
     </div>`;
 }
+function esCotizacionModal(){return !!(document.getElementById('ck-cotiz')||{}).checked;}
+// CORR 005 — cotización es una casilla; regla: un pedido con abonos no puede volver a cotización
+function toggleCotiz(){
+  const ck=document.getElementById('ck-cotiz');if(!ck)return;
+  if(ck.checked&&fPag.some(p=>(evalExpr(p.monto)||0)>0)){
+    ck.checked=false;toast('Este pedido ya tiene abonos: no puede volver a ser cotización',false);
+  }
+  aplicarVistaCotizacion();
+}
 function aplicarVistaCotizacion(){
-  const esCotiz=(document.getElementById('f-estado-ciclo')||{}).value==='cotizacion';
+  const esCotiz=esCotizacionModal();
   const sp=document.getElementById('sec-pagos'),sr=document.getElementById('sec-registro'),sa=document.getElementById('sec-cotiz-aviso');
   if(sp)sp.style.display=esCotiz?'none':'block';
   if(sr)sr.style.display=esCotiz?'none':'block';
@@ -3730,7 +3738,8 @@ function resetForm(){
   fEnc=[];fPag=[];fArch=[];fCostos=[];fCostosManual=false;encCounter=0;editCliId=null;fValorFinalRaw='';_pagosNuevos.clear();
   ['f-nom','f-tel','f-fecha','f-notas','f-valor-final','f-cli-nit','f-cli-contacto','f-cli-direccion','f-cli-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
   ['ck-urg'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
-  document.getElementById('f-estado-ciclo').value=CFG.estado_default_cotizacion?'cotizacion':'nuevo';
+  document.getElementById('f-estado-ciclo').value='nuevo';
+  const ckc=document.getElementById('ck-cotiz');if(ckc)ckc.checked=!!CFG.estado_default_cotizacion;
   document.getElementById('ac-drop').style.display='none';
   document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: $0';
   document.getElementById('valor-ajustado').style.display='none';
@@ -3794,7 +3803,8 @@ async function abrirEditar(id){
   fValorFinalRaw=(p.valor_final!=null?p.valor_final:'');
   document.getElementById('f-valor-final').value=displayMoneyVal(fValorFinalRaw);
   document.getElementById('ck-urg').checked=!!p.urgente;
-  document.getElementById('f-estado-ciclo').value=p.cancelado?'cancelado':(p.entregado?'entregado':(p.es_cotizacion?'cotizacion':'nuevo'));
+  document.getElementById('f-estado-ciclo').value=p.cancelado?'cancelado':(p.entregado?'entregado':'nuevo');
+  const ckc=document.getElementById('ck-cotiz');if(ckc)ckc.checked=!!p.es_cotizacion;
   aplicarVistaCotizacion();
   document.getElementById('m-tit').textContent=p.nombre;
   document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido)+validezCotHTML(p);
@@ -3845,7 +3855,7 @@ async function guardar(){
     entregado:document.getElementById('f-estado-ciclo').value==='entregado',
     cancelado:document.getElementById('f-estado-ciclo').value==='cancelado',
     pendiente_pago:false,
-    es_cotizacion:document.getElementById('f-estado-ciclo').value==='cotizacion',
+    es_cotizacion:esCotizacionModal(),
     fecha_entrega:document.getElementById('f-fecha').value,
     notas:document.getElementById('f-notas').value.trim(),
     valor_final:(fValorFinalRaw||'').trim(),
