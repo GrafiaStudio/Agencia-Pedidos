@@ -2019,6 +2019,7 @@ function prodCardHTML(p){
       <div class="cli-sub">${cat?`<span class="ttag ${cat.tc}">${cat.label}</span> `:''}<span class="b-tipo">${TIPO_LABEL_PROD[p.tipo_precio]||p.tipo_precio}</span> ${!p.activo?'<span class="b-canc">Inactivo</span>':''} ${(p.stock_actual!=null&&p.stock_minimo!=null&&p.stock_actual<=p.stock_minimo)?'<span class="b-pend">Stock bajo</span>':''}</div>
     </div>
     <div style="font-weight:800;color:var(--navy);flex-shrink:0">${p.tipo_precio==='variantes'?'desde '+fCOP(p.precio_oficial):(p.tipo_precio==='pliego'?fCOP(p.precio_oficial)+' c/u aprox':(fCOP(p.precio_oficial)+(p.tipo_precio==='medidas'?' / '+(SUF_UNIDAD[p.medida_unidad]||'m²'):'')))}</div>
+    <button class="item-del" title="Duplicar producto" onclick="event.stopPropagation();duplicarProducto('${p.id}')" style="flex-shrink:0;color:var(--teal)"><i class="ti ti-copy"></i></button>
   </div>`;
 }
 async function cargarProductos(q=''){
@@ -3304,6 +3305,17 @@ function onProdInvChange(){
   wrap.style.display=sel.value?'block':'none';
   const cant=document.getElementById('prod-inv-cant');
   if(sel.value&&cant&&!cant.value)cant.value='1';
+}
+// B1.6 — duplicar la ficha completa: la carga en el editor pero como producto NUEVO (para editar y guardar)
+async function duplicarProducto(id){
+  await abrirEditarProducto(id);
+  editProdId=null;
+  fProdVariantes=(fProdVariantes||[]).map(clonarNodoVar);varSel=null; // ids nuevos para evitar colisiones
+  document.getElementById('prod-codigo').value='';
+  const nom=document.getElementById('prod-nombre');nom.value=(nom.value||'').trim()+' (copia)';
+  document.getElementById('prod-tit').textContent='Duplicar producto';
+  document.getElementById('prod-btn-del').style.display='none';
+  renderVariantes();
 }
 async function abrirEditarProducto(id){
   const p=await api('GET',`/productos/${id}`);
