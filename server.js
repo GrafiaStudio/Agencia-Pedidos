@@ -154,6 +154,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS configuracion_negocio(
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_activo INTEGER DEFAULT 0"); } catch(e){}
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_porcentaje INTEGER DEFAULT 19"); } catch(e){}
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_desglosado INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN info_pdf TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_actual INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_minimo INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN regla_lleva INTEGER"); } catch(e){}
@@ -279,6 +280,7 @@ const CFG_DEFAULTS={
   moneda_prefijo:'$',decimales:0,separador_miles:'.',formato_fecha:'DD/MM/AAAA',
   zona_horaria:'America/Bogota',dias_validez_cotizacion:15,estado_default_cotizacion:0,
   metodos_pago:['efectivo','transferencia','nequi','daviplata','otro'],
+  info_pdf:'',
   alertas_entrega:1,dias_anticipacion_entrega:3,
   iva_activo:0,iva_porcentaje:19,iva_desglosado:0
 };
@@ -303,6 +305,7 @@ function getConfiguracion(wsId){
     dias_validez_cotizacion:row.dias_validez_cotizacion??CFG_DEFAULTS.dias_validez_cotizacion,
     estado_default_cotizacion:row.estado_default_cotizacion?1:0,
     metodos_pago:metodos,
+    info_pdf:row.info_pdf||'',
     alertas_entrega:row.alertas_entrega?1:0,
     dias_anticipacion_entrega:row.dias_anticipacion_entrega??CFG_DEFAULTS.dias_anticipacion_entrega,
     iva_activo:row.iva_activo?1:0,
@@ -1040,7 +1043,7 @@ app.put('/api/configuracion',(req,res)=>{
     if(b.formato_fecha!==undefined&&!FORMATOS_FECHA.includes(b.formato_fecha))errores.push('Formato de fecha no válido');
     if(b.separador_miles!==undefined&&!SEPARADORES_MILES.includes(b.separador_miles))errores.push('Separador de miles no válido');
     if(b.zona_horaria!==undefined&&!ZONAS_HORARIAS.has(b.zona_horaria))errores.push('Zona horaria no válida');
-    if(b.metodos_pago!==undefined&&(!Array.isArray(b.metodos_pago)||b.metodos_pago.some(m=>!METODOS_PAGO_VALIDOS.includes(m))))errores.push('Métodos de pago no válidos');
+    if(b.metodos_pago!==undefined&&!Array.isArray(b.metodos_pago))errores.push('Métodos de pago no válidos');
     if(b.dias_validez_cotizacion!==undefined&&(!Number.isInteger(b.dias_validez_cotizacion)||b.dias_validez_cotizacion<0))errores.push('Días de validez de cotización no válido');
     if(b.dias_anticipacion_entrega!==undefined&&(!Number.isInteger(b.dias_anticipacion_entrega)||b.dias_anticipacion_entrega<0))errores.push('Días de anticipación no válido');
     if(b.iva_porcentaje!==undefined&&(!Number.isInteger(b.iva_porcentaje)||b.iva_porcentaje<0||b.iva_porcentaje>100))errores.push('Porcentaje de IVA no válido');
@@ -1048,14 +1051,14 @@ app.put('/api/configuracion',(req,res)=>{
     const actual=getConfiguracion(req.wsId);
     const nuevo={...actual,...b};
     db.prepare(`INSERT INTO configuracion_negocio
-        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado)
-      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado)
+        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,info_pdf,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado)
+      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@info_pdf,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado)
       ON CONFLICT(workspace_id) DO UPDATE SET
         nombre_negocio=excluded.nombre_negocio,direccion=excluded.direccion,telefono=excluded.telefono,
         email=excluded.email,nit=excluded.nit,moneda_prefijo=excluded.moneda_prefijo,decimales=excluded.decimales,
         separador_miles=excluded.separador_miles,formato_fecha=excluded.formato_fecha,zona_horaria=excluded.zona_horaria,
         dias_validez_cotizacion=excluded.dias_validez_cotizacion,estado_default_cotizacion=excluded.estado_default_cotizacion,
-        metodos_pago=excluded.metodos_pago,alertas_entrega=excluded.alertas_entrega,dias_anticipacion_entrega=excluded.dias_anticipacion_entrega,
+        metodos_pago=excluded.metodos_pago,info_pdf=excluded.info_pdf,alertas_entrega=excluded.alertas_entrega,dias_anticipacion_entrega=excluded.dias_anticipacion_entrega,
         iva_activo=excluded.iva_activo,iva_porcentaje=excluded.iva_porcentaje,iva_desglosado=excluded.iva_desglosado`)
       .run({
         workspace_id:req.wsId,
@@ -1072,6 +1075,7 @@ app.put('/api/configuracion',(req,res)=>{
         dias_validez_cotizacion:Number.isInteger(nuevo.dias_validez_cotizacion)?nuevo.dias_validez_cotizacion:15,
         estado_default_cotizacion:nuevo.estado_default_cotizacion?1:0,
         metodos_pago:JSON.stringify(Array.isArray(nuevo.metodos_pago)?nuevo.metodos_pago:CFG_DEFAULTS.metodos_pago),
+        info_pdf:(nuevo.info_pdf||''),
         alertas_entrega:nuevo.alertas_entrega?1:0,
         dias_anticipacion_entrega:Number.isInteger(nuevo.dias_anticipacion_entrega)?nuevo.dias_anticipacion_entrega:3,
         iva_activo:nuevo.iva_activo?1:0,

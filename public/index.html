@@ -703,15 +703,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
             <div class="ck-box"><input type="checkbox" id="cfg-estado-default-cot"><label for="cfg-estado-default-cot">Los pedidos nuevos inician como Cotización</label></div>
           </div>
         </div>
-        <div class="msec"><span class="tri"></span>Métodos de pago habilitados</div>
-        <div class="cfg-mp-grid">
-          <div class="ck-box"><input type="checkbox" id="cfg-mp-efectivo"><label for="cfg-mp-efectivo">Efectivo</label></div>
-          <div class="ck-box"><input type="checkbox" id="cfg-mp-transferencia"><label for="cfg-mp-transferencia">Transferencia</label></div>
-          <div class="ck-box"><input type="checkbox" id="cfg-mp-nequi"><label for="cfg-mp-nequi">Nequi</label></div>
-          <div class="ck-box"><input type="checkbox" id="cfg-mp-daviplata"><label for="cfg-mp-daviplata">Daviplata</label></div>
-          <div class="ck-box"><input type="checkbox" id="cfg-mp-contraentrega"><label for="cfg-mp-contraentrega">Contraentrega</label></div>
-          <div class="ck-box"><input type="checkbox" id="cfg-mp-otro"><label for="cfg-mp-otro">Otro</label></div>
-        </div>
+        <div class="msec"><span class="tri"></span>Métodos de pago</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;max-width:640px">Crea tus propios métodos con sus datos (cuenta, alias, link… lo que aplique). Solo los <b>activos</b> aparecen en el PDF y al registrar pagos. Sirve para cualquier país.</div>
+        <div id="cfg-mp-list"></div>
+        <button class="btn-add-g" type="button" onclick="addMetodoPago()"><i class="ti ti-plus"></i> Agregar método</button>
+        <div class="msec" style="margin-top:18px"><span class="tri"></span>Información extra en el PDF (opcional)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;max-width:640px">Texto libre que aparecerá bajo tus datos en el PDF: otros contactos, horarios, anotaciones, etc.</div>
+        <textarea id="cfg-info-pdf" rows="3" placeholder="Ej.: WhatsApp 300 123 4567 · Horario L-V 9am-6pm · Gracias por tu compra" style="width:100%;max-width:640px;resize:vertical"></textarea>
       </div>
 
       <div id="cfg-notificaciones" class="cfg-panel">
@@ -1318,10 +1316,21 @@ const CFG_DEFAULTS={
   nombre_negocio:'',logo_ruta:'',direccion:'',telefono:'',email:'',nit:'',
   moneda_prefijo:'$',decimales:0,separador_miles:'.',formato_fecha:'DD/MM/AAAA',
   zona_horaria:'America/Bogota',dias_validez_cotizacion:15,estado_default_cotizacion:0,
-  metodos_pago:['efectivo','transferencia','nequi','daviplata','otro'],
+  metodos_pago:[{key:'efectivo',label:'Efectivo',datos:'',activo:true},{key:'transferencia',label:'Transferencia',datos:'',activo:true},{key:'nequi',label:'Nequi',datos:'',activo:true},{key:'daviplata',label:'Daviplata',datos:'',activo:true}],
+  info_pdf:'',
   alertas_entrega:1,dias_anticipacion_entrega:3,
   iva_activo:0,iva_porcentaje:19,iva_desglosado:0
 };
+// CORR 004 — métodos de pago personalizables (objetos), con migración del formato viejo (array de strings)
+function normMetodos(arr){
+  if(!Array.isArray(arr)||!arr.length)return JSON.parse(JSON.stringify(CFG_DEFAULTS.metodos_pago));
+  return arr.map(m=>{
+    if(typeof m==='string'){const c=METODOS_PAGO_CATALOGO.find(x=>x.key===m);return{key:m,label:c?c.label:m,datos:'',activo:true};}
+    return{key:m.key||uid(),label:m.label||m.key||'Método',datos:m.datos||'',activo:m.activo!==false};
+  });
+}
+function metodoLabel(key){const m=(CFG.metodos_pago||[]).find(x=>x.key===key);if(m)return m.label;const c=METODOS_PAGO_CATALOGO.find(x=>x.key===key);return c?c.label:(key||'—');}
+function metodosPagoActivos(){return (CFG.metodos_pago||[]).filter(m=>m.activo!==false&&(m.label||'').trim());}
 let CFG={...CFG_DEFAULTS};
 function onIvaActivoChange(){
   document.getElementById('cfg-iva-detalle-wrap').style.display=document.getElementById('cfg-iva-activo').checked?'block':'none';
@@ -1330,6 +1339,7 @@ function onIvaActivoChange(){
 async function cargarConfiguracion(){
   try{
     CFG=Object.assign({},CFG_DEFAULTS,await api('GET','/configuracion'));
+    CFG.metodos_pago=normMetodos(CFG.metodos_pago);
   }catch(e){
     CFG=Object.assign({},CFG_DEFAULTS);
     console.warn('Configuración:',e.message);
@@ -1368,10 +1378,9 @@ function pintarConfiguracion(){
   document.getElementById('cfg-zona-horaria').value=CFG.zona_horaria;
   document.getElementById('cfg-dias-validez').value=CFG.dias_validez_cotizacion;
   document.getElementById('cfg-estado-default-cot').checked=!!CFG.estado_default_cotizacion;
-  METODOS_PAGO_CATALOGO.forEach(m=>{
-    const el=document.getElementById('cfg-mp-'+m.key);
-    if(el)el.checked=CFG.metodos_pago.includes(m.key);
-  });
+  CFG.metodos_pago=normMetodos(CFG.metodos_pago);
+  renderMetodosPago();
+  document.getElementById('cfg-info-pdf').value=CFG.info_pdf||'';
   document.getElementById('cfg-alertas-entrega').checked=!!CFG.alertas_entrega;
   document.getElementById('cfg-dias-anticipacion').value=CFG.dias_anticipacion_entrega;
   document.getElementById('cfg-iva-activo').checked=!!CFG.iva_activo;
@@ -1443,7 +1452,7 @@ function renderEtiquetas(){
 }
 
 async function guardarConfiguracion(){
-  const metodos=METODOS_PAGO_CATALOGO.map(m=>m.key).filter(k=>document.getElementById('cfg-mp-'+k)?.checked);
+  const metodos=(CFG.metodos_pago||[]).filter(m=>(m.label||'').trim()).map(m=>({key:m.key||uid(),label:(m.label||'').trim(),datos:(m.datos||'').trim(),activo:m.activo!==false}));
   const payload={
     nombre_negocio:document.getElementById('cfg-nombre').value.trim(),
     direccion:document.getElementById('cfg-direccion').value.trim(),
@@ -1458,6 +1467,7 @@ async function guardarConfiguracion(){
     dias_validez_cotizacion:parseInt(document.getElementById('cfg-dias-validez').value,10)||15,
     estado_default_cotizacion:document.getElementById('cfg-estado-default-cot').checked?1:0,
     metodos_pago:metodos,
+    info_pdf:document.getElementById('cfg-info-pdf').value.trim(),
     alertas_entrega:document.getElementById('cfg-alertas-entrega').checked?1:0,
     dias_anticipacion_entrega:parseInt(document.getElementById('cfg-dias-anticipacion').value,10)||3,
     iva_activo:document.getElementById('cfg-iva-activo').checked?1:0,
@@ -1466,11 +1476,26 @@ async function guardarConfiguracion(){
   };
   try{
     CFG=Object.assign({},CFG_DEFAULTS,await api('PUT','/configuracion',payload));
+    CFG.metodos_pago=normMetodos(CFG.metodos_pago);
     aplicarPerfilNegocio();
     toast('Configuración guardada');
   }catch(e){toast(e.message,false)}
 }
 
+function renderMetodosPago(){
+  const cont=document.getElementById('cfg-mp-list');if(!cont)return;
+  const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  cont.innerHTML=(CFG.metodos_pago||[]).map(m=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
+      <input type="text" value="${esc(m.label)}" placeholder="Nombre (ej. Bancolombia)" oninput="setMetodoPago('${m.key}','label',this.value)" style="flex:1;min-width:140px">
+      <input type="text" value="${esc(m.datos)}" placeholder="Datos: cuenta, alias, link… (opcional)" oninput="setMetodoPago('${m.key}','datos',this.value)" style="flex:1.5;min-width:160px">
+      <div class="ck-box" style="margin:0"><input type="checkbox" id="mp-act-${m.key}" ${m.activo!==false?'checked':''} onchange="setMetodoPago('${m.key}','activo',this.checked)"><label for="mp-act-${m.key}">Activo</label></div>
+      <button class="costo-del" onclick="remMetodoPago('${m.key}')" title="Quitar"><i class="ti ti-x"></i></button>
+    </div>`).join('')||'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Sin métodos todavía. Agrega al menos uno.</div>';
+}
+function addMetodoPago(){CFG.metodos_pago=CFG.metodos_pago||[];CFG.metodos_pago.push({key:uid(),label:'',datos:'',activo:true});renderMetodosPago();}
+function remMetodoPago(key){CFG.metodos_pago=(CFG.metodos_pago||[]).filter(m=>m.key!==key);renderMetodosPago();}
+function setMetodoPago(key,field,val){const m=(CFG.metodos_pago||[]).find(x=>x.key===key);if(m)m[field]=val;}
 async function subirLogoCfg(e){
   const file=e.target.files[0];
   if(!file)return;
@@ -1753,7 +1778,7 @@ async function construirPdfPedido(){
     doc.autoTable({
       startY:finalY,
       head:[['Fecha','Forma de pago','Monto']],
-      body:p.pagos.map(pg=>[fd(pg.fecha),METODOS_PAGO_CATALOGO.find(x=>x.key===pg.tipo)?.label||pg.tipo,fCOP(parseInt(String(pg.monto_calc||0).replace(/\D/g,''))||0)]),
+      body:p.pagos.map(pg=>[fd(pg.fecha),metodoLabel(pg.tipo),fCOP(parseInt(String(pg.monto_calc||0).replace(/\D/g,''))||0)]),
       styles:{fontSize:9}
     });
     finalY=doc.lastAutoTable.finalY+6;
@@ -1765,9 +1790,15 @@ async function construirPdfPedido(){
     finalY+=10;
   }
   doc.setFontSize(9);
-  if(CFG.metodos_pago&&CFG.metodos_pago.length){
-    const labels=CFG.metodos_pago.map(m=>METODOS_PAGO_CATALOGO.find(x=>x.key===m)?.label||m).join(', ');
-    doc.text('Métodos de pago aceptados: '+labels,14,finalY);
+  const activos=metodosPagoActivos();
+  if(activos.length){
+    doc.text('Métodos de pago aceptados:',14,finalY);finalY+=5;
+    activos.forEach(m=>{doc.text('• '+m.label+(m.datos?' — '+m.datos:''),16,finalY);finalY+=5;});
+  }
+  // CORR 004 — información extra de la empresa
+  if((CFG.info_pdf||'').trim()){
+    finalY+=3;
+    String(CFG.info_pdf).split('\n').filter(l=>l.trim()).forEach(l=>{doc.text(l.trim(),14,finalY);finalY+=5;});
   }
   return {doc,tipo,p,filename:`${tipo.replace(/\s+/g,'_')}_${p.ref}.pdf`};
 }
@@ -2277,8 +2308,7 @@ function collectPrecioEdits(){
 let _pagosNuevos=new Set();
 function collectPagosNuevos(){
   return fPag.filter(p=>_pagosNuevos.has(p.id)&&(evalExpr(p.monto)||0)>0).map(p=>{
-    const m=METODOS_PAGO_CATALOGO.find(x=>x.key===p.tipo);
-    return {monto:fCOP(evalExpr(p.monto)||0),forma:(m?m.label:p.tipo)||'—',nota:(p.nota||'').slice(0,80)};
+    return {monto:fCOP(evalExpr(p.monto)||0),forma:metodoLabel(p.tipo)||'—',nota:(p.nota||'').slice(0,80)};
   });
 }
 let _acItemResults={};
@@ -3495,9 +3525,7 @@ function renderPagos(){
         <div><label>Monto</label><input type="text" value="${displayMoneyVal(pg.monto)}" placeholder="$ 0" oninput="setPagVal('${pg.id}','monto',this.value)" onfocus="focusPagVal(this,'${pg.id}')" onblur="blurPagVal(this,'${pg.id}')"><div id="pagprev-${pg.id}" style="font-size:9px;font-weight:700;color:var(--teal-dk);margin-top:2px;display:none"></div></div>
         <div><label>Forma</label>
           <select onchange="setPagVal('${pg.id}','tipo',this.value)">
-            ${METODOS_PAGO_CATALOGO.filter(m=>CFG.metodos_pago.includes(m.key)||m.key===pg.tipo).map(m=>
-              `<option value="${m.key}"${pg.tipo===m.key?' selected':''}>${m.label}</option>`
-            ).join('')}
+            ${(()=>{const act=metodosPagoActivos();if(pg.tipo&&!act.some(m=>m.key===pg.tipo))act.unshift({key:pg.tipo,label:metodoLabel(pg.tipo)});return act.map(m=>`<option value="${m.key}"${pg.tipo===m.key?' selected':''}>${m.label}</option>`).join('');})()}
           </select>
         </div>
         <div><label>Nota</label><input type="text" value="${pg.nota||''}" placeholder="Opcional…" oninput="setPagVal('${pg.id}','nota',this.value)"></div>
@@ -4037,7 +4065,7 @@ function buildRegPanel(tab){
       <div class="sc"><div class="sc-l">Pagos</div><div class="sc-n">${all.length}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>Fecha</th><th>Pedido</th><th>Forma</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
-    <tbody>${all.map(pg=>`<tr><td>${fd(pg.fecha)}</td><td><span style="font-family:'DM Mono',monospace;font-size:10px">#${pg.ref}</span> ${pg.nom}</td><td>${pg.tipo||'—'}</td><td style="color:var(--muted);font-size:10px">${pg.nota||'—'}</td><td style="text-align:right" class="mpos">${fCOP(pg.monto_calc)}</td></tr>`).join('')}</tbody></table>`;
+    <tbody>${all.map(pg=>`<tr><td>${fd(pg.fecha)}</td><td><span style="font-family:'DM Mono',monospace;font-size:10px">#${pg.ref}</span> ${pg.nom}</td><td>${metodoLabel(pg.tipo)}</td><td style="color:var(--muted);font-size:10px">${pg.nota||'—'}</td><td style="text-align:right" class="mpos">${fCOP(pg.monto_calc)}</td></tr>`).join('')}</tbody></table>`;
   }
   if(tab==='saldos'){
     const rows=todos.filter(p=>!p.cancelado).map(p=>{
