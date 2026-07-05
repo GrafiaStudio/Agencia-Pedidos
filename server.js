@@ -97,6 +97,7 @@ try { db.exec("ALTER TABLE costos ADD COLUMN descripcion TEXT DEFAULT ''"); } ca
 try { db.exec("ALTER TABLE costos ADD COLUMN encargo_id TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("CREATE TABLE IF NOT EXISTS enc_items(id TEXT PRIMARY KEY,encargo_id TEXT REFERENCES encargos(id) ON DELETE CASCADE,cantidad TEXT DEFAULT '',detalle TEXT DEFAULT '',orden INTEGER DEFAULT 0)"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN es_cotizacion INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN costos_manual INTEGER DEFAULT 0"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario TEXT DEFAULT '0'"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE encargos ADD COLUMN valor_calc TEXT"); } catch(e){}
@@ -436,7 +437,7 @@ function pedidoCompleto(p){
   p.costos  =db.prepare('SELECT * FROM costos WHERE pedido_id=? ORDER BY creado').all(p.id);
   p.historial=db.prepare('SELECT * FROM historial WHERE pedido_id=? ORDER BY creado DESC').all(p.id);
   p.archivos =db.prepare('SELECT * FROM archivos WHERE pedido_id=? ORDER BY creado').all(p.id);
-  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago; p.es_cotizacion=!!p.es_cotizacion;
+  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago; p.es_cotizacion=!!p.es_cotizacion; p.costos_manual=!!p.costos_manual;
   encargos.forEach(enc=>{
     enc.valor_referencial=calcReferencialEncargo(enc);
     enc.valor_efectivo=calcValorEncargoEfectivo(enc);
@@ -830,6 +831,7 @@ app.post('/api/pedidos',(req,res)=>{
       const consumo=descontarStock(id,req.wsId);
       db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),id);
     }
+    if(b.costos_manual)db.prepare('UPDATE pedidos SET costos_manual=1 WHERE id=?').run(id);
     addHist(id,'Pedido creado',req.wsId);
     (b.pagos_nuevos||[]).forEach(pg=>addHist(id,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
     (b.precio_edits||[]).forEach(ed=>addHist(id,`PAM · Precio ajustado manualmente en "${ed.detalle}": sugerido ${ed.sugerido} → final ${ed.nuevo}${ed.dif?' (dif '+ed.dif+')':''}`,req.wsId));
@@ -850,8 +852,8 @@ app.put('/api/pedidos/:id',(req,res)=>{
     if(b.cancelado&&!p.cancelado)addHist(pid,'Pedido cancelado',req.wsId);
     (b.pagos_nuevos||[]).forEach(pg=>addHist(pid,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
     (b.precio_edits||[]).forEach(ed=>addHist(pid,`Precio editado en "${ed.detalle}": sugerido ${ed.sugerido} → ${ed.nuevo}`,req.wsId));
-    db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=? AND workspace_id=?`)
-      .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid,req.wsId);
+    db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,costos_manual=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=? AND workspace_id=?`)
+      .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.costos_manual!==undefined?(b.costos_manual?1:0):p.costos_manual),(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid,req.wsId);
     if(b.encargos!==undefined)saveEncargos(pid,b.encargos,req.wsId);
     if(b.pagos!==undefined){db.prepare('DELETE FROM pagos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.pagos||[]).forEach(pg=>db.prepare('INSERT INTO pagos(id,pedido_id,monto,monto_calc,fecha,tipo,nota,workspace_id)VALUES(?,?,?,?,?,?,?,?)').run(uid(),pid,pg.monto||'',normCalc(pg.monto),pg.fecha||hoy(req.wsId),pg.tipo||'efectivo',pg.nota||'',req.wsId));}
     if(b.costos!==undefined){db.prepare('DELETE FROM costos WHERE pedido_id=? AND workspace_id=?').run(pid,req.wsId);(b.costos||[]).forEach(c=>db.prepare('INSERT INTO costos(id,pedido_id,encargo_id,descripcion,cantidad,valor_unitario,valor_unitario_calc,monto,monto_calc,auto,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(uid(),pid,c.encargo_id||'',c.descripcion||'',c.cantidad||'',c.valor_unitario||'',normCalc(c.valor_unitario),c.monto||'',normCalc(c.monto),c.auto?1:0,req.wsId));}

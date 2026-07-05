@@ -1215,6 +1215,7 @@ let pedidos=[],clientes=[],productos=[];
 let filtroAct='todos',busq='';
 let editId=null,editCliId=null;
 let fEnc=[],fPag=[],fArch=[],fCostos=[];
+let fCostosManual=false; // B0.4: cuando el usuario toma control manual de los costos, no se autogeneran para este pedido
 let encCounter=0;
 let fValorFinalRaw='';
 
@@ -3524,6 +3525,8 @@ function costoTotalCostosArr(arr){
   return(arr||[]).reduce((a,c)=>a+(parseInt(String(c.valor_calc||0).replace(/\D/g,''))||0),0);
 }
 function recalcularCostosAutomaticos(){
+  // B0.4: si el usuario tomó control manual de los costos, NO regenerar (respeta lo que escribió a mano)
+  if(fCostosManual){renderCostosRes();return;}
   fCostos=fCostos.filter(c=>!c._auto);
   fEnc.forEach(e=>{
     (e.items||[]).forEach(it=>{
@@ -3554,9 +3557,16 @@ function recalcularCostosAutomaticos(){
   renderCostos();
 }
 function addCosto(){fCostos.push({id:uid(),descripcion:'',cantidad:'',valor_unitario:'',monto:''});renderCostos()}
-function remCosto(id){fCostos=fCostos.filter(x=>x.id!==id);renderCostos()}
+function remCosto(id){
+  const c=fCostos.find(x=>x.id===id);
+  // B0.4: borrar un costo automático = el usuario toma control manual (deja de regenerarse)
+  if(c&&c._auto)fCostosManual=true;
+  fCostos=fCostos.filter(x=>x.id!==id);renderCostos();
+}
 function setCostoVal(id,k,v){
   const c=fCostos.find(x=>x.id===id);
+  // B0.4: editar un costo automático lo vuelve manual y activa el modo manual del pedido
+  if(c&&c._auto){c._auto=false;fCostosManual=true;}
   if(c)c[k]=v;
   if(k==='cantidad'||k==='valor_unitario')recalcCostoTotal(id);
   renderCostosRes();
@@ -3635,8 +3645,12 @@ function blurCostoVal(el,id){
   const elp=document.getElementById('costprev-'+id);
   if(elp)elp.style.display='none';
 }
+function reactivarCostosAuto(){
+  if(!confirm('Se reemplazarán los costos actuales por los calculados automáticamente desde los insumos de los productos. ¿Continuar?'))return;
+  fCostos=[];fCostosManual=false;recalcularCostosAutomaticos();
+}
 function renderCostos(){
-  document.getElementById('costos-lista').innerHTML=fCostos.map(c=>`
+  document.getElementById('costos-lista').innerHTML=(fCostosManual?`<div style="font-size:10px;color:#8A6D1B;background:#FBF3D9;border:1px solid #EBD9A0;border-radius:9px;padding:7px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><i class="ti ti-hand-stop"></i> Costos en modo manual — los automáticos están desactivados para este pedido.</span><a onclick="reactivarCostosAuto()" style="cursor:pointer;font-weight:700;color:var(--teal-dk);white-space:nowrap">Volver a automáticos</a></div>`:'')+fCostos.map(c=>`
     <div class="costo-item">
       <div class="ac-wrap" style="flex:1"><input type="text" value="${c.descripcion||''}" placeholder="Descripción del costo…" oninput="setCostoVal('${c.id}','descripcion',this.value);acCosto('${c.id}',this.value)"><div class="ac-drop" id="cost-ac-drop-${c.id}"></div>${c._auto?'<div style="font-size:8px;font-weight:700;color:var(--teal-dk);margin-top:2px">Automático (insumos)</div>':''}</div>
       <input type="text" value="${c.cantidad||''}" placeholder="Cant." style="max-width:55px;width:100%" oninput="setCostoVal('${c.id}','cantidad',this.value)">
@@ -3695,7 +3709,7 @@ function renderHist(hist){
 
 /* ══ MODAL ══ */
 function resetForm(){
-  fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;fValorFinalRaw='';_pagosNuevos.clear();
+  fEnc=[];fPag=[];fArch=[];fCostos=[];fCostosManual=false;encCounter=0;editCliId=null;fValorFinalRaw='';_pagosNuevos.clear();
   ['f-nom','f-tel','f-fecha','f-notas','f-valor-final','f-cli-nit','f-cli-contacto','f-cli-direccion','f-cli-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
   ['ck-urg'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
   document.getElementById('f-estado-ciclo').value=CFG.estado_default_cotizacion?'cotizacion':'nuevo';
@@ -3737,6 +3751,7 @@ async function abrirEditar(id){
   fPag=JSON.parse(JSON.stringify(p.pagos||[]));_pagosNuevos.clear();
   fArch=JSON.parse(JSON.stringify(p.archivos||[]));
   fCostos=JSON.parse(JSON.stringify(p.costos||[])).map(c=>({...c,_auto:!!c.auto}));
+  fCostosManual=!!p.costos_manual;
   const fichaIds=[...new Set(fEnc.flatMap(e=>e.items.map(it=>it.ficha_id).filter(Boolean)))];
   if(fichaIds.length){
     const fichas=await Promise.all(fichaIds.map(fid=>api('GET',`/productos/${fid}`).catch(()=>null)));
@@ -3820,6 +3835,7 @@ async function guardar(){
     pagos:fPag,
     pagos_nuevos:collectPagosNuevos(),
     costos:fCostos.map(c=>({...c,auto:c._auto?1:0})),
+    costos_manual:fCostosManual,
     precio_edits:collectPrecioEdits(),
   };
   const errExpr=validarExpresionesBody(body);
