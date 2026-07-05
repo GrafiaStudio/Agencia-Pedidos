@@ -237,6 +237,19 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .var-md-badge{flex-shrink:0;font-size:9px;font-weight:800;background:var(--line);color:var(--slate);border-radius:20px;padding:1px 7px}
 .var-md-detail{min-width:0}
 @media(max-width:820px){.var-md{grid-template-columns:1fr}.var-md-list{position:static;flex-direction:row;flex-wrap:wrap}.var-md-item{width:auto}}
+/* B1.4 (CORR 001) — casillas compactas: costos y tramos como bloques que se acomodan a lo ancho */
+.var-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 2px}
+.var-chip{display:flex;align-items:center;gap:2px;background:var(--white);border:1px solid var(--line);border-radius:9px;padding:3px 5px}
+.var-chip:focus-within{border-color:#7B6EF6}
+.var-chip .chip-inp{border:none;background:transparent;font-size:11px;padding:4px 5px;width:118px;min-width:0;color:var(--navy)}
+.var-chip .chip-inp:focus{outline:none}
+.var-chip .chip-inp.chip-sm{width:44px;text-align:center}
+.var-chip .chip-inp.chip-val{width:78px;font-weight:700;border-left:1px solid var(--line);padding-left:8px}
+.chip-lbl{font-size:10px;color:var(--muted);padding:0 1px}
+.chip-x{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:2px;display:flex;align-items:center}
+.chip-x:hover{color:var(--red)}
+.chip-add{display:inline-flex;align-items:center;gap:4px;border:1px dashed #C9C2E6;background:transparent;color:var(--teal-dk);border-radius:9px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer}
+.chip-add:hover{border-color:#7B6EF6;background:#F6F4FD}
 .mhead-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .mhead-actions .btn-ghost,.mhead-actions .btn-danger{padding:8px 14px;font-size:11px}
 
@@ -2910,25 +2923,27 @@ function actualizarUtilidadVariante(vid){
   el.textContent='Costo de este nivel: '+fCOP(costo)+((!esGrupo&&precio>0)?(' · Utilidad: '+fCOP(precio-costo)):'');
 }
 function htmlCostosVar(v){
-  return `<table class="items-table"><tbody>
-    ${(v.costos||[]).map(c=>`<tr>
-      <td><input class="item-inp" type="text" value="${c.nombre||''}" placeholder="Ej: Fabricante" oninput="setCostoVariante('${v.id}','${c.id}','nombre',this.value)"></td>
-      <td style="width:110px"><input class="item-inp" type="text" value="${c.valor||''}" placeholder="$ 0" oninput="setCostoVariante('${v.id}','${c.id}','valor',this.value)"></td>
-      <td style="width:26px"><button class="item-del" onclick="remCostoVariante('${v.id}','${c.id}')"><i class="ti ti-x"></i></button></td>
-    </tr>`).join('')}
-  </tbody></table>
-  <button class="btn-add-row" onclick="addCostoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar costo</button>`;
+  return `<div class="var-chips">
+    ${(v.costos||[]).map(c=>`<div class="var-chip">
+      <input class="chip-inp" type="text" value="${String(c.nombre||'').replace(/"/g,'&quot;')}" placeholder="Concepto" oninput="setCostoVariante('${v.id}','${c.id}','nombre',this.value)">
+      <input class="chip-inp chip-val" type="text" value="${String(c.valor||'').replace(/"/g,'&quot;')}" placeholder="$ 0" oninput="setCostoVariante('${v.id}','${c.id}','valor',this.value)">
+      <button class="chip-x" title="Quitar" onclick="remCostoVariante('${v.id}','${c.id}')"><i class="ti ti-x"></i></button>
+    </div>`).join('')}
+    <button class="chip-add" onclick="addCostoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar costo</button>
+  </div>`;
 }
 function htmlTramosVar(v){
-  return `<table class="items-table"><tbody>
-    ${(v.tramos||[]).map(t=>`<tr>
-      <td style="width:70px"><input class="item-inp" type="text" value="${t.desde||''}" placeholder="Desde" oninput="setTramoVariante('${v.id}','${t.id}','desde',this.value)"></td>
-      <td style="width:70px"><input class="item-inp" type="text" value="${t.hasta||''}" placeholder="Hasta" oninput="setTramoVariante('${v.id}','${t.id}','hasta',this.value)"></td>
-      <td><input class="item-inp" type="text" value="${t.precio||''}" placeholder="$ 0" oninput="setTramoVariante('${v.id}','${t.id}','precio',this.value)"></td>
-      <td style="width:26px"><button class="item-del" onclick="remTramoVariante('${v.id}','${t.id}')"><i class="ti ti-x"></i></button></td>
-    </tr>`).join('')}
-  </tbody></table>
-  <button class="btn-add-row" onclick="addTramoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar tramo</button>`;
+  return `<div class="var-chips">
+    ${(v.tramos||[]).map(t=>`<div class="var-chip">
+      <span class="chip-lbl">De</span>
+      <input class="chip-inp chip-sm" type="text" value="${String(t.desde||'').replace(/"/g,'&quot;')}" placeholder="1" oninput="setTramoVariante('${v.id}','${t.id}','desde',this.value)">
+      <span class="chip-lbl">a</span>
+      <input class="chip-inp chip-sm" type="text" value="${String(t.hasta||'').replace(/"/g,'&quot;')}" placeholder="+" oninput="setTramoVariante('${v.id}','${t.id}','hasta',this.value)">
+      <input class="chip-inp chip-val" type="text" value="${String(t.precio||'').replace(/"/g,'&quot;')}" placeholder="$ 0" oninput="setTramoVariante('${v.id}','${t.id}','precio',this.value)">
+      <button class="chip-x" title="Quitar" onclick="remTramoVariante('${v.id}','${t.id}')"><i class="ti ti-x"></i></button>
+    </div>`).join('')}
+    <button class="chip-add" onclick="addTramoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar tramo</button>
+  </div>`;
 }
 function htmlNodoVariante(v,nivel){
   const esGrupo=!!(v.hijos&&v.hijos.length);
