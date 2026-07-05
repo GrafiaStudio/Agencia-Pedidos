@@ -2343,6 +2343,7 @@ function setHojaExtraItem(encId,itemId,extraIdx,on){
   recalcHojaItem(it);
   const elU=document.getElementById('itval-'+itemId);if(elU)elU.value=displayMoneyVal(it.valor_unitario);
   const elD=document.getElementById('itdet-'+itemId);if(elD){elD.value=it.detalle||'';autoTA(elD)}
+  updateItemTotalCell(encId,itemId);
   actualizarValorTotal();recalcularCostosAutomaticos();
 }
 function calcPrecioMedidas(ficha,ancho,alto){
@@ -2372,6 +2373,7 @@ function setMedidaItem(encId,itemId,campo,valor){
     const area=(it._fichaSel.medida_unidad==='m')?a:a*b;
     hint.textContent=(area>0)?(area+' '+suf+' → '+fCOP(precio)+' por pieza'):'';
   }
+  updateItemTotalCell(encId,itemId);
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
@@ -2475,6 +2477,7 @@ function setVarPickMulti(encId,itemId,parteId,opcionId,qtyStr){
   if(elU)elU.value=displayMoneyVal(it.valor_unitario);
   const elD=document.getElementById('itdet-'+itemId);
   if(elD){elD.value=it.detalle||'';autoTA(elD)}
+  updateItemTotalCell(encId,itemId);
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
