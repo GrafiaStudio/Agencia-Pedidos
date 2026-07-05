@@ -895,7 +895,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div>
         <label>Marcación</label>
-        <select id="f-estado-ciclo" onchange="aplicarVistaCotizacion()">
+        <select id="f-estado-ciclo" onchange="onEstadoCiclo()">
           <option value="nuevo">Pedido en curso</option>
           <option value="entregado">Entregado</option>
           <option value="cancelado">Cancelado</option>
@@ -913,6 +913,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     </div>
 
     <div class="fg"><label>Anotaciones generales</label><textarea id="f-notas" placeholder="Observaciones del pedido…" style="min-height:44px"></textarea></div>
+
+    <!-- CORR 006 — datos de cancelación (visible solo cuando Marcación = Cancelado) -->
+    <div id="sec-cancel" style="display:none;margin-top:6px;padding:12px 14px;border-radius:13px;background:var(--red-lt);border:1px solid #F3C9C9">
+      <div style="font-size:11px;font-weight:800;color:var(--red);margin-bottom:8px"><i class="ti ti-ban"></i> Cancelación del pedido</div>
+      <div class="fg"><label>Motivo de la cancelación</label><textarea id="f-cancel-motivo" placeholder="¿Por qué se canceló?" style="min-height:36px"></textarea></div>
+      <div class="ck-box" style="display:inline-flex;margin-top:8px"><input type="checkbox" id="f-cancel-reintegro" onchange="onReintegroChange()"><label for="f-cancel-reintegro">¿Se reintegró el dinero al cliente?</label></div>
+      <div id="f-cancel-monto-wrap" style="display:none;margin-top:8px;max-width:200px"><label style="font-size:10px;color:var(--muted)">Monto reintegrado</label><input type="text" id="f-cancel-monto" placeholder="$ 0"></div>
+      <div id="f-cancel-hint" style="font-size:10px;color:var(--muted);margin-top:8px"></div>
+    </div>
 
     <!-- ENCARGOS -->
     <div class="msec"><span class="tri"></span>Encargos</div>
@@ -3558,6 +3567,19 @@ function toggleCotiz(){
   }
   aplicarVistaCotizacion();
 }
+// CORR 006 — mostrar/ocultar el bloque de cancelación según la Marcación
+function onEstadoCiclo(){
+  aplicarVistaCotizacion();
+  const cancel=document.getElementById('f-estado-ciclo').value==='cancelado';
+  const sc=document.getElementById('sec-cancel');if(sc)sc.style.display=cancel?'block':'none';
+  if(cancel)onReintegroChange();
+}
+function onReintegroChange(){
+  const on=!!(document.getElementById('f-cancel-reintegro')||{}).checked;
+  const w=document.getElementById('f-cancel-monto-wrap');if(w)w.style.display=on?'block':'none';
+  const h=document.getElementById('f-cancel-hint');
+  if(h)h.textContent=on?'El monto devuelto se descuenta de tus activos (no afecta ingresos ni utilidades).':'El dinero recibido queda registrado como ingreso real — "cancelado sin reintegro" — para auditoría.';
+}
 function aplicarVistaCotizacion(){
   const esCotiz=esCotizacionModal();
   const sp=document.getElementById('sec-pagos'),sr=document.getElementById('sec-registro'),sa=document.getElementById('sec-cotiz-aviso');
@@ -3768,6 +3790,9 @@ function resetForm(){
   ['ck-urg'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
   document.getElementById('f-estado-ciclo').value='nuevo';
   const ckc=document.getElementById('ck-cotiz');if(ckc)ckc.checked=!!CFG.estado_default_cotizacion;
+  ['f-cancel-motivo','f-cancel-monto'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const crb=document.getElementById('f-cancel-reintegro');if(crb)crb.checked=false;
+  const scb=document.getElementById('sec-cancel');if(scb)scb.style.display='none';
   document.getElementById('ac-drop').style.display='none';
   document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: $0';
   document.getElementById('valor-ajustado').style.display='none';
@@ -3833,6 +3858,10 @@ async function abrirEditar(id){
   document.getElementById('ck-urg').checked=!!p.urgente;
   document.getElementById('f-estado-ciclo').value=p.cancelado?'cancelado':(p.entregado?'entregado':'nuevo');
   const ckc=document.getElementById('ck-cotiz');if(ckc)ckc.checked=!!p.es_cotizacion;
+  document.getElementById('f-cancel-motivo').value=p.cancel_motivo||'';
+  document.getElementById('f-cancel-reintegro').checked=!!p.cancel_reintegro;
+  document.getElementById('f-cancel-monto').value=p.cancel_monto||'';
+  onEstadoCiclo();
   aplicarVistaCotizacion();
   document.getElementById('m-tit').textContent=p.nombre;
   document.getElementById('m-ref').textContent='#'+p.ref+' · '+fd(p.fecha_pedido)+validezCotHTML(p);
@@ -3884,6 +3913,9 @@ async function guardar(){
     cancelado:document.getElementById('f-estado-ciclo').value==='cancelado',
     pendiente_pago:false,
     es_cotizacion:esCotizacionModal(),
+    cancel_motivo:document.getElementById('f-cancel-motivo').value.trim(),
+    cancel_reintegro:document.getElementById('f-cancel-reintegro').checked,
+    cancel_monto:document.getElementById('f-cancel-monto').value.trim(),
     fecha_entrega:document.getElementById('f-fecha').value,
     notas:document.getElementById('f-notas').value.trim(),
     valor_final:(fValorFinalRaw||'').trim(),

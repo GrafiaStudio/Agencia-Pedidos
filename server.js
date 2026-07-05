@@ -98,6 +98,10 @@ try { db.exec("ALTER TABLE costos ADD COLUMN encargo_id TEXT DEFAULT ''"); } cat
 try { db.exec("CREATE TABLE IF NOT EXISTS enc_items(id TEXT PRIMARY KEY,encargo_id TEXT REFERENCES encargos(id) ON DELETE CASCADE,cantidad TEXT DEFAULT '',detalle TEXT DEFAULT '',orden INTEGER DEFAULT 0)"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN es_cotizacion INTEGER DEFAULT 0"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN costos_manual INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cancel_motivo TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cancel_reintegro INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cancel_monto TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cancel_monto_calc TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE enc_items ADD COLUMN valor_unitario TEXT DEFAULT '0'"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN valor_final TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE encargos ADD COLUMN valor_calc TEXT"); } catch(e){}
@@ -440,7 +444,7 @@ function pedidoCompleto(p){
   p.costos  =db.prepare('SELECT * FROM costos WHERE pedido_id=? ORDER BY creado').all(p.id);
   p.historial=db.prepare('SELECT * FROM historial WHERE pedido_id=? ORDER BY creado DESC').all(p.id);
   p.archivos =db.prepare('SELECT * FROM archivos WHERE pedido_id=? ORDER BY creado').all(p.id);
-  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago; p.es_cotizacion=!!p.es_cotizacion; p.costos_manual=!!p.costos_manual;
+  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago; p.es_cotizacion=!!p.es_cotizacion; p.costos_manual=!!p.costos_manual; p.cancel_reintegro=!!p.cancel_reintegro;
   encargos.forEach(enc=>{
     enc.valor_referencial=calcReferencialEncargo(enc);
     enc.valor_efectivo=calcValorEncargoEfectivo(enc);
@@ -449,6 +453,10 @@ function pedidoCompleto(p){
   p.valor_total=valorOficialPedido(p,p.valor_sugerido);
   if(p.cliente_id){const cli=db.prepare('SELECT nit,email,direccion,contacto FROM clientes WHERE id=?').get(p.cliente_id);if(cli){p.cli_nit=cli.nit||'';p.cli_email=cli.email||'';p.cli_direccion=cli.direccion||'';p.cli_contacto=cli.contacto||'';}}
   return p;
+}
+// CORR 006 — texto de historial para una cancelación (motivo + reintegro sí/no)
+function txtCancelacion(motivo,reint,monto){
+  return 'Pedido cancelado'+((motivo||'').trim()?` — Motivo: ${String(motivo).trim()}`:'')+(reint?` · Reintegro al cliente: Sí${(monto||'').trim()?' ('+String(monto).trim()+')':''}`:' · Sin reintegro (el dinero recibido queda como ingreso real, para auditoría)');
 }
 
 function addHist(pid,txt,wsId){
@@ -835,7 +843,13 @@ app.post('/api/pedidos',(req,res)=>{
       db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),id);
     }
     if(b.costos_manual)db.prepare('UPDATE pedidos SET costos_manual=1 WHERE id=?').run(id);
+    // CORR 006 — datos de cancelación
+    if(b.cancel_motivo!==undefined||b.cancel_reintegro!==undefined||b.cancel_monto!==undefined){
+      db.prepare('UPDATE pedidos SET cancel_motivo=?,cancel_reintegro=?,cancel_monto=?,cancel_monto_calc=? WHERE id=?')
+        .run(b.cancel_motivo||'',b.cancel_reintegro?1:0,b.cancel_monto||'',normCalc(String(b.cancel_monto||'').replace(/[$\s]/g,'')),id);
+    }
     addHist(id,'Pedido creado',req.wsId);
+    if(b.cancelado)addHist(id,txtCancelacion(b.cancel_motivo,b.cancel_reintegro,b.cancel_monto),req.wsId);
     (b.pagos_nuevos||[]).forEach(pg=>addHist(id,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
     (b.precio_edits||[]).forEach(ed=>addHist(id,`PAM · Precio ajustado manualmente en "${ed.detalle}": sugerido ${ed.sugerido} → final ${ed.nuevo}${ed.dif?' (dif '+ed.dif+')':''}`,req.wsId));
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
@@ -852,7 +866,12 @@ app.put('/api/pedidos/:id',(req,res)=>{
     const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id,req.wsId,{nit:b.cli_nit,email:b.cli_email,direccion:b.cli_direccion,contacto:b.cli_contacto});
     // Log cambios de estado checkboxes
     if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado',req.wsId);
-    if(b.cancelado&&!p.cancelado)addHist(pid,'Pedido cancelado',req.wsId);
+    if(b.cancelado&&!p.cancelado)addHist(pid,txtCancelacion(b.cancel_motivo,b.cancel_reintegro,b.cancel_monto),req.wsId);
+    // CORR 006 — persistir datos de cancelación
+    if(b.cancel_motivo!==undefined||b.cancel_reintegro!==undefined||b.cancel_monto!==undefined){
+      db.prepare('UPDATE pedidos SET cancel_motivo=?,cancel_reintegro=?,cancel_monto=?,cancel_monto_calc=? WHERE id=? AND workspace_id=?')
+        .run(b.cancel_motivo||'',b.cancel_reintegro?1:0,b.cancel_monto||'',normCalc(String(b.cancel_monto||'').replace(/[$\s]/g,'')),pid,req.wsId);
+    }
     (b.pagos_nuevos||[]).forEach(pg=>addHist(pid,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
     (b.precio_edits||[]).forEach(ed=>addHist(pid,`Precio editado en "${ed.detalle}": sugerido ${ed.sugerido} → ${ed.nuevo}`,req.wsId));
     db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,costos_manual=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=? AND workspace_id=?`)
