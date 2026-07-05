@@ -3915,7 +3915,8 @@ function regAplicarPersonalizado(){
   buildRegPanel(regTabAct);
 }
 function regPedidosFiltrados(){
-  const todos=window._rPeds||[];
+  // Una cotización es SOLO información: no es ingreso ni genera abonos/saldos/costos en Registros.
+  const todos=(window._rPeds||[]).filter(p=>!p.es_cotizacion);
   if(!regFiltro.desde&&!regFiltro.hasta)return todos;
   return todos.filter(p=>{
     const f=p.fecha_pedido||'';
