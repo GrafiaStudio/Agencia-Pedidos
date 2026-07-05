@@ -2255,6 +2255,14 @@ function collectPrecioEdits(){
   }));
   return out;
 }
+// B0.2 — abonos nuevos de la sesión, para que el historial los registre (incluso el mismo día del pedido)
+let _pagosNuevos=new Set();
+function collectPagosNuevos(){
+  return fPag.filter(p=>_pagosNuevos.has(p.id)&&(evalExpr(p.monto)||0)>0).map(p=>{
+    const m=METODOS_PAGO_CATALOGO.find(x=>x.key===p.tipo);
+    return {monto:fCOP(evalExpr(p.monto)||0),forma:(m?m.label:p.tipo)||'—',nota:(p.nota||'').slice(0,80)};
+  });
+}
 let _acItemResults={};
 function detectarPrecioEscalonado(rangos,cantidad){
   if(!rangos||!rangos.length)return null;
@@ -3435,7 +3443,7 @@ function renderProgresoCard(prog){
 function addPago(){
   const sel=document.getElementById('f-estado-ciclo');
   if(sel&&sel.value==='cotizacion'){sel.value='nuevo';aplicarVistaCotizacion();toast('La cotización pasó a pedido (recibió un abono)');}
-  fPag.push({id:uid(),monto:'',fecha:hoy(),tipo:'efectivo',nota:''});renderPagos();
+  const nid=uid();fPag.push({id:nid,monto:'',fecha:hoy(),tipo:'efectivo',nota:''});_pagosNuevos.add(nid);renderPagos();
 }
 function remPago(id){fPag=fPag.filter(x=>x.id!==id);renderPagos()}
 function setPagVal(id,k,v){const p=fPag.find(x=>x.id===id);if(p)p[k]=v;if(k==='monto'){renderPagRes();previewPago(id,v)}}
@@ -3684,7 +3692,7 @@ function renderHist(hist){
 
 /* ══ MODAL ══ */
 function resetForm(){
-  fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;fValorFinalRaw='';
+  fEnc=[];fPag=[];fArch=[];fCostos=[];encCounter=0;editCliId=null;fValorFinalRaw='';_pagosNuevos.clear();
   ['f-nom','f-tel','f-fecha','f-notas','f-valor-final','f-cli-nit','f-cli-contacto','f-cli-direccion','f-cli-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
   ['ck-urg'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
   document.getElementById('f-estado-ciclo').value=CFG.estado_default_cotizacion?'cotizacion':'nuevo';
@@ -3723,7 +3731,7 @@ async function abrirEditar(id){
   // Asegurar items en cada encargo
   fEnc.forEach(e=>{if(!e.items||!e.items.length)e.items=[{id:uid(),cantidad:'',detalle:'',valor_unitario:''}]});
   encCounter=fEnc.length?Math.max(...fEnc.map(e=>e.numero||0)):0;
-  fPag=JSON.parse(JSON.stringify(p.pagos||[]));
+  fPag=JSON.parse(JSON.stringify(p.pagos||[]));_pagosNuevos.clear();
   fArch=JSON.parse(JSON.stringify(p.archivos||[]));
   fCostos=JSON.parse(JSON.stringify(p.costos||[])).map(c=>({...c,_auto:!!c.auto}));
   const fichaIds=[...new Set(fEnc.flatMap(e=>e.items.map(it=>it.ficha_id).filter(Boolean)))];
@@ -3807,6 +3815,7 @@ async function guardar(){
     valor_final:(fValorFinalRaw||'').trim(),
     encargos:fEnc,
     pagos:fPag,
+    pagos_nuevos:collectPagosNuevos(),
     costos:fCostos.map(c=>({...c,auto:c._auto?1:0})),
     precio_edits:collectPrecioEdits(),
   };
@@ -3815,7 +3824,7 @@ async function guardar(){
   try{
     if(editId){await api('PUT',`/pedidos/${editId}`,body);toast('Pedido actualizado ✓')}
     else{await api('POST','/pedidos',body);toast('Pedido creado ✓')}
-    _preciosEditados.clear();
+    _preciosEditados.clear();_pagosNuevos.clear();
     cerrar();
     await Promise.all([cargarStats(),cargarPedidos()]);
   }catch(e){toast('Error: '+e.message,false);console.error(e)}

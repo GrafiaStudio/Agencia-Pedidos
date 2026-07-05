@@ -831,6 +831,7 @@ app.post('/api/pedidos',(req,res)=>{
       db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),id);
     }
     addHist(id,'Pedido creado',req.wsId);
+    (b.pagos_nuevos||[]).forEach(pg=>addHist(id,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
     (b.precio_edits||[]).forEach(ed=>addHist(id,`PAM · Precio ajustado manualmente en "${ed.detalle}": sugerido ${ed.sugerido} → final ${ed.nuevo}${ed.dif?' (dif '+ed.dif+')':''}`,req.wsId));
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
   }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
@@ -847,6 +848,7 @@ app.put('/api/pedidos/:id',(req,res)=>{
     // Log cambios de estado checkboxes
     if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado',req.wsId);
     if(b.cancelado&&!p.cancelado)addHist(pid,'Pedido cancelado',req.wsId);
+    (b.pagos_nuevos||[]).forEach(pg=>addHist(pid,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
     (b.precio_edits||[]).forEach(ed=>addHist(pid,`Precio editado en "${ed.detalle}": sugerido ${ed.sugerido} → ${ed.nuevo}`,req.wsId));
     db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=? AND workspace_id=?`)
       .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid,req.wsId);
