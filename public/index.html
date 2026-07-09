@@ -1159,7 +1159,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div class="msec"><span class="tri"></span>Variantes</div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Cada versión con su propio precio y sus propios costos. Ej: Retablo 10×15 → $15.000 (cuesta fabricante $3.000 + vinilo $3.000 + laminado $1.000). El cliente elige una al pedir, y entran su precio y sus costos. Los Insumos de arriba (si pones alguno) son costos globales que aplican a todas las variantes.</div>
       <div id="prod-variantes-body"></div>
-      <button class="btn-add-row" onclick="addVariante()"><i class="ti ti-plus"></i>Agregar variante</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn-add-row" onclick="addVariante()"><i class="ti ti-plus"></i>Agregar variante con precio</button>
+        <button class="btn-add-row" onclick="addVarianteInformativa()"><i class="ti ti-list-check"></i>Agregar variable informativa (sin costo)</button>
+      </div>
     </div>
 
     <div id="prod-sec-escalonado" style="display:none">
@@ -2513,12 +2516,12 @@ function renderVarSelectsHTML(encId,it){
     if(parte.hijos&&parte.hijos.length){
       if(parte.multi){
         const mapa=(picks[parte.id]&&typeof picks[parte.id]==='object')?picks[parte.id]:{};
-        html+=`<div style="display:flex;flex-direction:column;gap:5px">${parte.hijos.map(op=>`<label style="display:flex;align-items:center;gap:6px;font-size:10px"><input class="item-inp" type="number" min="0" style="width:44px" value="${parseInt(mapa[op.id],10)||''}" placeholder="0" oninput="setVarPickMulti('${encId}','${it.id}','${parte.id}','${op.id}',this.value)"><span>${op.nombre} <span style="color:var(--muted)">(${fCOP(varPrecioBaseFE(op))})</span></span></label>`).join('')}</div>`;
+        html+=`<div style="display:flex;flex-direction:column;gap:5px">${parte.hijos.map(op=>`<label style="display:flex;align-items:center;gap:6px;font-size:10px"><input class="item-inp" type="number" min="0" style="width:44px" value="${parseInt(mapa[op.id],10)||''}" placeholder="0" oninput="setVarPickMulti('${encId}','${it.id}','${parte.id}','${op.id}',this.value)"><span>${op.nombre}${parte.informativa?'':` <span style="color:var(--muted)">(${fCOP(varPrecioBaseFE(op))})</span>`}</span></label>`).join('')}</div>`;
       }else{
         const val=picks[parte.id]||'';
         html+=`<select class="item-inp" style="width:100%" onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.value)">
             <option value="">— ninguno —</option>
-            ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre} — ${fCOP(varPrecioBaseFE(h))}</option>`).join('')}
+            ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre}${parte.informativa?'':` — ${fCOP(varPrecioBaseFE(h))}`}</option>`).join('')}
           </select>`;
       }
     }else{
@@ -2879,8 +2882,8 @@ let varColapsadas=new Set();
 function toggleVarCard(id){if(varColapsadas.has(id))varColapsadas.delete(id);else varColapsadas.add(id);renderVariantes()}
 let varItemPlegados=new Set();
 function toggleVarItem(encId,itemId){if(varItemPlegados.has(itemId))varItemPlegados.delete(itemId);else varItemPlegados.add(itemId);renderEncItems(encId)}
-function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'precio',piezas:''}}
-function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',
+function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'precio',piezas:'',informativa:false}}
+function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,
   costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
   tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
   hijos:(v.hijos||[]).map(clonarNodoVar)}}
@@ -2895,6 +2898,7 @@ function duplicarVariante(id){
   buscar(fProdVariantes);renderVariantes();
 }
 function addVariante(){const n=nodoVarNuevo();fProdVariantes.push(n);varSel=n.id;varColapsadas.delete(n.id);renderVariantes()}
+function addVarianteInformativa(){const n=nodoVarNuevo();n.informativa=true;n.hijos=[nodoVarNuevo()];fProdVariantes.push(n);varSel=n.id;varColapsadas.delete(n.id);renderVariantes()}
 function addSubVariante(vid){const v=buscarNodoVar(vid);if(v){v.hijos=v.hijos||[];v.hijos.push(nodoVarNuevo());renderVariantes()}}
 function remVariante(id){quitarNodoVar(id);renderVariantes()}
 function setVariante(id,k,v){const c=buscarNodoVar(id);if(c){c[k]=v;if(k==='precio')actualizarUtilidadVariante(id)}}
@@ -2937,7 +2941,26 @@ function htmlTramosVar(v){
     <button class="chip-add" onclick="addTramoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar tramo</button>
   </div>`;
 }
+// B1.5 (CORR 002) — variable INFORMATIVA (sin costo): solo nombre + lista simple de opciones
+function htmlNodoInformativa(v){
+  const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  const ops=v.hijos||[];
+  return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--white)">
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div style="flex:1"><label style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Variable informativa · sin costo</label><input class="item-inp" type="text" value="${esc(v.nombre)}" placeholder="Ej: Talla" oninput="setVariante('${v.id}','nombre',this.value)"></div>
+      <button class="item-del" title="Duplicar" onclick="duplicarVariante('${v.id}')" style="color:var(--teal)"><i class="ti ti-copy"></i></button>
+      <button class="item-del" title="Eliminar" onclick="remVariante('${v.id}')"><i class="ti ti-trash"></i></button>
+    </div>
+    <label class="ck-box" style="display:inline-flex;gap:6px;margin:10px 0 6px"><input type="checkbox" ${v.multi?'checked':''} onchange="setVarMulti('${v.id}',this.checked)"><span style="font-size:10px">Permite elegir varias opciones (ej. varios colores). Apagado = se elige una sola (ej. una talla).</span></label>
+    <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:2px 0 5px">Opciones</div>
+    <div class="var-chips">
+      ${ops.map(o=>`<div class="var-chip"><input class="chip-inp" type="text" value="${esc(o.nombre)}" placeholder="Ej: M" oninput="setVariante('${o.id}','nombre',this.value)"><button class="chip-x" title="Quitar" onclick="remVariante('${o.id}')"><i class="ti ti-x"></i></button></div>`).join('')}
+      <button class="chip-add" onclick="addSubVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar opción</button>
+    </div>
+  </div>`;
+}
 function htmlNodoVariante(v,nivel){
+  if(nivel===1&&v.informativa)return htmlNodoInformativa(v);
   const esGrupo=!!(v.hijos&&v.hijos.length);
   const sub=nivel<2;
   const colapsado=varColapsadas.has(v.id);
@@ -2987,7 +3010,7 @@ function renderVariantes(){
   const sel=fProdVariantes.find(v=>v.id===varSel);
   cont.innerHTML=`<div class="var-md">
     <div class="var-md-list">
-      ${fProdVariantes.map(v=>`<button type="button" class="var-md-item${v.id===varSel?' active':''}" onclick="setVarSel('${v.id}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${String(v.nombre||'(sin nombre)').replace(/</g,'&lt;')}</span>${(v.hijos&&v.hijos.length)?`<span class="var-md-badge">${v.hijos.length}</span>`:''}</button>`).join('')}
+      ${fProdVariantes.map(v=>`<button type="button" class="var-md-item${v.id===varSel?' active':''}" onclick="setVarSel('${v.id}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${String(v.nombre||'(sin nombre)').replace(/</g,'&lt;')}</span>${v.informativa?`<span class="var-md-badge" style="background:#EDE9FB;color:#6A5AE0">info</span>`:((v.hijos&&v.hijos.length)?`<span class="var-md-badge">${v.hijos.length}</span>`:'')}</button>`).join('')}
     </div>
     <div class="var-md-detail">${htmlNodoVariante(sel,1)}</div>
   </div>`;
@@ -2995,13 +3018,13 @@ function renderVariantes(){
   walk([sel]);
 }
 function cargarNodoVar(v){
-  return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',
+  return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,
     costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
     tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
     hijos:(v.hijos||[]).map(cargarNodoVar)};
 }
 function serializarNodoVar(v){
-  return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo:v.modo==='hoja'?'hoja':'precio',piezas:parseInt(v.piezas,10)||null,
+  return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo:v.modo==='hoja'?'hoja':'precio',piezas:parseInt(v.piezas,10)||null,informativa:v.informativa?1:0,
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),
     tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
     hijos:(v.hijos||[]).map(serializarNodoVar)};
@@ -3414,8 +3437,15 @@ function validarProductoBody(b){
   }
   if(b.tipo_precio==='variantes'){
     if(!b.variantes||!b.variantes.length)return'Agrega al menos una variante';
-    const valNodo=(v,etiq)=>{
+    const valNodo=(v,etiq,info)=>{
       if(!String(v.nombre||'').trim())return`Variante ${etiq}: escribe un nombre`;
+      // B1.5 — variable informativa: solo requiere nombre + al menos una opción con nombre (sin precio)
+      if(v.informativa){
+        if(!v.hijos||!v.hijos.length)return`Variable "${v.nombre}": agrega al menos una opción`;
+        for(let j=0;j<v.hijos.length;j++){const e=valNodo(v.hijos[j],etiq+'.'+(j+1),true);if(e)return e}
+        return null;
+      }
+      if(info)return null; // opción de variable informativa: solo el nombre (ya validado)
       if(v.hijos&&v.hijos.length){
         for(let j=0;j<v.hijos.length;j++){const e=valNodo(v.hijos[j],etiq+'.'+(j+1));if(e)return e}
       }else if(v.modo==='hoja'){

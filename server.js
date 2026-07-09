@@ -263,6 +263,7 @@ try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN parent_id TEXT DEFAULT ''"
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN multi INTEGER DEFAULT 0"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN modo TEXT DEFAULT 'precio'"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN piezas INTEGER"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN informativa INTEGER DEFAULT 0"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -725,8 +726,15 @@ function validarFicha(b,wsId,fid){
   }
   if(b.tipo_precio==='variantes'){
     if(!Array.isArray(b.variantes)||!b.variantes.length)errores.push('Un producto por variantes necesita al menos una variante');
-    const validarNodo=(v,etiq)=>{
+    const validarNodo=(v,etiq,info)=>{
       if(!String(v.nombre||'').trim())errores.push(`Variante ${etiq}: escribe un nombre`);
+      // B1.5 — variable informativa: opciones sin precio (solo nombre)
+      if(v.informativa){
+        if(!Array.isArray(v.hijos)||!v.hijos.length)errores.push(`Variable "${v.nombre}": agrega al menos una opción`);
+        else v.hijos.forEach((h,j)=>validarNodo(h,etiq+'.'+(j+1),true));
+        return;
+      }
+      if(info)return; // opción informativa: solo nombre
       const tieneHijos=Array.isArray(v.hijos)&&v.hijos.length;
       if(tieneHijos){
         v.hijos.forEach((h,j)=>validarNodo(h,etiq+'.'+(j+1)));
@@ -1204,8 +1212,8 @@ function guardarVariantes(fichaId,variantes,wsId){
   const insertarNodo=(v,parentId,i)=>{
     const id=v.id||uid();
     const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)}));
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,v.modo==='hoja'?'hoja':'precio',Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i);
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,v.modo==='hoja'?'hoja':'precio',Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0);
     (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));
   };
   (variantes||[]).forEach((v,i)=>insertarNodo(v,'',i));
@@ -1215,6 +1223,7 @@ function arbolVariantes(filas){
     try{v.costos=JSON.parse(v.costos||'[]')}catch(e){v.costos=[]}
     try{v.tramos=JSON.parse(v.tramos||'[]')}catch(e){v.tramos=[]}
     v.multi=!!v.multi;
+    v.informativa=!!v.informativa;
     v.hijos=[];
   });
   const porId={}; filas.forEach(v=>porId[v.id]=v);
