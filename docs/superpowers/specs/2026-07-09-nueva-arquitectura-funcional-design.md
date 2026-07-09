@@ -121,16 +121,17 @@ roles(
 - Tras confirmar, vendedores **no** editan cliente; solo roles autorizados desde módulo Clientes.
 - Clientes: nunca eliminar, solo archivar/reactivar (ya hay `archivado`).
 
-## Decisiones abiertas (confirmar antes del plan de Fase 1)
-1. **Login:** ¿el propietario define su contraseña en el primer arranque, o usamos el `APP_PIN`
-   actual como contraseña inicial del admin y ya?
-2. **Alcance de la Fase 1:** ¿construimos el catálogo de permisos **completo** (los ~15 del pilar
-   11) de una, o arrancamos con un set mínimo (crear/editar pedidos, ver costos, admin) y crecemos?
-3. **"Cambio importante" para versionar:** ¿toda edición crea versión, o solo campos clave (valor,
-   ítems, cliente)? (afecta cuánto crece la base).
-4. **Responsable de producción:** ¿se asigna a nivel de **pedido**, de **encargo** o de **ítem**?
-5. **Compatibilidad móvil:** el pilar 10 menciona "cada empleado descargará la aplicación". Hoy es
-   web (Railway). ¿El alcance incluye app instalable (PWA) o seguimos 100% web por ahora?
+## Decisiones tomadas (2026-07-09, confirmadas por el usuario)
+1. **Login inicial:** ✅ el `APP_PIN` actual se usa como **contraseña inicial** de la cuenta admin
+   (cero fricción; se puede cambiar después). No se pide crear contraseña en el primer arranque.
+2. **Alcance de permisos Fase 1:** ✅ **set mínimo y crecer** — arrancar con permisos clave
+   (crear/editar pedidos, ver costos, admin) y agregar el resto en fases siguientes.
+3. **Versionado:** ✅ **solo cambios clave** (valor, ítems, cliente) crean versión — no toda edición.
+4. **Responsable de producción:** ⏸️ se decide en la Fase 4 (no bloquea la Fase 1).
+5. **Plataforma:** ✅ **seguir 100% web** (Railway) por ahora; PWA/instalable queda para después.
+
+Detalle de la Fase 1 con estas decisiones incorporadas:
+`specs/2026-07-09-fase1-usuarios-roles-design.md`.
 
 ## Qué NO incluye este roadmap
 - Rediseño visual del PDF (pendiente aparte, sesión dedicada — ver Feed Back 2).
