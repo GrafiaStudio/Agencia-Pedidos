@@ -170,7 +170,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
   activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_produccion','gestionar_produccion','consumir_inventario','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
 const ENC_ESTADOS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 function permisosDeRol(rol){
   if(!rol) return {};
@@ -1338,6 +1338,45 @@ app.get('/api/stats',(req,res)=>{
   const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
   const cotizaciones=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND es_cotizacion=1").get(wsId).n;
   res.json({activos,urgentes,listos,clientes,pendPago,cotizaciones});
+});
+
+// ── DASHBOARD EJECUTIVO (v3.0 Fase 6) — solo lectura, agregaciones ──
+app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
+  const wsId=req.wsId; const hoyStr=hoy(wsId);
+  const periodo=['hoy','semana','mes'].includes(req.query.periodo)?req.query.periodo:'hoy';
+  // KPIs
+  const activos=db.prepare("SELECT COUNT(*) n FROM pedidos WHERE workspace_id=? AND archivado=0 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
+  const urgentes=db.prepare("SELECT COUNT(*) n FROM pedidos WHERE workspace_id=? AND archivado=0 AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
+  const entregasHoy=db.prepare("SELECT COUNT(*) n FROM pedidos WHERE workspace_id=? AND archivado=0 AND entregado=0 AND cancelado=0 AND es_cotizacion=0 AND fecha_entrega=?").get(wsId,hoyStr).n;
+  const cotPeds=db.prepare("SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND es_cotizacion=1 AND cancelado=0").all(wsId).map(pedidoCompleto);
+  const cotValor=cotPeds.reduce((a,p)=>a+(p.valor_total||0),0);
+  // Finanzas del período (ingresos = pagos por fecha; costos = por fecha de registro; solo pedidos vivos)
+  const desde = periodo==='hoy'?hoyStr : periodo==='semana'
+    ? db.prepare("SELECT date(?, '-6 days') d").get(hoyStr).d
+    : db.prepare("SELECT date(?, 'start of month') d").get(hoyStr).d;
+  const ingresos=db.prepare(`SELECT COALESCE(SUM(CAST(pg.monto_calc AS INTEGER)),0) s FROM pagos pg JOIN pedidos p ON p.id=pg.pedido_id
+    WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND pg.fecha>=? AND pg.fecha<=?`).get(wsId,desde,hoyStr).s;
+  // Costos por fecha del pedido (los registros de costos se reescriben al editar → su 'creado' no es confiable)
+  const costos=db.prepare(`SELECT COALESCE(SUM(CAST(c.monto_calc AS INTEGER)),0) s FROM costos c JOIN pedidos p ON p.id=c.pedido_id
+    WHERE c.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.fecha_pedido>=? AND p.fecha_pedido<=?`).get(wsId,desde,hoyStr).s;
+  const utilidad=ingresos-costos;
+  const margen=ingresos>0?Math.round(utilidad*100/ingresos):0;
+  // Pedidos recientes (últimos 5, con valor oficial)
+  const recientes=db.prepare("SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 ORDER BY creado DESC LIMIT 5").all(wsId)
+    .map(pedidoCompleto).map(p=>({id:p.id,ref:p.ref,nombre:p.nombre,entregado:p.entregado,cancelado:p.cancelado,cerrado:!!p.cerrado,es_cotizacion:p.es_cotizacion,urgente:p.urgente,valor_total:p.valor_total||0,pagado:(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0),encargos:(p.encargos||[]).map(e=>({estado:e.estado})),fecha_pedido:p.fecha_pedido}));
+  // Entregas próximas (7 días)
+  const hasta=db.prepare("SELECT date(?, '+7 days') d").get(hoyStr).d;
+  const entregas=db.prepare(`SELECT id,ref,nombre,fecha_entrega,urgente FROM pedidos WHERE workspace_id=? AND archivado=0
+    AND entregado=0 AND cancelado=0 AND es_cotizacion=0 AND fecha_entrega>=? AND fecha_entrega<=? ORDER BY fecha_entrega ASC LIMIT 8`).all(wsId,hoyStr,hasta);
+  // Producción: encargos por estado (pedidos activos)
+  const prodRows=db.prepare(`SELECT e.estado, COUNT(*) n FROM encargos e JOIN pedidos p ON p.id=e.pedido_id
+    WHERE e.workspace_id=? AND p.archivado=0 AND p.entregado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.cerrado=0 GROUP BY e.estado`).all(wsId);
+  const produccion={}; ENC_ESTADOS.forEach(s=>produccion[s]=0);
+  prodRows.forEach(r=>{ const s=ENC_ESTADOS.includes(r.estado)?r.estado:'Nuevo'; produccion[s]+=r.n; });
+  // Actividad reciente (historial cross-pedidos)
+  const actividad=db.prepare(`SELECT h.texto,h.usuario_nombre,h.creado,p.ref FROM historial h JOIN pedidos p ON p.id=h.pedido_id
+    WHERE h.workspace_id=? ORDER BY h.creado DESC LIMIT 8`).all(wsId);
+  res.json({hoy:hoyStr,periodo,kpis:{activos,urgentes,entregasHoy,cotizaciones:cotPeds.length,cotValor},finanzas:{desde,ingresos,costos,utilidad,margen},recientes,entregas,produccion,actividad});
 });
 
 // Export CSV

@@ -222,6 +222,44 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pcx-stk-add button:hover{background:var(--navy2)}
 .pcx-stk-add button:disabled{opacity:.4;cursor:default}
 
+/* DASHBOARD (Fase 6) */
+.dash-hello{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.dash-hi{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
+.dash-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.dash-periodo{display:flex;gap:4px}
+.dash-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.dash-kpi{background:linear-gradient(180deg,#FDFEFF,#F3F7FC);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:box-shadow .14s,transform .14s;border:1px solid transparent}
+.dash-kpi:hover{box-shadow:var(--sh-lg);transform:translateY(-2px)}
+.dash-kpi .ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.dash-kpi .num{font-size:26px;font-weight:700;color:var(--navy);line-height:1;letter-spacing:-.02em}
+.dash-kpi .lbl{font-size:10px;font-weight:700;color:var(--slate)}
+.dash-kpi .sub{font-size:9.5px;color:var(--muted)}
+.dash-kpi.k-nav{background:var(--navy);border-color:var(--navy)}
+.dash-kpi.k-nav .num{color:#fff}.dash-kpi.k-nav .lbl{color:rgba(255,255,255,.55)}.dash-kpi.k-nav .sub{color:rgba(255,255,255,.35)}
+.dash-fin{background:linear-gradient(180deg,#FDFEFF,#F3F7FC);border-radius:var(--r-lg);box-shadow:var(--sh);padding:15px 20px;margin-bottom:14px;display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+.dash-fin .tit{font-size:11px;font-weight:800;color:var(--navy);letter-spacing:.02em;display:flex;align-items:center;gap:7px}
+.dash-fin .fm{display:flex;align-items:center;gap:10px}
+.dash-fin .fm .fico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.dash-fin .fm .fv{font-size:17px;font-weight:700;color:var(--navy);line-height:1.1}
+.dash-fin .fm .fl{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.dash-fin .marg{margin-left:auto;text-align:right}
+.dash-fin .marg .fv{font-size:20px}
+.dash-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:14px;align-items:start}
+@media(max-width:1100px){.dash-grid{grid-template-columns:1fr}}
+.dash-row{display:flex;align-items:center;gap:9px;padding:8px 2px;border-bottom:1px solid var(--line-lt);cursor:pointer;border-radius:7px}
+.dash-row:hover{background:rgba(91,127,166,.06)}
+.dash-row:last-child{border-bottom:none}
+.dash-row .rref{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);flex-shrink:0;width:44px}
+.dash-row .rnom{font-size:11.5px;font-weight:700;color:var(--navy);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dash-row .rval{font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap}
+.dash-act{display:flex;gap:9px;padding:7px 2px;border-bottom:1px solid var(--line-lt);align-items:flex-start}
+.dash-act:last-child{border-bottom:none}
+.dash-act .aico{width:24px;height:24px;border-radius:50%;background:var(--teal-lt);color:var(--teal-dk);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:1px}
+.dash-act .atxt{font-size:10.5px;color:var(--navy);line-height:1.4;min-width:0}
+.dash-act .atxt b{font-weight:700}
+.dash-act .asub{font-size:9px;color:var(--muted);margin-top:1px}
+.dash-empty{font-size:10.5px;color:var(--muted);padding:10px 2px}
+
 /* Tags de categoría */
 .tags{display:flex;gap:3px;flex-wrap:wrap;margin:4px 0 2px}
 .ttag{font-size:8px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;color:#fff}
@@ -624,6 +662,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   </div>
   <nav class="sb-nav">
     <div class="nav-sec">Principal</div>
+    <button class="nav-item" data-view="dashboard" data-perm="ver_dashboard" onclick="showView('dashboard')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
     <button class="nav-item active" data-view="pedidos" onclick="showView('pedidos')"><i class="ti ti-clipboard-list"></i>Pedidos<span class="nb g" id="sb-act">0</span></button>
     <button class="nav-item" data-view="clientes" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
     <button class="nav-item" data-view="registros" data-perm="ver_registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
@@ -661,6 +700,37 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   <div class="content">
 
     <!-- PEDIDOS -->
+    <!-- DASHBOARD (Fase 6) -->
+    <div id="view-dashboard" class="view">
+      <div class="dash-hello">
+        <div>
+          <div class="dash-hi" id="dash-hi">¡Hola!</div>
+          <div class="dash-sub">Aquí tienes un resumen de lo que ocurre hoy en tu negocio.</div>
+        </div>
+        <div class="dash-periodo">
+          <button class="pill" data-per="hoy" onclick="dashSetPeriodo('hoy')">Hoy</button>
+          <button class="pill" data-per="semana" onclick="dashSetPeriodo('semana')">7 días</button>
+          <button class="pill" data-per="mes" onclick="dashSetPeriodo('mes')">Mes</button>
+        </div>
+      </div>
+      <div id="dash-kpis" class="dash-kpis"></div>
+      <div id="dash-fin" class="dash-fin"></div>
+      <div class="dash-grid">
+        <div class="ped-side-card" style="margin:0">
+          <div class="msec" style="margin-top:0"><span class="tri"></span>Pedidos recientes</div>
+          <div id="dash-recientes"></div>
+        </div>
+        <div class="ped-side-card" style="margin:0">
+          <div class="msec" style="margin-top:0"><span class="tri"></span>Entregas próximas</div>
+          <div id="dash-entregas"></div>
+        </div>
+        <div class="ped-side-card" style="margin:0">
+          <div class="msec" style="margin-top:0"><span class="tri"></span>Actividad reciente</div>
+          <div id="dash-actividad"></div>
+        </div>
+      </div>
+    </div>
+
     <div id="view-pedidos" class="view active">
       <div class="stats" id="stats"></div>
       <div class="toolbar">
@@ -1565,9 +1635,9 @@ function showCfgTab(tab){
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
-const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
+const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_dashboard:'Ver Dashboard ejecutivo',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
 // Mapa vista -> permiso requerido (para el gating de navegación)
-const VIEW_PERM={registros:'ver_registros',produccion:'ver_produccion',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
+const VIEW_PERM={registros:'ver_registros',dashboard:'ver_dashboard',produccion:'ver_produccion',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
 function permLabel(k){ return PERM_LABELS[k]||k; }
 async function renderUsuariosRoles(){
@@ -2099,13 +2169,14 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',produccion:'Producción',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
+  const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',produccion:'Producción',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
   document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,productos:4,inventario:4,ayuda:4,configuracion:4}[v]??0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
+  if(v==='dashboard')cargarDashboard();
   if(v==='productos')cargarProductos();
   if(v==='produccion')cargarProduccion();
   if(v==='inventario')cargarInventario();
@@ -2232,6 +2303,81 @@ function buildEncSummary(encs){
     const cls=EST_CLS[s]||'es-nuevo';
     return`<span class="esc ${cls}">${n} ${s}</span>`;
   }).join('');
+}
+
+/* ══ DASHBOARD (Fase 6) ══ */
+let DASH_PER='hoy';
+function dashSetPeriodo(p){ DASH_PER=p; cargarDashboard(); }
+function dashSaludo(){
+  const h=new Date().getHours();
+  const s=h<12?'¡Buenos días':h<19?'¡Buenas tardes':'¡Buenas noches';
+  const n=(ME&&(ME.nombre||ME.usuario))||'';
+  return `${s}${n?', '+n.split(' ')[0]:''}! 👋`;
+}
+function dashEstadoPed(p){
+  if(p.cancelado)return['Cancelado','#bbb'];
+  if(p.cerrado)return['Cerrado','#4A6FA5'];
+  if(p.entregado)return['Entregado','#6B7A8D'];
+  if(p.es_cotizacion)return['Cotización','#7B6EF6'];
+  const ests=(p.encargos||[]).map(e=>e.estado||'Nuevo');
+  if(ests.length&&ests.every(e=>e==='Listo'||e==='Entregado'))return['Listo','#2BAD72'];
+  for(const s of['Producción','Aprobación','Diseño']){ if(ests.includes(s))return[s,ECOL_MAP[s]]; }
+  return['Nuevo','#8A9EAD'];
+}
+function dashEntregaLbl(f,hoyStr){
+  if(!f)return['—','var(--muted)'];
+  const d=Math.round((new Date(f+'T00:00:00')-new Date(hoyStr+'T00:00:00'))/86400000);
+  if(d<0)return['Vencido '+Math.abs(d)+'d','var(--red)'];
+  if(d===0)return['Hoy','var(--green)'];
+  if(d===1)return['Mañana','var(--amber)'];
+  return['En '+d+'d','var(--slate)'];
+}
+function dashActIcon(t){
+  t=(t||'').toLowerCase();
+  if(t.includes('abono')||t.includes('pago'))return'ti-cash';
+  if(t.includes('cancelado'))return'ti-x';
+  if(t.includes('entregado'))return'ti-check';
+  if(t.includes('cerrado'))return'ti-lock';
+  if(t.includes('reabierto'))return'ti-lock-open';
+  if(t.includes('producción'))return'ti-tools';
+  if(t.includes('versión'))return'ti-history';
+  if(t.includes('creado'))return'ti-plus';
+  return'ti-point';
+}
+async function cargarDashboard(){
+  document.getElementById('dash-hi').textContent=dashSaludo();
+  document.querySelectorAll('.dash-periodo .pill').forEach(b=>b.classList.toggle('active',b.dataset.per===DASH_PER));
+  let d;
+  try{ d=await api('GET',`/dashboard?periodo=${DASH_PER}`); }
+  catch(e){ toast('Error cargando dashboard: '+e.message,false); return; }
+  const k=d.kpis;
+  document.getElementById('dash-kpis').innerHTML=`
+    <div class="dash-kpi k-nav" onclick="showView('pedidos')"><div class="ico" style="background:rgba(255,255,255,.1);color:#9DBBDC"><i class="ti ti-clipboard-list"></i></div><div class="num">${k.activos}</div><div class="lbl">Pedidos activos</div></div>
+    <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--red-lt);color:var(--red)"><i class="ti ti-bolt"></i></div><div class="num">${k.urgentes}</div><div class="lbl">Urgentes</div>${k.urgentes?'<div class="sub" style="color:var(--red)">requieren atención</div>':''}</div>
+    <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--green-lt);color:#1A6B45"><i class="ti ti-truck-delivery"></i></div><div class="num">${k.entregasHoy}</div><div class="lbl">Entregas para hoy</div></div>
+    <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--purple-lt);color:var(--purple)"><i class="ti ti-file-invoice"></i></div><div class="num">${k.cotizaciones}</div><div class="lbl">Cotizaciones</div>${k.cotValor?`<div class="sub">Valor: ${fCOP(k.cotValor)}</div>`:''}</div>
+    <div class="dash-kpi" onclick="showView('produccion')" ${puede('ver_produccion')?'':'style="display:none"'}><div class="ico" style="background:#E0F5F4;color:#0BB5B0"><i class="ti ti-tools"></i></div><div class="num">${d.produccion['Producción']||0}</div><div class="lbl">En producción</div><div class="sub">${(d.produccion['Diseño']||0)} diseño · ${(d.produccion['Listo']||0)} listos</div></div>`;
+  const f=d.finanzas;
+  const perLbl={hoy:'Hoy',semana:'Últimos 7 días',mes:'Este mes'}[d.periodo]||'';
+  const verFin=puede('ver_utilidad')||ES_ADMIN;
+  document.getElementById('dash-fin').style.display=verFin?'flex':'none';
+  if(verFin)document.getElementById('dash-fin').innerHTML=`
+    <div class="tit"><i class="ti ti-chart-line" style="color:var(--teal-dk)"></i>Resumen financiero · ${perLbl}</div>
+    <div class="fm"><div class="fico" style="background:var(--green-lt);color:#1A6B45"><i class="ti ti-arrow-down-left"></i></div><div><div class="fv">${fCOP(f.ingresos)}</div><div class="fl">Ingresos</div></div></div>
+    <div class="fm"><div class="fico" style="background:var(--red-lt);color:var(--red)"><i class="ti ti-arrow-up-right"></i></div><div><div class="fv">${fCOP(f.costos)}</div><div class="fl">Costos</div></div></div>
+    <div class="fm"><div class="fico" style="background:var(--teal-lt);color:var(--teal-dk)"><i class="ti ti-wallet"></i></div><div><div class="fv" style="color:${f.utilidad>=0?'#1A6B45':'var(--red)'}">${fCOP(f.utilidad)}</div><div class="fl">Utilidad</div></div></div>
+    <div class="marg"><div class="fv" style="color:${f.margen>=0?'var(--teal-dk)':'var(--red)'}">${f.margen}%</div><div class="fl">Margen</div></div>`;
+  document.getElementById('dash-recientes').innerHTML=(d.recientes||[]).map(p=>{
+    const[eg,col]=dashEstadoPed(p);
+    const pagP=p.valor_total>0&&p.pagado>=p.valor_total?'<span class="badge b-ok">Pagado</span>':(p.pagado>0?'<span class="badge b-par">Abono</span>':'<span class="badge b-no">Sin pago</span>');
+    return`<div class="dash-row" onclick="abrirEditar('${p.id}')"><span class="rref">#${p.ref}</span><span class="rnom">${pesc(p.nombre)}</span>${pagP}<span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:var(--slate)"><span class="pt-dot" style="background:${col};margin:0"></span>${eg}</span><span class="rval">${p.valor_total?fCOP(p.valor_total):'—'}</span></div>`;
+  }).join('')||'<div class="dash-empty">Aún no hay pedidos</div>';
+  document.getElementById('dash-entregas').innerHTML=(d.entregas||[]).map(p=>{
+    const[lbl,col]=dashEntregaLbl(p.fecha_entrega,d.hoy);
+    return`<div class="dash-row" onclick="abrirEditar('${p.id}')"><span class="rref">#${p.ref}</span><span class="rnom">${p.urgente?'⚡ ':''}${pesc(p.nombre)}</span><span style="font-size:10px;font-weight:700;color:${col};white-space:nowrap"><i class="ti ti-calendar" style="font-size:11px"></i> ${lbl}</span></div>`;
+  }).join('')||'<div class="dash-empty">Sin entregas en los próximos 7 días</div>';
+  document.getElementById('dash-actividad').innerHTML=(d.actividad||[]).map(a=>`
+    <div class="dash-act"><div class="aico"><i class="ti ${dashActIcon(a.texto)}"></i></div><div class="atxt"><b>#${a.ref}</b> · ${pesc(a.texto)}<div class="asub">${pesc(a.usuario_nombre||'')}${a.usuario_nombre?' · ':''}${pesc((a.creado||'').slice(0,16))}</div></div></div>`).join('')||'<div class="dash-empty">Sin actividad todavía</div>';
 }
 
 /* ══ PRODUCCIÓN (Fase 4) ══ */

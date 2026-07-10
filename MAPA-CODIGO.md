@@ -185,6 +185,26 @@ Spec: `docs/superpowers/specs/2026-07-10-fase5-inventario-desde-produccion-desig
 
 ---
 
+## 🆕 v3.0 Fase 6 — Dashboard ejecutivo
+
+### server.js
+| Qué | Dónde |
+|---|---|
+| PERMISOS_FASE1 +`ver_dashboard` | catálogo |
+| **GET /api/dashboard?periodo=hoy\|semana\|mes** — kpis/finanzas/recientes/entregas/produccion/actividad. Ingresos por fecha de pago; costos por `p.fecha_pedido` (el `creado` de costos se reescribe al editar) | tras GET /api/stats |
+
+### public/index.html
+| Qué | Dónde |
+|---|---|
+| Nav **Dashboard** (primero, `data-perm="ver_dashboard"`) + vista `#view-dashboard` (saludo + píldoras período + `#dash-kpis/#dash-fin/#dash-grid`) | sidebar / antes de view-pedidos |
+| CSS `.dash-*` | tras `.pcx-stk-add` |
+| `PERM_LABELS.ver_dashboard`, `VIEW_PERM.dashboard`, showView título+`cargarDashboard()` | ~1490/1507/2039 |
+| **funcs** `dashSetPeriodo, dashSaludo, dashEstadoPed, dashEntregaLbl, dashActIcon, cargarDashboard` | antes de `/* ══ PRODUCCIÓN` |
+
+Spec: `docs/superpowers/specs/2026-07-10-fase6-dashboard-design.md`.
+
+---
+
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
 | Archivo | Peso | Qué contiene |
