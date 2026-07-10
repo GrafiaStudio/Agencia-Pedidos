@@ -6,6 +6,7 @@ const cors=require('cors');
 const path=require('path');
 const fs=require('fs');
 const jwt=require('jsonwebtoken');
+const bcrypt=require('bcryptjs');
 
 const app=express();
 const PORT=process.env.PORT||3000;
@@ -131,6 +132,41 @@ seedWs.run('main','GRAFÍA Studio',APP_PIN,'real');
 [['prueba-1','0010'],['prueba-2','0021'],['prueba-3','0032'],['prueba-4','0043'],['prueba-5','0054']]
   .forEach(([id,pin])=>{ try{ seedWs.run(id,`Workspace de prueba ${id.split('-')[1]}`,pin,'prueba'); }
   catch(e){ console.error('Seed workspace falló:',id,e.message); } });
+
+// ── USUARIOS Y ROLES (v3.0 Fase 1) ──
+// Multi-usuario dentro de cada workspace. El PIN del workspace sigue sirviendo como
+// contraseña del usuario admin (migración sin fricción). Usuario único POR workspace.
+db.exec(`CREATE TABLE IF NOT EXISTS roles(
+  id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, nombre TEXT NOT NULL,
+  permisos TEXT DEFAULT '{}', es_admin INTEGER DEFAULT 0, orden INTEGER DEFAULT 0,
+  creado TEXT DEFAULT(datetime('now','localtime')))`);
+db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
+  id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, usuario TEXT NOT NULL,
+  pass_hash TEXT NOT NULL, nombre TEXT DEFAULT '', rol_id TEXT,
+  activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
+
+// Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
+const PERMISOS_FASE1=['administrar_usuarios','configurar_sistema','crear_pedidos','editar_pedidos','ver_costos','ver_utilidad','registrar_pagos'];
+function permisosDeRol(rol){
+  if(!rol) return {};
+  if(rol.es_admin) return {__admin:true};
+  try{ return JSON.parse(rol.permisos||'{}'); }catch(e){ return {}; }
+}
+// Seed idempotente: cada workspace sin usuarios estrena rol admin + rol Vendedor + usuario admin.
+function sembrarUsuariosSiFalta(){
+  const wss=db.prepare('SELECT id,pin FROM workspaces').all();
+  for(const ws of wss){
+    const ya=db.prepare('SELECT COUNT(*) c FROM usuarios WHERE workspace_id=?').get(ws.id).c;
+    if(ya>0) continue;
+    let rolAdmin=db.prepare('SELECT id FROM roles WHERE workspace_id=? AND es_admin=1').get(ws.id);
+    if(!rolAdmin){ const rid=uid(); db.prepare('INSERT INTO roles(id,workspace_id,nombre,permisos,es_admin,orden)VALUES(?,?,?,?,?,?)').run(rid,ws.id,'Administrador','{}',1,0); rolAdmin={id:rid}; }
+    const permVend=JSON.stringify({crear_pedidos:true,editar_pedidos:true,registrar_pagos:true});
+    try{ db.prepare('INSERT INTO roles(id,workspace_id,nombre,permisos,es_admin,orden)VALUES(?,?,?,?,?,?)').run(uid(),ws.id,'Vendedor',permVend,0,1); }catch(e){}
+    db.prepare('INSERT INTO usuarios(id,workspace_id,usuario,pass_hash,nombre,rol_id,activo)VALUES(?,?,?,?,?,?,1)')
+      .run(uid(),ws.id,'admin',bcrypt.hashSync(String(ws.pin),10),'Administrador',rolAdmin.id);
+  }
+}
+sembrarUsuariosSiFalta();
 
 // ── CONFIGURACIÓN DEL NEGOCIO (una fila por workspace) ──
 db.exec(`CREATE TABLE IF NOT EXISTS configuracion_negocio(
@@ -784,30 +820,148 @@ function validarPedido(b){
   return errores;
 }
 
-// ── AUTENTICACIÓN (PIN simple) ──
+// ── AUTENTICACIÓN (usuario+contraseña · con compat de PIN) ──
+function firmarUsuario(u){ return jwt.sign({wsId:u.workspace_id,userId:u.id,rolId:u.rol_id},JWT_SECRET,{expiresIn:'90d'}); }
 app.post('/api/auth/login',(req,res)=>{
-  const{pin}=req.body||{};
-  const ws=pin?db.prepare('SELECT id FROM workspaces WHERE pin=?').get(String(pin)):null;
-  if(!ws){
-    return res.status(401).json({error:'PIN incorrecto'});
+  const{usuario,pass,pin}=req.body||{};
+  // 1) Login por usuario + contraseña
+  if(usuario&&pass){
+    const cands=db.prepare('SELECT * FROM usuarios WHERE usuario=? AND activo=1').all(String(usuario).trim());
+    const u=cands.find(c=>{ try{ return bcrypt.compareSync(String(pass),c.pass_hash); }catch(e){ return false; } });
+    if(!u) return res.status(401).json({error:'Usuario o contraseña incorrectos'});
+    return res.json({token:firmarUsuario(u)});
   }
-  const token=jwt.sign({wsId:ws.id},JWT_SECRET,{expiresIn:'90d'});
-  res.json({token});
+  // 2) Login por PIN (compat) → entra como el usuario admin de ese workspace
+  if(pin){
+    const ws=db.prepare('SELECT id FROM workspaces WHERE pin=?').get(String(pin));
+    if(!ws) return res.status(401).json({error:'PIN incorrecto'});
+    const adm=db.prepare('SELECT * FROM usuarios WHERE workspace_id=? AND activo=1 ORDER BY (rol_id IN (SELECT id FROM roles WHERE es_admin=1)) DESC, creado ASC').get(ws.id);
+    if(!adm) return res.status(401).json({error:'PIN incorrecto'});
+    return res.json({token:firmarUsuario(adm)});
+  }
+  return res.status(401).json({error:'Ingresa usuario y contraseña'});
 });
 
 app.use('/api',(req,res,next)=>{
   if(req.path==='/auth/login')return next();
   const header=req.headers.authorization||'';
   const token=header.startsWith('Bearer ')?header.slice(7):null;
-  if(!token)return res.status(401).json({error:'No autorizado, ingresa el PIN'});
+  if(!token)return res.status(401).json({error:'No autorizado, inicia sesión'});
   try{
     const payload=jwt.verify(token,JWT_SECRET);
-    if(!payload.wsId)return res.status(401).json({error:'Sesión expirada, ingresa el PIN de nuevo'});
+    if(!payload.wsId)return res.status(401).json({error:'Sesión expirada, inicia sesión de nuevo'});
     req.wsId=payload.wsId;
+    // Cargar usuario+rol (tokens viejos sin userId → degradar al admin del workspace)
+    let u=payload.userId?db.prepare('SELECT * FROM usuarios WHERE id=? AND activo=1').get(payload.userId):null;
+    if(!u) u=db.prepare('SELECT * FROM usuarios WHERE workspace_id=? AND activo=1 ORDER BY (rol_id IN (SELECT id FROM roles WHERE es_admin=1)) DESC, creado ASC').get(req.wsId);
+    if(u){
+      req.userId=u.id; req.usuario=u;
+      const rol=db.prepare('SELECT * FROM roles WHERE id=?').get(u.rol_id);
+      req.rol=rol; req.rolId=u.rol_id; req.permisos=permisosDeRol(rol);
+    }else{ req.permisos={}; }
     next();
   }catch(e){
-    res.status(401).json({error:'Sesión expirada, ingresa el PIN de nuevo'});
+    res.status(401).json({error:'Sesión expirada, inicia sesión de nuevo'});
   }
+});
+// Middleware de permiso: corta con 403 si el rol no lo tiene (admin siempre pasa).
+function requiere(clave){ return (req,res,next)=>{ const p=req.permisos||{}; if(p.__admin||p[clave]===true) return next(); return res.status(403).json({error:'No tienes permiso para esta acción'}); }; }
+
+// ── IDENTIDAD, USUARIOS Y ROLES (v3.0 Fase 1) ──
+function rolPublico(r){ return r?{id:r.id,nombre:r.nombre,es_admin:!!r.es_admin,permisos:permisosDeRol(r),orden:r.orden}:null; }
+function usuarioPublico(u,rolesPorId){ const r=rolesPorId?rolesPorId[u.rol_id]:null; return {id:u.id,usuario:u.usuario,nombre:u.nombre,activo:!!u.activo,rol_id:u.rol_id,rol_nombre:r?r.nombre:'',es_admin:r?!!r.es_admin:false}; }
+
+app.get('/api/me',(req,res)=>{
+  const u=req.usuario; if(!u) return res.status(401).json({error:'Sin sesión'});
+  res.json({id:u.id,usuario:u.usuario,nombre:u.nombre,rol:req.rol?req.rol.nombre:'',rol_id:u.rol_id,es_admin:!!(req.permisos&&req.permisos.__admin),permisos:req.permisos||{},permisos_catalogo:PERMISOS_FASE1});
+});
+app.post('/api/me/pass',(req,res)=>{
+  const u=req.usuario; if(!u) return res.status(401).json({error:'Sin sesión'});
+  const{actual,nueva}=req.body||{};
+  if(!nueva||String(nueva).length<4) return res.status(400).json({error:'La nueva contraseña debe tener al menos 4 caracteres'});
+  if(!bcrypt.compareSync(String(actual||''),u.pass_hash)) return res.status(400).json({error:'La contraseña actual no es correcta'});
+  db.prepare('UPDATE usuarios SET pass_hash=? WHERE id=?').run(bcrypt.hashSync(String(nueva),10),u.id);
+  res.json({ok:true});
+});
+
+// Roles
+app.get('/api/roles',requiere('administrar_usuarios'),(req,res)=>{
+  const rows=db.prepare('SELECT * FROM roles WHERE workspace_id=? ORDER BY es_admin DESC, orden ASC, creado ASC').all(req.wsId);
+  res.json(rows.map(rolPublico));
+});
+app.post('/api/roles',requiere('administrar_usuarios'),(req,res)=>{
+  const{nombre,permisos}=req.body||{};
+  if(!String(nombre||'').trim()) return res.status(400).json({error:'El rol necesita un nombre'});
+  const perm={}; PERMISOS_FASE1.forEach(k=>{ if(permisos&&permisos[k]===true) perm[k]=true; });
+  const id=uid();
+  db.prepare('INSERT INTO roles(id,workspace_id,nombre,permisos,es_admin,orden)VALUES(?,?,?,?,0,?)').run(id,req.wsId,String(nombre).trim(),JSON.stringify(perm),Date.now());
+  res.json(rolPublico(db.prepare('SELECT * FROM roles WHERE id=?').get(id)));
+});
+app.put('/api/roles/:id',requiere('administrar_usuarios'),(req,res)=>{
+  const r=db.prepare('SELECT * FROM roles WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!r) return res.status(404).json({error:'Rol no encontrado'});
+  if(r.es_admin) return res.status(400).json({error:'El rol Administrador no se puede modificar'});
+  const{nombre,permisos}=req.body||{};
+  const perm={}; PERMISOS_FASE1.forEach(k=>{ if(permisos&&permisos[k]===true) perm[k]=true; });
+  db.prepare('UPDATE roles SET nombre=?,permisos=? WHERE id=?').run(String(nombre||r.nombre).trim(),JSON.stringify(perm),r.id);
+  res.json(rolPublico(db.prepare('SELECT * FROM roles WHERE id=?').get(r.id)));
+});
+app.delete('/api/roles/:id',requiere('administrar_usuarios'),(req,res)=>{
+  const r=db.prepare('SELECT * FROM roles WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!r) return res.status(404).json({error:'Rol no encontrado'});
+  if(r.es_admin) return res.status(400).json({error:'El rol Administrador no se puede eliminar'});
+  const enUso=db.prepare('SELECT COUNT(*) c FROM usuarios WHERE rol_id=? AND activo=1').get(r.id).c;
+  if(enUso>0) return res.status(400).json({error:`No puedes eliminar un rol en uso (${enUso} usuario(s))`});
+  db.prepare('DELETE FROM roles WHERE id=?').run(r.id);
+  res.json({ok:true});
+});
+
+// Usuarios
+app.get('/api/usuarios',requiere('administrar_usuarios'),(req,res)=>{
+  const roles=db.prepare('SELECT * FROM roles WHERE workspace_id=?').all(req.wsId);
+  const rolesPorId={}; roles.forEach(r=>rolesPorId[r.id]=r);
+  const rows=db.prepare('SELECT * FROM usuarios WHERE workspace_id=? ORDER BY activo DESC, creado ASC').all(req.wsId);
+  res.json(rows.map(u=>usuarioPublico(u,rolesPorId)));
+});
+app.post('/api/usuarios',requiere('administrar_usuarios'),(req,res)=>{
+  const{usuario,nombre,pass,rol_id}=req.body||{};
+  const login=String(usuario||'').trim();
+  if(!login) return res.status(400).json({error:'Escribe un nombre de usuario'});
+  if(!pass||String(pass).length<4) return res.status(400).json({error:'La contraseña debe tener al menos 4 caracteres'});
+  const rol=rol_id?db.prepare('SELECT id FROM roles WHERE id=? AND workspace_id=?').get(rol_id,req.wsId):null;
+  if(!rol) return res.status(400).json({error:'Elige un rol válido'});
+  const dup=db.prepare('SELECT id FROM usuarios WHERE workspace_id=? AND usuario=?').get(req.wsId,login);
+  if(dup) return res.status(400).json({error:'Ya existe un usuario con ese nombre'});
+  const id=uid();
+  db.prepare('INSERT INTO usuarios(id,workspace_id,usuario,pass_hash,nombre,rol_id,activo)VALUES(?,?,?,?,?,?,1)').run(id,req.wsId,login,bcrypt.hashSync(String(pass),10),String(nombre||'').trim(),rol.id);
+  const roles=db.prepare('SELECT * FROM roles WHERE workspace_id=?').all(req.wsId); const rp={}; roles.forEach(r=>rp[r.id]=r);
+  res.json(usuarioPublico(db.prepare('SELECT * FROM usuarios WHERE id=?').get(id),rp));
+});
+app.put('/api/usuarios/:id',requiere('administrar_usuarios'),(req,res)=>{
+  const u=db.prepare('SELECT * FROM usuarios WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!u) return res.status(404).json({error:'Usuario no encontrado'});
+  const{nombre,rol_id,activo}=req.body||{};
+  let rid=u.rol_id;
+  if(rol_id){ const rol=db.prepare('SELECT id FROM roles WHERE id=? AND workspace_id=?').get(rol_id,req.wsId); if(!rol) return res.status(400).json({error:'Rol inválido'}); rid=rol.id; }
+  const act=(activo===undefined)?u.activo:(activo?1:0);
+  db.prepare('UPDATE usuarios SET nombre=?,rol_id=?,activo=? WHERE id=?').run(nombre===undefined?u.nombre:String(nombre).trim(),rid,act,u.id);
+  const roles=db.prepare('SELECT * FROM roles WHERE workspace_id=?').all(req.wsId); const rp={}; roles.forEach(r=>rp[r.id]=r);
+  res.json(usuarioPublico(db.prepare('SELECT * FROM usuarios WHERE id=?').get(u.id),rp));
+});
+app.put('/api/usuarios/:id/pass',requiere('administrar_usuarios'),(req,res)=>{
+  const u=db.prepare('SELECT * FROM usuarios WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!u) return res.status(404).json({error:'Usuario no encontrado'});
+  const{pass}=req.body||{};
+  if(!pass||String(pass).length<4) return res.status(400).json({error:'La contraseña debe tener al menos 4 caracteres'});
+  db.prepare('UPDATE usuarios SET pass_hash=? WHERE id=?').run(bcrypt.hashSync(String(pass),10),u.id);
+  res.json({ok:true});
+});
+app.delete('/api/usuarios/:id',requiere('administrar_usuarios'),(req,res)=>{
+  const u=db.prepare('SELECT * FROM usuarios WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!u) return res.status(404).json({error:'Usuario no encontrado'});
+  if(u.id===req.userId) return res.status(400).json({error:'No puedes desactivar tu propia cuenta'});
+  db.prepare('UPDATE usuarios SET activo=0 WHERE id=?').run(u.id);
+  res.json({ok:true});
 });
 
 // ── PEDIDOS ──

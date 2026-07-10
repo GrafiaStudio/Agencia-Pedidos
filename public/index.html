@@ -534,10 +534,23 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   <div class="pin-box">
     <span class="tri"></span>
     <h2>GRAFÍA Studio</h2>
-    <p>Ingresa el PIN para entrar</p>
-    <input type="password" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" autocomplete="off" placeholder="••••">
-    <div class="pin-err" id="pinErr"></div>
-    <button class="btn-pri" style="width:100%;justify-content:center;margin-top:8px" onclick="intentarPin()"><i class="ti ti-lock-open"></i> Entrar</button>
+    <!-- Login por usuario + contraseña -->
+    <div id="loginUserBox">
+      <p>Inicia sesión con tu cuenta</p>
+      <input type="text" id="loginUser" class="pin-input" autocomplete="username" placeholder="Usuario" style="letter-spacing:normal;text-align:left;font-size:15px">
+      <input type="password" id="loginPass" class="pin-input" autocomplete="current-password" placeholder="Contraseña" style="letter-spacing:normal;text-align:left;font-size:15px;margin-top:8px" onkeydown="if(event.key==='Enter')intentarLogin()">
+      <div class="pin-err" id="pinErr"></div>
+      <button class="btn-pri" style="width:100%;justify-content:center;margin-top:8px" onclick="intentarLogin()"><i class="ti ti-lock-open"></i> Entrar</button>
+      <p style="margin-top:14px;font-size:12px"><a href="#" onclick="mostrarLoginPin();return false" style="color:var(--muted)">Entrar con PIN de administrador</a></p>
+    </div>
+    <!-- Login por PIN (acceso rápido de admin) -->
+    <div id="loginPinBox" style="display:none">
+      <p>Ingresa el PIN de administrador</p>
+      <input type="password" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" autocomplete="off" placeholder="••••" onkeydown="if(event.key==='Enter')intentarPin()">
+      <div class="pin-err" id="pinErrPin"></div>
+      <button class="btn-pri" style="width:100%;justify-content:center;margin-top:8px" onclick="intentarPin()"><i class="ti ti-lock-open"></i> Entrar</button>
+      <p style="margin-top:14px;font-size:12px"><a href="#" onclick="mostrarLoginUser();return false" style="color:var(--muted)">Entrar con usuario y contraseña</a></p>
+    </div>
   </div>
 </div>
 
@@ -568,6 +581,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="ayuda" onclick="showView('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="nav-item" data-view="configuracion" onclick="showView('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
     <button class="nav-item" onclick="abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
+    <div id="me-nombre" style="font-size:10px;color:var(--muted);padding:2px 12px 0"></div>
     <button class="nav-item" onclick="cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
   </div>
 </aside>
@@ -682,6 +696,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <button class="cfgtab" onclick="showCfgTab('notificaciones')">Notificaciones</button>
         <button class="cfgtab" onclick="showCfgTab('impuestos')">Impuestos</button>
         <button class="cfgtab" onclick="showCfgTab('etiquetas')">Etiquetas</button>
+        <button class="cfgtab" data-perm="administrar_usuarios" onclick="showCfgTab('usuarios')">Usuarios y Roles</button>
       </div>
 
       <div id="cfg-perfil" class="cfg-panel active">
@@ -766,6 +781,18 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px">Cada fila es una <b>Etiqueta</b> (el grupo grande, ej. "Estampados") con su color. El segundo campo son sus <b>Subetiquetas</b> (las que salen dentro de ese grupo, ej. "Camisetas, Vasos, Gorras") — se escriben separadas por coma.</div>
         <div id="etiquetas-lista"></div>
         <button class="btn-add-row" onclick="abrirNuevaEtiqueta()"><i class="ti ti-plus"></i>Agregar etiqueta</button>
+      </div>
+
+      <div id="cfg-usuarios" class="cfg-panel">
+        <div class="msec"><span class="tri"></span>Usuarios</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px">Crea cuentas para tu equipo. Cada persona entra con su <b>usuario y contraseña</b> y solo ve lo que su <b>rol</b> le permite. Tú (administrador) puedes entrar también con el PIN.</div>
+        <div id="usuarios-lista"></div>
+        <button class="btn-add-row" onclick="abrirNuevoUsuario()"><i class="ti ti-user-plus"></i>Agregar usuario</button>
+
+        <div class="msec" style="margin-top:22px"><span class="tri"></span>Roles y permisos</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px">Un <b>rol</b> es un conjunto de permisos (estilo Discord). Crea los que necesites y marca qué puede hacer cada uno. El rol <b>Administrador</b> siempre lo puede todo.</div>
+        <div id="roles-lista"></div>
+        <button class="btn-add-row" onclick="abrirNuevoRol()"><i class="ti ti-shield-plus"></i>Agregar rol</button>
       </div>
 
       <button class="btn-pri" id="btn-guardar-config" style="margin-top:18px" onclick="guardarConfiguracion()"><i class="ti ti-device-floppy"></i> Guardar configuración</button>
@@ -1230,6 +1257,18 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 /* ══ CONSTANTES ══ */
 const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate','red','pink','blue','yellow','brown','indigo'];
 let CATS=[];
+let ME=null, PERMISOS={}, ES_ADMIN=false;
+function puede(clave){ return !!(ES_ADMIN||PERMISOS[clave]===true); }
+async function cargarMe(){
+  ME=await api('GET','/me');
+  PERMISOS=ME.permisos||{}; ES_ADMIN=!!ME.es_admin;
+  const nb=document.getElementById('me-nombre'); if(nb) nb.textContent=(ME.nombre||ME.usuario||'')+(ME.rol?' · '+ME.rol:'');
+  aplicarGatingPermisos();
+}
+function aplicarGatingPermisos(){
+  // Muestra/oculta lo que dependa de permisos (crece en fases siguientes)
+  document.querySelectorAll('[data-perm]').forEach(el=>{ el.style.display=puede(el.getAttribute('data-perm'))?'':'none'; });
+}
 async function cargarEtiquetas(){
   try{
     CATS=await api('GET','/etiquetas');
@@ -1259,30 +1298,38 @@ function clearToken(){localStorage.removeItem(TOKEN_KEY)}
 function showPinScreen(msg){
   document.getElementById('pinScreen').style.display='flex';
   document.getElementById('pinErr').textContent=msg||'';
-  const inp=document.getElementById('pinInput');
-  inp.value='';
-  setTimeout(()=>inp.focus(),100);
+  document.getElementById('pinErrPin').textContent='';
+  mostrarLoginUser();
+  const inp=document.getElementById('loginUser'); if(inp){inp.value='';document.getElementById('loginPass').value='';}
+  setTimeout(()=>inp&&inp.focus(),100);
 }
 function hidePinScreen(){document.getElementById('pinScreen').style.display='none'}
+function mostrarLoginPin(){document.getElementById('loginUserBox').style.display='none';document.getElementById('loginPinBox').style.display='';const p=document.getElementById('pinInput');p.value='';setTimeout(()=>p.focus(),50);}
+function mostrarLoginUser(){document.getElementById('loginPinBox').style.display='none';document.getElementById('loginUserBox').style.display='';}
 
+async function intentarLogin(){
+  const usuario=document.getElementById('loginUser').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const err=document.getElementById('pinErr');
+  if(!usuario||!pass){err.textContent='Escribe usuario y contraseña';return}
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario,pass})});
+    const data=await r.json();
+    if(!r.ok){err.textContent=data.error||'Usuario o contraseña incorrectos';document.getElementById('loginPass').value='';return;}
+    setToken(data.token);hidePinScreen();init();
+  }catch(e){err.textContent='Sin conexión con el servidor'}
+}
 async function intentarPin(){
   const pin=document.getElementById('pinInput').value.trim();
-  if(pin.length!==4){document.getElementById('pinErr').textContent='Ingresa los 4 dígitos';return}
+  const err=document.getElementById('pinErrPin');
+  if(pin.length!==4){err.textContent='Ingresa los 4 dígitos';return}
   try{
     const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
     const data=await r.json();
-    if(!r.ok){
-      document.getElementById('pinErr').textContent=data.error||'PIN incorrecto';
-      document.getElementById('pinInput').value='';
-      document.getElementById('pinInput').focus();
-      return;
-    }
-    setToken(data.token);
-    hidePinScreen();
-    init();
-  }catch(e){document.getElementById('pinErr').textContent='Sin conexión con el servidor'}
+    if(!r.ok){err.textContent=data.error||'PIN incorrecto';document.getElementById('pinInput').value='';document.getElementById('pinInput').focus();return;}
+    setToken(data.token);hidePinScreen();init();
+  }catch(e){err.textContent='Sin conexión con el servidor'}
 }
-document.getElementById('pinInput').addEventListener('keydown',e=>{if(e.key==='Enter')intentarPin()});
 
 function cerrarSesion(){
   if(!confirm('¿Cerrar sesión?'))return;
@@ -1427,10 +1474,91 @@ function showCfgTab(tab){
   document.querySelectorAll('.cfg-panel').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.cfgtab').forEach(x=>x.classList.remove('active'));
   document.getElementById('cfg-'+tab).classList.add('active');
-  ['perfil','preferencias','pedidos','notificaciones','impuestos','etiquetas'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.cfgtab')[i].classList.add('active')});
-  document.getElementById('btn-guardar-config').style.display=tab==='etiquetas'?'none':'inline-flex';
+  ['perfil','preferencias','pedidos','notificaciones','impuestos','etiquetas','usuarios'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.cfgtab')[i].classList.add('active')});
+  document.getElementById('btn-guardar-config').style.display=(tab==='etiquetas'||tab==='usuarios')?'none':'inline-flex';
   if(tab==='etiquetas')renderEtiquetas();
+  if(tab==='usuarios')renderUsuariosRoles();
 }
+/* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
+let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
+const PERM_LABELS={administrar_usuarios:'Administrar usuarios y roles',configurar_sistema:'Configurar el sistema',crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',ver_costos:'Ver costos',ver_utilidad:'Ver utilidad',registrar_pagos:'Registrar pagos'};
+function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
+function permLabel(k){ return PERM_LABELS[k]||k; }
+async function renderUsuariosRoles(){
+  try{ USUARIOS=await api('GET','/usuarios'); ROLES=await api('GET','/roles'); }
+  catch(e){ document.getElementById('usuarios-lista').innerHTML='<div style="color:var(--muted);font-size:11px">'+escHtml(e.message)+'</div>'; return; }
+  renderUsuariosLista(); renderRolesLista();
+}
+function rolOptions(sel){ return ROLES.map(r=>`<option value="${r.id}"${r.id===sel?' selected':''}>${escHtml(r.nombre)}</option>`).join(''); }
+function renderUsuariosLista(){
+  const cont=document.getElementById('usuarios-lista');
+  let html=USUARIOS.map(u=>`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px${u.activo?'':';opacity:.5'}">
+      <div style="flex:1;min-width:140px"><b>${escHtml(u.nombre||u.usuario)}</b><div style="font-size:10px;color:var(--muted)">@${escHtml(u.usuario)}${u.es_admin?' · Administrador':''}</div></div>
+      <select class="item-inp" style="width:150px" ${u.es_admin?'disabled':''} onchange="cambiarRolUsuario('${u.id}',this.value)">${rolOptions(u.rol_id)}</select>
+      <button class="btn-ghost" title="Cambiar contraseña" onclick="cambiarPassUsuario('${u.id}')"><i class="ti ti-key"></i></button>
+      ${u.es_admin?'':`<button class="btn-ghost" title="${u.activo?'Desactivar':'Reactivar'}" onclick="toggleActivoUsuario('${u.id}',${u.activo?0:1})"><i class="ti ${u.activo?'ti-user-off':'ti-user-check'}"></i></button>`}
+    </div>`).join('');
+  if(nuevoUsrTmp){
+    html+=`<div style="padding:10px;border:1px dashed var(--teal);border-radius:8px;margin-bottom:6px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label>Usuario (para entrar)</label><input class="item-inp" id="nu-usuario" placeholder="ej: maria"></div>
+        <div><label>Nombre visible</label><input class="item-inp" id="nu-nombre" placeholder="María López"></div>
+        <div><label>Contraseña</label><input class="item-inp" id="nu-pass" type="text" placeholder="mínimo 4 caracteres"></div>
+        <div><label>Rol</label><select class="item-inp" id="nu-rol">${rolOptions('')}</select></div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px"><button class="btn-pri" onclick="guardarNuevoUsuario()"><i class="ti ti-check"></i> Crear usuario</button><button class="btn-ghost" onclick="nuevoUsrTmp=null;renderUsuariosLista()">Cancelar</button></div>
+    </div>`;
+  }
+  cont.innerHTML=html||'<div style="color:var(--muted);font-size:11px">Aún no hay usuarios.</div>';
+}
+function abrirNuevoUsuario(){ if(!ROLES.length){toast('Primero crea un rol',false);return} nuevoUsrTmp={}; renderUsuariosLista(); }
+async function guardarNuevoUsuario(){
+  const b={usuario:document.getElementById('nu-usuario').value.trim(),nombre:document.getElementById('nu-nombre').value.trim(),pass:document.getElementById('nu-pass').value,rol_id:document.getElementById('nu-rol').value};
+  try{ await api('POST','/usuarios',b); nuevoUsrTmp=null; toast('Usuario creado'); await renderUsuariosRoles(); }
+  catch(e){ toast(e.message,false); }
+}
+async function cambiarRolUsuario(id,rol_id){ try{ await api('PUT','/usuarios/'+id,{rol_id}); toast('Rol actualizado'); }catch(e){ toast(e.message,false); renderUsuariosRoles(); } }
+async function toggleActivoUsuario(id,activo){ try{ await api('PUT','/usuarios/'+id,{activo:!!activo}); await renderUsuariosRoles(); }catch(e){ toast(e.message,false); } }
+async function cambiarPassUsuario(id){ const p=prompt('Nueva contraseña (mínimo 4 caracteres):'); if(p==null)return; try{ await api('PUT','/usuarios/'+id+'/pass',{pass:p}); toast('Contraseña cambiada'); }catch(e){ toast(e.message,false); } }
+function renderRolesLista(){
+  const cont=document.getElementById('roles-lista');
+  const cat=permCatalogo();
+  let html=ROLES.map(r=>{
+    if(r.es_admin) return `<div style="padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--teal-lt)"><b>${escHtml(r.nombre)}</b> <span style="font-size:10px;color:var(--muted)">· acceso total (no editable)</span></div>`;
+    const checks=cat.map(k=>`<label class="ck-box" style="display:inline-flex;gap:5px;font-size:10.5px"><input type="checkbox" data-rol="${r.id}" data-perm-k="${k}" ${r.permisos&&r.permisos[k]?'checked':''}><span>${escHtml(permLabel(k))}</span></label>`).join('');
+    return `<div style="padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input class="item-inp" style="flex:1;font-weight:700" value="${escHtml(r.nombre)}" data-rolnombre="${r.id}">
+        <button class="btn-pri" onclick="guardarRol('${r.id}')"><i class="ti ti-device-floppy"></i> Guardar</button>
+        <button class="btn-ghost" title="Eliminar rol" onclick="eliminarRol('${r.id}')"><i class="ti ti-trash"></i></button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px">${checks}</div>
+    </div>`;
+  }).join('');
+  if(nuevoRolTmp){
+    const checks=cat.map(k=>`<label class="ck-box" style="display:inline-flex;gap:5px;font-size:10.5px"><input type="checkbox" id="nr-perm-${k}"><span>${escHtml(permLabel(k))}</span></label>`).join('');
+    html+=`<div style="padding:10px;border:1px dashed var(--teal);border-radius:8px;margin-bottom:6px">
+      <div style="margin-bottom:8px"><label>Nombre del rol</label><input class="item-inp" id="nr-nombre" placeholder="ej: Diseñador"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px">${checks}</div>
+      <div style="display:flex;gap:8px"><button class="btn-pri" onclick="guardarNuevoRol()"><i class="ti ti-check"></i> Crear rol</button><button class="btn-ghost" onclick="nuevoRolTmp=null;renderRolesLista()">Cancelar</button></div>
+    </div>`;
+  }
+  cont.innerHTML=html||'<div style="color:var(--muted);font-size:11px">Aún no hay roles.</div>';
+}
+function abrirNuevoRol(){ nuevoRolTmp={}; renderRolesLista(); }
+function leerPermisosDe(sel){ const p={}; document.querySelectorAll(sel).forEach(ch=>{ if(ch.checked) p[ch.getAttribute('data-perm-k')||ch.id.replace('nr-perm-','')]=true; }); return p; }
+async function guardarNuevoRol(){
+  const nombre=document.getElementById('nr-nombre').value.trim();
+  const permisos={}; permCatalogo().forEach(k=>{ const el=document.getElementById('nr-perm-'+k); if(el&&el.checked)permisos[k]=true; });
+  try{ await api('POST','/roles',{nombre,permisos}); nuevoRolTmp=null; toast('Rol creado'); await renderUsuariosRoles(); }
+  catch(e){ toast(e.message,false); }
+}
+async function guardarRol(id){
+  const nombre=document.querySelector(`[data-rolnombre="${id}"]`).value.trim();
+  const permisos={}; document.querySelectorAll(`[data-rol="${id}"]`).forEach(ch=>{ if(ch.checked)permisos[ch.getAttribute('data-perm-k')]=true; });
+  try{ await api('PUT','/roles/'+id,{nombre,permisos}); toast('Rol guardado'); await renderUsuariosRoles(); }
+  catch(e){ toast(e.message,false); }
+}
+async function eliminarRol(id){ if(!confirm('¿Eliminar este rol?'))return; try{ await api('DELETE','/roles/'+id); toast('Rol eliminado'); await renderUsuariosRoles(); }catch(e){ toast(e.message,false); } }
+
 let etqNuevaTmp=null;
 function abrirNuevaEtiqueta(){
   if(etqNuevaTmp)return;
@@ -4205,6 +4333,8 @@ function buildRegPanel(tab){
 
 /* ══ INIT ══ */
 async function init(){
+  // Cargar identidad/permisos primero; si el token no sirve, volver al login
+  try{ await cargarMe(); }catch(e){ if(/401|sesión|autoriz/i.test(e.message||'')){ clearToken(); showPinScreen(); return; } console.warn('Identidad:',e.message); }
   // Pintar la interfaz SIEMPRE, aunque no haya servidor
   renderFiltros();
   document.getElementById('stats').innerHTML=`
