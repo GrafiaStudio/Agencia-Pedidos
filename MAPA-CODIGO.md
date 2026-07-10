@@ -6,9 +6,10 @@
 > - `server.js` = 1.350 líneas (~22k tokens) → lee tramos.
 >
 > Regenerar este mapa tras cambios grandes: grep de `function`/`app.(get|post|put|delete)` con `-n`.
-> Última sync: commit 6d5fc0e (v3.0 Fase 1). server.js=1504 líneas, index.html=4354 líneas.
-> ⚠️ Tras Fase 1 las tablas de abajo (pre-v3.0) corrieron ~+30 líneas antes de la línea 800 y ~+50
-> después; sirven para saltar cerca. Los anclajes exactos de Fase 1 están en la sección v3.0 al final.
+> Última sync: commit 0eec568 (v3.0 Fase 2b). **server.js=1580 líneas, index.html=4399 líneas.**
+> ⚠️ Las tablas grandes de abajo son PRE-v3.0: sus números corrieron ~+120 líneas en server.js y
+> ~+250 en index.html. Sirven para saltar cerca; los anclajes EXACTOS de v3.0 están en la sección
+> "🆕 v3.0" (abajo). Ante la duda, re-grep del nombre de la función.
 
 ---
 
@@ -84,22 +85,32 @@
 
 ---
 
-## 🆕 v3.0 Fase 1 — Usuarios y Roles (anclajes exactos, commit 6d5fc0e)
+## 🆕 v3.0 (Fases 1, 2a, 2b) + medidas — anclajes exactos, commit 0eec568
 
 ### server.js
 | Línea | Qué |
 |---|---|
-| 136–182 | Tablas `roles`/`usuarios`, `PERMISOS_FASE1`, `permisosDeRol` 150, `sembrarUsuariosSiFalta` 156 |
-| 823–868 | Auth: `firmarUsuario` 824, login usuario+PIN 825, guard con permisos 834, `requiere(clave)` 868 |
-| 870–962 | Endpoints: `rolPublico`/`usuarioPublico` 871, GET /me 874, POST /me/pass 878, roles CRUD 888–917, usuarios CRUD 920–962 |
+| 120–164 | **Esquema v3.0**: `pedido_versiones` 121 (+ALTER historial usuario/rol/motivo); `roles` 149, `usuarios` 153; `PERMISOS_FASE1` (10 permisos), `permisosDeRol`, `sembrarUsuariosSiFalta` |
+| 443–455 | `toFloatCO` (decimal colombiano para tarifas por medida) |
+| 503–526 | `pedidoCompleto` (expone `p.version`) |
+| 528–556 | **Versionado**: `addHist(pid,txt,ws,actor,motivo)` 528, `actorDe(req)` 534, `firmaClave(pc)` 536, `crearVersion` 542 |
+| 624–695 | Medidas: `calcPrecioMedidas` (usa toFloatCO), `calcCostoMedida` 684 (costo proveedor ancho×alto+mín) |
+| 884–928 | **Auth**: login usuario+PIN 884, guard carga permisos, `requiere(clave)` |
+| 931–1013 | **Endpoints usuarios/roles**: GET /me 935, /me/pass, roles CRUD 949–, usuarios CRUD 981– |
+| 1029–1145 | **Pedidos**: GET list 1029, GET :id + **GET :id/versiones 1050**, POST 1055 (crea v1), PUT :id 1089 (firmaClave→crearVersion), DELETE 1137 |
+| ~1440 | INSERT/UPDATE fichas_producto: incluye `costo_medida_tarifa/minimo` (+_calc) |
 
 ### public/index.html
 | Línea | Qué |
 |---|---|
-| 1260–1276 | Globals `ME/PERMISOS/ES_ADMIN`, `puede()` 1261, `cargarMe()` 1262, `aplicarGatingPermisos` 1268 |
-| 1290–1331 | Login: `showPinScreen` 1290, `mostrarLoginPin/User` 1307, `intentarLogin` 1310, `intentarPin` 1321 |
-| 1486–1561 | Gestión: `renderUsuariosRoles` 1487, usuarios 1493–1521, roles 1523–1560 |
-| ~533 (markup) | Pantalla login (loginUserBox/loginPinBox); ~697 tab "Usuarios y Roles"; ~785 panel `cfg-usuarios` |
+| 1265–1284 | Globals `ME/PERMISOS/ES_ADMIN`, `puede()` 1267, `cargarMe`, `aplicarGatingPermisos`, `VIEW_PERM` |
+| 1300–1345 | Login: `showPinScreen`, `mostrarLoginPin/User`, `intentarLogin`, `intentarPin` |
+| 1785–1795 | `toFloatCO` + `fmtTarifa` (decimales de tarifa) |
+| ~1500–1575 | Gestión usuarios/roles (`renderUsuariosRoles`, etc.) |
+| 3841 | `recalcularCostosAutomaticos` (suma insumos + **costo por medida** por ítem) |
+| 4020 | `renderHist(hist,version)` — badge Versión + usuario·rol·motivo |
+| 4153 | `guardar()` — envía `motivo` (Fase 2b) |
+| markup | login ~533; tab "Usuarios y Roles" en Config; sidebar con `data-perm`; sección "Costo por medida" en form producto; card Historial con `#ped-version-badge`; footer editor con `#f-motivo` |
 
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
