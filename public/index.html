@@ -1154,7 +1154,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
             <option value="cm2">Centímetro cuadrado (ancho × alto)</option>
           </select>
         </div>
-        <div><label>Tarifa por unidad</label><input type="text" id="prod-medida-tarifa" placeholder="Ej: 30000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Es tu precio de venta por unidad; ya incluye tu ganancia. Ej: si cobras $30.000 el m², escribe 30000.</div></div>
+        <div><label>Tarifa por unidad (venta)</label><input type="text" id="prod-medida-tarifa" placeholder="Ej: 8,5 o 30000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Tu precio de venta por unidad de medida; ya incluye tu ganancia. <b>Acepta decimales</b> (ej: $8,5 por cm²).</div></div>
+      </div>
+      <div class="msec"><span class="tri"></span>Costo por medida — proveedor (opcional)</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Si tu proveedor también te cobra por tamaño (ancho × alto), pon aquí su tarifa. Se calcula automáticamente como costo al hacer el pedido. Ej: el pendón te lo dan a $3,5 por cm² con un mínimo.</div>
+      <div class="fr2 fg">
+        <div><label>Tarifa de costo por unidad</label><input type="text" id="prod-costo-medida-tarifa" placeholder="Ej: 3,5"><div style="font-size:10px;color:var(--muted);margin-top:3px">Lo que te cuesta a ti por unidad de medida. Acepta decimales.</div></div>
+        <div><label>Costo mínimo (opcional)</label><input type="text" id="prod-costo-medida-minimo" placeholder="Ej: 15000"><div style="font-size:10px;color:var(--muted);margin-top:3px">Si el costo calculado da menos que esto, se registra este mínimo.</div></div>
       </div>
       <div class="msec"><span class="tri"></span>Costos fijos adicionales (opcional)</div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Se suman una vez a cada pieza, sin importar el tamaño. Ej: diseño, mensajería.</div>
@@ -1772,6 +1778,18 @@ function displayMoneyVal(raw){
   const v=evalExpr(raw);
   return v==null?String(raw):fCOP(v);
 }
+// Decimales estilo colombiano (coma decimal, punto miles) para tarifas por medida.
+function toFloatCO(s){
+  if(s==null)return 0;
+  let t=String(s).replace(/[^0-9.,]/g,'').trim();
+  if(t==='')return 0;
+  const c=t.lastIndexOf(','), d=t.lastIndexOf('.');
+  if(c>-1&&d>-1){ t=(c>d)?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,''); }
+  else if(c>-1){ t=t.replace(',','.'); }
+  const v=parseFloat(t);
+  return isFinite(v)?v:0;
+}
+function fmtTarifa(v){ const n=(typeof v==='number')?v:toFloatCO(v); if(!isFinite(n)||n===0)return ''; return String(n).replace('.',','); }
 function calcReferencialEncargo(enc){
   return(enc.items||[]).reduce((a,it)=>{
     const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
@@ -3405,6 +3423,8 @@ function resetProdForm(){
   document.getElementById('prod-medida-unidad').value='m2';
   document.getElementById('prod-medida-tarifa').value='';
   document.getElementById('prod-cobro-minimo').value='';
+  document.getElementById('prod-costo-medida-tarifa').value='';
+  document.getElementById('prod-costo-medida-minimo').value='';
   fProdHojaSuperficies=[];fProdHojaExtras=[];
   renderCostosFijos();
   renderVariantes();
@@ -3520,8 +3540,10 @@ async function abrirEditarProducto(id){
   document.getElementById('prod-modo-variantes').checked=prodModoCalculo==='variantes';
   document.getElementById('prod-modo-pliego').checked=prodModoCalculo==='pliego';
   document.getElementById('prod-medida-unidad').value=p.medida_unidad||'m2';
-  document.getElementById('prod-medida-tarifa').value=displayMoneyVal(p.medida_tarifa||'');
+  document.getElementById('prod-medida-tarifa').value=p.medida_tarifa||fmtTarifa(p.medida_tarifa_calc)||'';
   document.getElementById('prod-cobro-minimo').value=displayMoneyVal(p.cobro_minimo||'');
+  document.getElementById('prod-costo-medida-tarifa').value=p.costo_medida_tarifa||fmtTarifa(p.costo_medida_tarifa_calc)||'';
+  document.getElementById('prod-costo-medida-minimo').value=displayMoneyVal(p.costo_medida_minimo||'');
   renderProdCatRow();
   renderInsumos();
   renderRangos();
@@ -3544,7 +3566,8 @@ function validarProductoBody(b){
     if(definidoFE(b.insumos[i].costo_unitario)&&evalExpr(b.insumos[i].costo_unitario)===null)return`Costo unitario del insumo #${i+1} no es una expresión válida`;
   }
   if(b.tipo_precio==='medidas'){
-    if(!definidoFE(b.medida_tarifa)||evalExpr(b.medida_tarifa)===null)return'La tarifa por unidad de medida es obligatoria';
+    if(!definidoFE(b.medida_tarifa)||!(toFloatCO(b.medida_tarifa)>0))return'La tarifa por unidad de medida es obligatoria (acepta decimales, ej: 8,5)';
+    if(definidoFE(b.costo_medida_tarifa)&&!(toFloatCO(b.costo_medida_tarifa)>0))return'El costo por medida debe ser un número válido (acepta decimales)';
     for(let i=0;i<(b.costos_fijos||[]).length;i++){
       if(definidoFE(b.costos_fijos[i].valor)&&evalExpr(b.costos_fijos[i].valor)===null)return`Costo fijo #${i+1} no es una expresión válida`;
     }
@@ -3633,6 +3656,8 @@ async function guardarProducto(){
     rangos:tipoPrecio==='escalonado'?fProdRangos.map(r=>({desde:parseInt(r.desde,10)||0,hasta:(r.hasta===''||r.hasta==null)?null:parseInt(r.hasta,10),precio:evalExpr(r.precio)||0})):[],
     medida_unidad:document.getElementById('prod-medida-unidad').value,
     medida_tarifa:esMedidas?document.getElementById('prod-medida-tarifa').value.trim():'',
+    costo_medida_tarifa:esMedidas?document.getElementById('prod-costo-medida-tarifa').value.trim():'',
+    costo_medida_minimo:esMedidas?document.getElementById('prod-costo-medida-minimo').value.trim():'',
     costos_fijos:esMedidas?fProdCostosFijos.map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})):[],
     cobro_minimo:esMedidas?document.getElementById('prod-cobro-minimo').value.trim():'',
     variantes:esVariantes?fProdVariantes.map(serializarNodoVar):[],
@@ -3817,27 +3842,33 @@ function recalcularCostosAutomaticos(){
   fEnc.forEach(e=>{
     (e.items||[]).forEach(it=>{
       if(!it._fichaSel)return;
+      const f=it._fichaSel;
       const cantNum=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
       if(cantNum<=0)return;
-      let costoUnit=0, desc='';
-      if(it._fichaSel.tipo_precio==='variantes'){
+      const push=(desc,unit)=>{ if(unit>0)fCostos.push({id:uid(),descripcion:desc,cantidad:String(cantNum),valor_unitario:String(unit),monto:String(cantNum*unit),_auto:true}); };
+      if(f.tipo_precio==='variantes'){
         const sel=partesSeleccionadasVar(it);
         if(!sel.length)return;
-        costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
+        let costoUnit=costoTotalInsumosFicha(f.insumos);
         const partesUsadas=new Set();
         sel.forEach(s=>{
           if(!partesUsadas.has(s.parte.id)){partesUsadas.add(s.parte.id);costoUnit+=costoTotalCostosArr(s.parte.costos)}
           if(s.opcion)costoUnit+=costoTotalCostosArr(s.opcion.costos)*(s.qty||1);
         });
         const cadena=sel.map(s=>{const n=s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre;return (s.qty>1)?(n+' ×'+s.qty):n}).join(' + ');
-        desc='Costos: '+it._fichaSel.nombre+(cadena?' — '+cadena:'');
+        push('Costos: '+f.nombre+(cadena?' — '+cadena:''), costoUnit);
       }else{
-        if(!it._fichaSel.insumos||!it._fichaSel.insumos.length)return;
-        costoUnit=costoTotalInsumosFicha(it._fichaSel.insumos);
-        desc='Insumos: '+it._fichaSel.nombre;
+        if(f.insumos&&f.insumos.length) push('Insumos: '+f.nombre, costoTotalInsumosFicha(f.insumos));
+        // Costo por medida (proveedor): ancho×alto×tarifa con su mínimo
+        if(f.tipo_precio==='medidas'){
+          const ct=toFloatCO(f.costo_medida_tarifa_calc);
+          if(ct>0){
+            const a=parseFloat(it._ancho)||0, b2=parseFloat(it._alto)||0;
+            const area=(f.medida_unidad==='m')?a:a*b2;
+            if(area>0){ const cmin=parseFloat(f.costo_medida_minimo_calc)||0; push('Costo por medida: '+f.nombre, Math.max(cmin,Math.round(area*ct))); }
+          }
+        }
       }
-      if(costoUnit<=0)return;
-      fCostos.push({id:uid(),descripcion:desc,cantidad:String(cantNum),valor_unitario:String(costoUnit),monto:String(cantNum*costoUnit),_auto:true});
     });
   });
   renderCostos();

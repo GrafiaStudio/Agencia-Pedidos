@@ -224,6 +224,11 @@ try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_tarifa_calc TEXT");
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costos_fijos TEXT DEFAULT '[]'"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN cobro_minimo TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN cobro_minimo_calc TEXT"); } catch(e){}
+// Costo por medida (proveedor): tarifa con decimales + mínimo. Se calcula ancho×alto al pedir.
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_tarifa TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_tarifa_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_minimo TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_minimo_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN piezas_por_pliego INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN precio_pliego TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN precio_pliego_calc TEXT"); } catch(e){}
@@ -423,6 +428,19 @@ function nextRef(){
   return ref;
 }
 function toNum(s){return parseInt(String(s||0).replace(/\D/g,''))||0}
+// Parseo de número con DECIMALES (formato colombiano: coma decimal, punto miles).
+// El separador decimal es el que aparece más a la derecha. Ej: "8,5"→8.5, "1.234,5"→1234.5, "3.5"→3.5
+function toFloatCO(s){
+  if(s==null)return 0;
+  let t=String(s).replace(/[^0-9.,]/g,'').trim();
+  if(t==='')return 0;
+  const c=t.lastIndexOf(','), d=t.lastIndexOf('.');
+  if(c>-1&&d>-1){ t=(c>d)?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,''); }
+  else if(c>-1){ t=t.replace(',','.'); }
+  const v=parseFloat(t);
+  return isFinite(v)?v:0;
+}
+function normDecimal(raw){const v=toFloatCO(raw);return v?String(v):null;}
 function definido(v){return v!=null&&String(v).trim()!==''}
 function normVF(v){return definido(v)?String(v):null}
 
@@ -622,13 +640,23 @@ function calcPrecioHojaTotal(superficie,extras,cantidad){
 }
 const MEDIDA_UNIDADES_VALIDAS=['m2','m','cm2'];
 function calcPrecioMedidas(ficha,ancho,alto){
-  const tarifa=toNum(ficha.medida_tarifa_calc);
+  const tarifa=toFloatCO(ficha.medida_tarifa_calc);
   const a=parseFloat(ancho)||0, b=parseFloat(alto)||0;
   const area=(ficha.medida_unidad==='m')?a:a*b;
   let fijos=0;
   try{(Array.isArray(ficha.costos_fijos)?ficha.costos_fijos:JSON.parse(ficha.costos_fijos||'[]')).forEach(c=>{fijos+=toNum(c.valor_calc)})}catch(e){}
   const minimo=toNum(ficha.cobro_minimo_calc);
   return Math.max(minimo, Math.round(area*tarifa+fijos));
+}
+// Costo del proveedor calculado por medida (ancho×alto×tarifa_costo) con su propio mínimo.
+function calcCostoMedida(ficha,ancho,alto){
+  const ct=toFloatCO(ficha.costo_medida_tarifa_calc);
+  if(!(ct>0))return 0;
+  const a=parseFloat(ancho)||0, b=parseFloat(alto)||0;
+  const area=(ficha.medida_unidad==='m')?a:a*b;
+  if(!(area>0))return 0;
+  const min=toNum(ficha.costo_medida_minimo_calc);
+  return Math.max(min, Math.round(area*ct));
 }
 const MARGEN_TIPOS_VALIDOS=['multiplicador','porcentaje','fijo'];
 
@@ -659,7 +687,7 @@ function detectarPrecioEscalonado(rangos,cantidad){
   return null;
 }
 function precioOficialFicha(ficha,precioSugerido){
-  if(ficha.tipo_precio==='medidas')return toNum(ficha.medida_tarifa_calc);
+  if(ficha.tipo_precio==='medidas')return toFloatCO(ficha.medida_tarifa_calc);
   if(ficha.tipo_precio==='pliego'){
     const sup=(Array.isArray(ficha.pliego_superficies)&&ficha.pliego_superficies.length)?ficha.pliego_superficies[0]:null;
     if(sup){const pz=parseInt(sup.piezas,10)||0;return pz>0?Math.round(toNum(sup.precio_calc)/pz):0;}
@@ -741,7 +769,8 @@ function validarFicha(b,wsId,fid){
   }
   if(b.tipo_precio==='medidas'){
     if(b.medida_unidad!==undefined&&!MEDIDA_UNIDADES_VALIDAS.includes(b.medida_unidad))errores.push('Unidad de medida no válida');
-    if(!definido(b.medida_tarifa)||evalExpr(b.medida_tarifa)===null)errores.push('La tarifa por unidad de medida es obligatoria y debe ser una expresión válida');
+    if(!definido(b.medida_tarifa)||!(toFloatCO(b.medida_tarifa)>0))errores.push('La tarifa por unidad de medida es obligatoria (acepta decimales, ej: 8,5)');
+    if(definido(b.costo_medida_tarifa)&&!(toFloatCO(b.costo_medida_tarifa)>0))errores.push('El costo por medida debe ser un número válido (acepta decimales)');
     (b.costos_fijos||[]).forEach((c,i)=>{
       if(definido(c.valor)&&evalExpr(c.valor)===null)errores.push(`Costo fijo #${i+1} no es una expresión válida`);
     });
@@ -1404,9 +1433,9 @@ app.post('/api/productos',requiere('gestionar_productos'),(req,res)=>{
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid();
     if(!String(b.codigo||'').trim()){const n=db.prepare('SELECT COUNT(*) c FROM fichas_producto WHERE workspace_id=?').get(req.wsId).c;b.codigo='P'+String(n+1).padStart(4,'0');}
-    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,codigo,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo,medida_unidad,medida_tarifa,medida_tarifa_calc,costos_fijos,cobro_minimo,cobro_minimo_calc,piezas_por_pliego,precio_pliego,precio_pliego_calc,pliego_superficies,pliego_extras)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,req.wsId,b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b));
+    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,codigo,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo,medida_unidad,medida_tarifa,medida_tarifa_calc,costos_fijos,cobro_minimo,cobro_minimo_calc,costo_medida_tarifa,costo_medida_tarifa_calc,costo_medida_minimo,costo_medida_minimo_calc,piezas_por_pliego,precio_pliego,precio_pliego_calc,pliego_superficies,pliego_extras)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,req.wsId,b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normDecimal(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),normVF(b.costo_medida_tarifa),normDecimal(b.costo_medida_tarifa),normVF(b.costo_medida_minimo),normCalc(b.costo_medida_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b));
     guardarInsumos(id,b.insumos,req.wsId);
     guardarComposicion(id,b.componentes,req.wsId);
     guardarVariantes(id,b.variantes,req.wsId);
@@ -1422,8 +1451,8 @@ app.put('/api/productos/:id',requiere('gestionar_productos'),(req,res)=>{
     if(!f)return res.status(404).json({error:'No encontrado'});
     const errores=validarFicha(b,req.wsId,fid);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
-    db.prepare(`UPDATE fichas_producto SET nombre=?,codigo=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=?,medida_unidad=?,medida_tarifa=?,medida_tarifa_calc=?,costos_fijos=?,cobro_minimo=?,cobro_minimo_calc=?,piezas_por_pliego=?,precio_pliego=?,precio_pliego_calc=?,pliego_superficies=?,pliego_extras=? WHERE id=? AND workspace_id=?`)
-      .run(b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normCalc(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b),fid,req.wsId);
+    db.prepare(`UPDATE fichas_producto SET nombre=?,codigo=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=?,medida_unidad=?,medida_tarifa=?,medida_tarifa_calc=?,costos_fijos=?,cobro_minimo=?,cobro_minimo_calc=?,costo_medida_tarifa=?,costo_medida_tarifa_calc=?,costo_medida_minimo=?,costo_medida_minimo_calc=?,piezas_por_pliego=?,precio_pliego=?,precio_pliego_calc=?,pliego_superficies=?,pliego_extras=? WHERE id=? AND workspace_id=?`)
+      .run(b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normDecimal(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),normVF(b.costo_medida_tarifa),normDecimal(b.costo_medida_tarifa),normVF(b.costo_medida_minimo),normCalc(b.costo_medida_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b),fid,req.wsId);
     if(b.insumos!==undefined)guardarInsumos(fid,b.insumos,req.wsId);
     if(b.componentes!==undefined)guardarComposicion(fid,b.componentes,req.wsId);
     if(b.variantes!==undefined)guardarVariantes(fid,b.variantes,req.wsId);
