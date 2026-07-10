@@ -205,6 +205,29 @@ Spec: `docs/superpowers/specs/2026-07-10-fase6-dashboard-design.md`.
 
 ---
 
+## 🆕 v3.0 Fase 7 — Clientes: plegado + bloqueo por rol
+
+### server.js
+| Qué | Dónde |
+|---|---|
+| PERMISOS_FASE1 +`editar_clientes` | catálogo |
+| PUT /api/pedidos: neutraliza b.nombre/tel/cliente_id/cli_* sin permiso (antes de asegurarCliente) | inicio del PUT |
+| **PUT /api/clientes/:id** (nuevo, requiere editar_clientes; propaga nombre/tel a pedidos) | tras GET /clientes/:id |
+| DELETE /api/clientes/:id → requiere('editar_clientes') | ~1660 |
+
+### public/index.html
+| Qué | Dónde |
+|---|---|
+| Markup: toggle `#cli-more-toggle` + grid plegable `#cli-more` + hint `#cli-lock-hint` | editor pedido, tras nombre/tel |
+| CSS `.cli-more-toggle/.cli-lock-hint/.cli-dato/.cli-edit-grid` | tras `.dash-empty` |
+| `toggleCliMore(force)`, `CAMPOS_CLIENTE`, `aplicarBloqueoCliente(bloquear)` | antes de resetForm |
+| Hooks: `abrirNuevo` (plegado+unlock), `abrirEditar` (abre si hay datos + lock si !editar_clientes, ANTES de aplicarModoCerrado) | ~4460/4530 |
+| Modal Clientes: `verCli`→`renderCliModal(editando)`, `cliDatoRow`, `guardarCli` | bloque CLIENTES |
+
+Spec: `docs/superpowers/specs/2026-07-10-fase7-clientes-design.md`.
+
+---
+
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
 | Archivo | Peso | Qué contiene |

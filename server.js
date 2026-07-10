@@ -170,7 +170,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
   activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','editar_clientes','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
 const ENC_ESTADOS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 function permisosDeRol(rol){
   if(!rol) return {};
@@ -1110,6 +1110,9 @@ app.put('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const act=actorDe(req);
+    // v3.0 Fase 7 — sin permiso editar_clientes, una edición del pedido NO puede tocar los datos del cliente
+    const puedeCli=!!(req.permisos&&(req.permisos.__admin||req.permisos.editar_clientes===true));
+    if(!puedeCli){ b.nombre=p.nombre; b.tel=undefined; b.cliente_id=p.cliente_id; b.cli_nit=undefined; b.cli_email=undefined; b.cli_direccion=undefined; b.cli_contacto=undefined; }
     const firmaAntes=firmaClave(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid))); // v3.0 Fase 2b
     const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id,req.wsId,{nit:b.cli_nit,email:b.cli_email,direccion:b.cli_direccion,contacto:b.cli_contacto});
     // Log cambios de estado checkboxes
@@ -1320,6 +1323,22 @@ app.get('/api/clientes/:id',(req,res)=>{
     return p;
   });
   res.json(c);
+});
+// v3.0 Fase 7 — editar la ficha del cliente (solo roles autorizados, desde el módulo Clientes)
+app.put('/api/clientes/:id',requiere('editar_clientes'),(req,res)=>{
+  const c=db.prepare('SELECT * FROM clientes WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!c)return res.status(404).json({error:'No encontrado'});
+  const b=req.body||{};
+  const nombre=(b.nombre!=null&&String(b.nombre).trim())?String(b.nombre).trim():c.nombre;
+  db.prepare(`UPDATE clientes SET nombre=?,tel=?,nit=?,email=?,direccion=?,contacto=?,notas=? WHERE id=? AND workspace_id=?`)
+    .run(nombre,b.tel!=null?String(b.tel).trim():c.tel,b.nit!=null?String(b.nit).trim():c.nit,
+         b.email!=null?String(b.email).trim():c.email,b.direccion!=null?String(b.direccion).trim():c.direccion,
+         b.contacto!=null?String(b.contacto).trim():c.contacto,b.notas!=null?String(b.notas):c.notas,
+         req.params.id,req.wsId);
+  // Mantener el nombre/tel copiados en los pedidos del cliente coherentes con la ficha
+  db.prepare('UPDATE pedidos SET nombre=?,tel=? WHERE cliente_id=? AND workspace_id=?')
+    .run(nombre,b.tel!=null?String(b.tel).trim():c.tel,req.params.id,req.wsId);
+  res.json(db.prepare('SELECT * FROM clientes WHERE id=?').get(req.params.id));
 });
 
 // Stats
@@ -1716,7 +1735,7 @@ app.delete('/api/inventario-items/:id',requiere('gestionar_inventario'),(req,res
   res.json({ok:true});
 });
 
-app.delete('/api/clientes/:id',(req,res)=>{
+app.delete('/api/clientes/:id',requiere('editar_clientes'),(req,res)=>{ // Fase 7: borrado definitivo solo roles autorizados (el flujo normal es archivar)
   const r=db.prepare('DELETE FROM clientes WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});
   res.json({ok:true});

@@ -260,6 +260,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .dash-act .asub{font-size:9px;color:var(--muted);margin-top:1px}
 .dash-empty{font-size:10.5px;color:var(--muted);padding:10px 2px}
 
+/* CLIENTES (Fase 7) — plegado + bloqueo por rol */
+.cli-more-toggle{display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:2px 0;font-size:10px;font-weight:700;color:var(--teal-dk);cursor:pointer;letter-spacing:.02em}
+.cli-more-toggle:hover{text-decoration:underline}
+.cli-more-toggle i{font-size:12px;transition:transform .15s}
+.cli-more-toggle.open i{transform:rotate(90deg)}
+.cli-more-toggle .cmt-hint{font-weight:600;color:var(--muted);margin-left:2px;font-size:9px}
+.cli-lock-hint{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:600;color:var(--muted);background:var(--line-lt);padding:2px 9px;border-radius:20px}
+.cli-lock-hint i{font-size:11px}
+.cli-dato{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--line-lt);font-size:11px}
+.cli-dato:last-child{border-bottom:none}
+.cli-dato .dl{width:78px;flex-shrink:0;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding-top:2px}
+.cli-dato .dv{color:var(--navy);font-weight:600;min-width:0;overflow-wrap:anywhere}
+.cli-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+
 /* Tags de categoría */
 .tags{display:flex;gap:3px;flex-wrap:wrap;margin:4px 0 2px}
 .ttag{font-size:8px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;color:#fff}
@@ -1078,7 +1092,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div><label>Teléfono / WhatsApp</label><input type="text" id="f-tel" placeholder="310 000 0000"></div>
     </div>
-    <div class="fg" style="display:grid;grid-template-columns:1fr 1fr 1.4fr 1.2fr;gap:14px">
+    <!-- v3.0 Fase 7 — datos secundarios del cliente, plegados -->
+    <div style="display:flex;align-items:center;gap:10px;margin:-4px 0 10px">
+      <button type="button" class="cli-more-toggle" id="cli-more-toggle" onclick="toggleCliMore()"><i class="ti ti-chevron-right" id="cli-more-chev"></i>Más datos del cliente<span class="cmt-hint">NIT · contacto · dirección · correo</span></button>
+      <span class="cli-lock-hint" id="cli-lock-hint" style="display:none"><i class="ti ti-lock"></i>Solo roles autorizados editan los datos del cliente</span>
+    </div>
+    <div class="fg" id="cli-more" style="display:none;grid-template-columns:1fr 1fr 1.4fr 1.2fr;gap:14px">
       <div><label>NIT / CC / RUT</label><input type="text" id="f-cli-nit" placeholder="Opcional"></div>
       <div><label>Contacto</label><input type="text" id="f-cli-contacto" placeholder="Persona de contacto"></div>
       <div><label>Dirección</label><input type="text" id="f-cli-direccion" placeholder="Opcional"></div>
@@ -1635,7 +1654,7 @@ function showCfgTab(tab){
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
-const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_dashboard:'Ver Dashboard ejecutivo',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
+const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_dashboard:'Ver Dashboard ejecutivo',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',editar_clientes:'Editar clientes (ficha y datos en pedidos)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
 // Mapa vista -> permiso requerido (para el gating de navegación)
 const VIEW_PERM={registros:'ver_registros',dashboard:'ver_dashboard',produccion:'ver_produccion',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
@@ -2667,12 +2686,40 @@ let _cliActual=null;
 async function verCli(id){
   const c=await api('GET',`/clientes/${id}`);
   _cliActual=c;
+  renderCliModal(false);
+  document.getElementById('ovCli').classList.add('open');
+}
+// v3.0 Fase 7 — ficha del cliente en el módulo Clientes; edición solo con permiso editar_clientes
+function cliDatoRow(l,v){ return v?`<div class="cli-dato"><div class="dl">${l}</div><div class="dv">${pesc(v)}</div></div>`:''; }
+function renderCliModal(editando){
+  const c=_cliActual;
   document.getElementById('cli-nom').textContent=c.nombre;
+  const puedeEd=puede('editar_clientes');
+  const datos=editando?`
+    <div class="cli-edit-grid">
+      <div><label>Nombre</label><input id="ce-nombre" type="text" value="${pesc(c.nombre)}"></div>
+      <div><label>Teléfono</label><input id="ce-tel" type="text" value="${pesc(c.tel||'')}"></div>
+      <div><label>NIT / CC / RUT</label><input id="ce-nit" type="text" value="${pesc(c.nit||'')}"></div>
+      <div><label>Email</label><input id="ce-email" type="email" value="${pesc(c.email||'')}"></div>
+      <div><label>Dirección</label><input id="ce-direccion" type="text" value="${pesc(c.direccion||'')}"></div>
+      <div><label>Contacto</label><input id="ce-contacto" type="text" value="${pesc(c.contacto||'')}"></div>
+    </div>
+    <div><label>Observaciones</label><textarea id="ce-notas" style="min-height:44px">${pesc(c.notas||'')}</textarea></div>
+    <div style="display:flex;gap:7px;justify-content:flex-end;margin:10px 0 14px">
+      <button class="btn-ghost" onclick="renderCliModal(false)">Cancelar</button>
+      <button class="btn-pri" onclick="guardarCli()"><i class="ti ti-device-floppy"></i>Guardar datos</button>
+    </div>`:`
+    <div style="margin-bottom:14px">
+      ${cliDatoRow('Teléfono',c.tel)}${cliDatoRow('NIT/CC',c.nit)}${cliDatoRow('Email',c.email)}${cliDatoRow('Dirección',c.direccion)}${cliDatoRow('Contacto',c.contacto)}${cliDatoRow('Notas',c.notas)}
+      ${puedeEd?`<div style="margin-top:8px"><button class="btn-ghost" style="font-size:10px;padding:5px 12px" onclick="renderCliModal(true)"><i class="ti ti-pencil"></i>Editar datos</button></div>`
+               :`<div class="cli-lock-hint" style="margin-top:8px"><i class="ti ti-lock"></i>Solo roles autorizados editan los datos del cliente</div>`}
+    </div>`;
   document.getElementById('cli-body').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
       <div class="sc"><div class="sc-l">Pedidos</div><div class="sc-n">${(c.pedidos||[]).length}</div></div>
       <div class="sc tl"><div class="sc-l">Tel</div><div class="sc-n" style="font-size:14px">${c.tel||'—'}</div></div>
     </div>
+    ${datos}
     <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px">Historial</div>
     ${(c.pedidos||[]).length?(c.pedidos||[]).map(p=>{
       const resumen=(p.encargosResumen||[]).map(e=>{
@@ -2700,6 +2747,21 @@ function nuevoPedidoDesdeCliente(){
   if(!_cliActual)return;
   cerrarCli();
   abrirNuevoParaCli(_cliActual.id,_cliActual.nombre,_cliActual.tel||'');
+}
+// v3.0 Fase 7 — guardar la ficha del cliente (PUT /clientes/:id, requiere editar_clientes)
+async function guardarCli(){
+  if(!_cliActual)return;
+  const nombre=document.getElementById('ce-nombre').value.trim();
+  if(!nombre){toast('El nombre es obligatorio',false);return}
+  const body={nombre,tel:document.getElementById('ce-tel').value.trim(),nit:document.getElementById('ce-nit').value.trim(),
+    email:document.getElementById('ce-email').value.trim(),direccion:document.getElementById('ce-direccion').value.trim(),
+    contacto:document.getElementById('ce-contacto').value.trim(),notas:document.getElementById('ce-notas').value};
+  try{
+    const c=await api('PUT',`/clientes/${_cliActual.id}`,body);
+    _cliActual={..._cliActual,...c};
+    renderCliModal(false); toast('Cliente actualizado ✓');
+    cargarClientes(); cargarPedidos(); // el nombre/tel copiado en pedidos también cambia
+  }catch(e){toast('Error: '+e.message,false)}
 }
 function cerrarCli(){document.getElementById('ovCli').classList.remove('open')}
 
@@ -4409,6 +4471,18 @@ function renderHist(hist,version){
 }
 
 /* ══ MODAL ══ */
+/* v3.0 Fase 7 — datos secundarios del cliente plegados + bloqueo por rol */
+function toggleCliMore(force){
+  const box=document.getElementById('cli-more'), tg=document.getElementById('cli-more-toggle');
+  const abrir=(force!==undefined)?force:(box.style.display==='none');
+  box.style.display=abrir?'grid':'none';
+  tg.classList.toggle('open',abrir);
+}
+const CAMPOS_CLIENTE=['f-nom','f-tel','f-cli-nit','f-cli-contacto','f-cli-direccion','f-cli-email'];
+function aplicarBloqueoCliente(bloquear){
+  CAMPOS_CLIENTE.forEach(id=>{const e=document.getElementById(id);if(e)e.disabled=!!bloquear;});
+  const h=document.getElementById('cli-lock-hint'); if(h)h.style.display=bloquear?'inline-flex':'none';
+}
 function resetForm(){
   fEnc=[];fPag=[];fArch=[];fCostos=[];fCostosManual=false;encCounter=0;editCliId=null;fValorFinalRaw='';_pagosNuevos.clear();
   ['f-nom','f-tel','f-fecha','f-notas','f-valor-final','f-cli-nit','f-cli-contacto','f-cli-direccion','f-cli-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
@@ -4433,6 +4507,7 @@ function abrirNuevo(){
   document.getElementById('m-tit').textContent='Nuevo pedido';
   document.getElementById('m-ref').textContent='';
   ['btn-del','btn-pdf','btn-wa','btn-print','btn-cerrar','btn-reabrir'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  toggleCliMore(false); aplicarBloqueoCliente(false); // Fase 7 — nuevo pedido: plegado y siempre editable
   aplicarModoCerrado(false,null); // v3.0 Fase 3 — un pedido nuevo nunca está cerrado
   const mw=document.getElementById('f-motivo-wrap'); if(mw)mw.style.display='none'; // motivo solo al editar
   const vb=document.getElementById('ped-version-badge'); if(vb)vb.style.display='none';
@@ -4505,6 +4580,9 @@ async function abrirEditar(id){
   const br=document.getElementById('btn-reabrir'); if(br)br.style.display=puedeReabrir?'inline-flex':'none';
   // v3.0 Fase 2b — el motivo del cambio solo aplica al editar un pedido existente
   const mw=document.getElementById('f-motivo-wrap'); if(mw){mw.style.display='';document.getElementById('f-motivo').value='';}
+  // v3.0 Fase 7 — plegado (abre solo si hay datos) + bloqueo del cliente por rol al editar
+  toggleCliMore(!!(p.cli_nit||p.cli_contacto||p.cli_direccion||p.cli_email));
+  aplicarBloqueoCliente(!puede('editar_clientes'));
   renderEncs();renderPagos();renderCostos();renderArchivos();renderHist(p.historial,p.version);
   actualizarValorTotal();actualizarProgreso();
   aplicarModoCerrado(!!p.cerrado,p); // v3.0 Fase 3 — bloquea el form si está cerrado (tras render de listas)
