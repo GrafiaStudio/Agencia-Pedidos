@@ -207,6 +207,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pcx-obs textarea{font-size:11px;min-height:46px;background:#F8FAFD}
 .pcx-obs .hint{font-size:9px;color:var(--muted);margin-top:3px}
 .prod-avatar{width:22px;height:22px;border-radius:50%;background:var(--teal-lt);color:var(--teal-dk);font-size:9px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.pcx-stock{margin-top:8px;display:none;background:#F6F9FC;border:1px solid var(--line);border-radius:9px;padding:9px}
+.pcx-stock.open{display:block}
+.pcx-stock .lbl2{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.pcx-stk-item{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--navy);padding:3px 0;border-bottom:1px solid var(--line-lt)}
+.pcx-stk-item b{font-weight:700}
+.pcx-stk-item button{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px;line-height:1}
+.pcx-stk-item button:hover{color:var(--red)}
+.pcx-stk-empty{font-size:10px;color:var(--muted);padding:2px 0 6px}
+.pcx-stk-add{display:flex;gap:5px;margin-top:8px}
+.pcx-stk-add select{flex:1;min-width:0;font-size:10.5px;padding:6px 8px;border-radius:8px;font-weight:600}
+.pcx-stk-add input{width:54px;flex-shrink:0;font-size:10.5px;padding:6px 6px;border-radius:8px;text-align:center}
+.pcx-stk-add button{flex-shrink:0;width:30px;background:var(--navy);border:none;border-radius:8px;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.pcx-stk-add button:hover{background:var(--navy2)}
+.pcx-stk-add button:disabled{opacity:.4;cursor:default}
 
 /* Tags de categoría */
 .tags{display:flex;gap:3px;flex-wrap:wrap;margin:4px 0 2px}
@@ -1551,7 +1565,7 @@ function showCfgTab(tab){
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
-const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
+const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
 // Mapa vista -> permiso requerido (para el gating de navegación)
 const VIEW_PERM={registros:'ver_registros',produccion:'ver_produccion',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
@@ -2221,13 +2235,13 @@ function buildEncSummary(encs){
 }
 
 /* ══ PRODUCCIÓN (Fase 4) ══ */
-let PROD_CARDS=[], PROD_EQUIPO=[], prodFUrg=false;
+let PROD_CARDS=[], PROD_EQUIPO=[], PROD_INV=[], prodFUrg=false;
 function pesc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 async function cargarProduccion(){
   try{
-    const [cards,equipo]=await Promise.all([api('GET','/produccion'),api('GET','/produccion/equipo')]);
-    PROD_CARDS=cards||[]; PROD_EQUIPO=equipo||[];
-  }catch(e){ PROD_CARDS=[];PROD_EQUIPO=[]; toast('Error cargando producción: '+e.message,false); }
+    const [cards,equipo,inv]=await Promise.all([api('GET','/produccion'),api('GET','/produccion/equipo'),api('GET','/inventario-items').catch(()=>[])]);
+    PROD_CARDS=cards||[]; PROD_EQUIPO=equipo||[]; PROD_INV=inv||[];
+  }catch(e){ PROD_CARDS=[];PROD_EQUIPO=[];PROD_INV=[]; toast('Error cargando producción: '+e.message,false); }
   const rs=document.getElementById('prod-f-resp');
   if(rs){ const cur=rs.value; rs.innerHTML='<option value="">Todos los responsables</option><option value="__none">Sin asignar</option>'+PROD_EQUIPO.map(u=>`<option value="${u.id}">${pesc(u.nombre)}</option>`).join(''); rs.value=cur; }
   const cs=document.getElementById('prod-f-cat');
@@ -2272,6 +2286,7 @@ function prodCardHTMLp(c,editable){
   const respOpts=`<option value="">Sin responsable</option>`+PROD_EQUIPO.map(u=>`<option value="${u.id}" ${u.id===c.responsable_id?'selected':''}>${pesc(u.nombre)}</option>`).join('');
   const estOpts=ENC_ESTS.map(e=>`<option value="${e}" ${e===c.estado?'selected':''}>${e}</option>`).join('');
   const dis=editable?'':'disabled';
+  const puedeConsumir=puede('consumir_inventario');
   const av=c.responsable_nombre?`<span class="prod-avatar" title="${pesc(c.responsable_nombre)}">${ini(c.responsable_nombre)}</span>`:'';
   return `<div class="prodx-card ${c.urgente?'urg':''}">
     <div class="pcx-top"><span class="pcx-ref" onclick="abrirEditar('${c.pedido_id}')">#${c.ref} · E${c.numero}</span>${c.urgente?'<span class="pcx-urg" title="Urgente"><i class="ti ti-bolt"></i></span>':''}</div>
@@ -2282,16 +2297,35 @@ function prodCardHTMLp(c,editable){
     <div class="pcx-row">
       ${av}
       <select class="pcx-resp" ${dis} onchange="prodSetResp('${c.encargo_id}',this.value)" title="Responsable">${respOpts}</select>
-      <button class="pcx-obsbtn ${c.notas_tec?'has':''}" onclick="prodToggleObs('${c.encargo_id}')" title="Observación técnica"><i class="ti ti-note"></i></button>
     </div>
     <div class="pcx-row">
       <select class="pcx-est" ${dis} onchange="prodSetEstado('${c.encargo_id}',this.value)" title="Estado de producción" style="flex:1">${estOpts}</select>
+      <button class="pcx-obsbtn ${c.notas_tec?'has':''}" onclick="prodToggleObs('${c.encargo_id}')" title="Observación técnica"><i class="ti ti-note"></i></button>
+      <button class="pcx-obsbtn ${(c.consumos&&c.consumos.length)?'has':''}" onclick="prodToggleStock('${c.encargo_id}')" title="Materiales / Stock"><i class="ti ti-package"></i></button>
     </div>
     <div class="pcx-obs" id="obs-${c.encargo_id}">
       <textarea ${dis} id="obstx-${c.encargo_id}" placeholder="Observaciones técnicas para producción…">${pesc(c.notas_tec||'')}</textarea>
       ${editable?`<div style="display:flex;gap:6px;margin-top:6px"><button class="btn-add-row" style="padding:5px 10px" onclick="prodGuardarObs('${c.encargo_id}')"><i class="ti ti-check"></i> Guardar nota</button></div>`:'<div class="hint">Solo lectura</div>'}
     </div>
+    <div class="pcx-stock" id="stk-${c.encargo_id}">
+      <div class="lbl2">Materiales usados</div>
+      <div class="pcx-stk-list">${prodConsumosHTML(c,puedeConsumir)}</div>
+      ${puedeConsumir?`<div class="pcx-stk-add">
+        <select id="stksel-${c.encargo_id}">${prodInvOptions()}</select>
+        <input type="number" id="stkqty-${c.encargo_id}" min="0" step="any" placeholder="Cant">
+        <button onclick="prodConsumir('${c.encargo_id}')" title="Registrar consumo"><i class="ti ti-minus"></i></button>
+      </div>`:'<div class="pcx-stk-empty">Solo lectura</div>'}
+    </div>
   </div>`;
+}
+function prodConsumosHTML(c,puedeConsumir){
+  if(!c.consumos||!c.consumos.length)return '<div class="pcx-stk-empty">Sin materiales registrados</div>';
+  return c.consumos.map(k=>`<div class="pcx-stk-item"><span>${pesc(k.item_nombre)} · <b>${k.cantidad}${k.unidad?' '+pesc(k.unidad):''}</b></span>${puedeConsumir?`<button onclick="prodQuitarConsumo('${k.id}','${c.encargo_id}')" title="Quitar y devolver al stock"><i class="ti ti-arrow-back-up"></i></button>`:''}</div>`).join('');
+}
+function prodInvOptions(){
+  const disp=PROD_INV.filter(i=>i.activo!==0&&i.stock_actual!=null);
+  if(!disp.length)return '<option value="">Sin ítems de inventario</option>';
+  return '<option value="">Ítem de inventario…</option>'+disp.map(i=>`<option value="${i.id}">${pesc(i.nombre)} · ${i.stock_actual}${i.unidad_medida?' '+pesc(i.unidad_medida):''}</option>`).join('');
 }
 function prodEntrega(c){
   if(!c.fecha_entrega)return '';
@@ -2324,6 +2358,29 @@ async function prodGuardarObs(encId){
   try{ await api('PUT',`/produccion/encargo/${encId}`,{notas_tec:txt});
     const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c)c.notas_tec=txt;
     renderProduccion(); toast('Observación guardada ✓');
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+function prodToggleStock(encId){ document.getElementById('stk-'+encId)?.classList.toggle('open'); }
+function prodReabrirStock(encId){ renderProduccion(); document.getElementById('stk-'+encId)?.classList.add('open'); }
+async function prodConsumir(encId){
+  const sel=document.getElementById('stksel-'+encId), qty=document.getElementById('stkqty-'+encId);
+  const item_inv_id=sel?.value||''; const cantidad=Number(qty?.value||0);
+  if(!item_inv_id){toast('Elige un ítem de inventario',false);return}
+  if(!(cantidad>0)){toast('Cantidad inválida',false);return}
+  try{
+    const r=await api('POST',`/produccion/encargo/${encId}/consumo`,{item_inv_id,cantidad});
+    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c){c.consumos=c.consumos||[];c.consumos.push(r.consumo);}
+    const inv=PROD_INV.find(x=>x.id===item_inv_id); if(inv&&r.stock_actual!=null)inv.stock_actual=r.stock_actual;
+    prodReabrirStock(encId); toast('Material descontado ✓');
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+async function prodQuitarConsumo(consumoId,encId){
+  if(!confirm('¿Quitar este consumo y devolver la cantidad al stock?'))return;
+  try{
+    const r=await api('DELETE',`/produccion/consumo/${consumoId}`);
+    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c)c.consumos=(c.consumos||[]).filter(k=>k.id!==consumoId);
+    const inv=PROD_INV.find(x=>x.id===r.item_inv_id); if(inv&&inv.stock_actual!=null)inv.stock_actual+=Number(r.stock_restaurado)||0;
+    prodReabrirStock(encId); toast('Consumo revertido ✓');
   }catch(e){ toast('Error: '+e.message,false); }
 }
 

@@ -135,6 +135,12 @@ try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado_motivo TEXT DEFAULT ''"); 
 // ── PRODUCCIÓN (v3.0 Fase 4) — responsable y observación técnica por encargo ──
 try { db.exec("ALTER TABLE encargos ADD COLUMN responsable_id TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE encargos ADD COLUMN notas_tec TEXT DEFAULT ''"); } catch(e){}
+// ── INVENTARIO DESDE PRODUCCIÓN (v3.0 Fase 5) — consumo real, ledger reversible ──
+db.exec(`CREATE TABLE IF NOT EXISTS consumo_inventario(
+  id TEXT PRIMARY KEY, workspace_id TEXT, pedido_id TEXT, encargo_id TEXT,
+  item_inv_id TEXT, item_nombre TEXT, unidad TEXT DEFAULT '', cantidad REAL,
+  usuario_id TEXT DEFAULT '', usuario_nombre TEXT DEFAULT '',
+  creado TEXT DEFAULT(datetime('now','localtime')))`);
 // ── WORKSPACES (aislamiento multi-tenant) ──
 // Cada PIN mapea a un workspace independiente. 'main' es el negocio real (PIN=APP_PIN);
 // los 'prueba-N' son accesos temporales para testers, con su propio espacio aislado.
@@ -164,7 +170,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
   activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_produccion','gestionar_produccion','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_produccion','gestionar_produccion','consumir_inventario','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
 const ENC_ESTADOS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 function permisosDeRol(rol){
   if(!rol) return {};
@@ -1191,13 +1197,14 @@ app.get('/api/produccion',requiere('ver_produccion'),(req,res)=>{
     encs.forEach(enc=>{
       resolverCategoriasEncargo(enc);
       const items=db.prepare('SELECT cantidad,detalle FROM enc_items WHERE encargo_id=? ORDER BY orden').all(enc.id);
+      const consumos=db.prepare('SELECT id,item_inv_id,item_nombre,unidad,cantidad FROM consumo_inventario WHERE encargo_id=? AND workspace_id=? ORDER BY creado').all(enc.id,req.wsId);
       tarjetas.push({
         pedido_id:p.id, ref:p.ref, cliente:p.nombre, tel:p.tel||'', urgente:!!p.urgente,
         fecha_entrega:p.fecha_entrega||'', creado:p.creado,
         encargo_id:enc.id, numero:enc.numero||1, estado:ENC_ESTADOS.includes(enc.estado)?enc.estado:'Nuevo',
         categorias:enc.categorias||[], anotacion:enc.anotacion||'',
         responsable_id:enc.responsable_id||'', responsable_nombre:uById[enc.responsable_id]||'',
-        notas_tec:enc.notas_tec||'', items
+        notas_tec:enc.notas_tec||'', items, consumos
       });
     });
   });
@@ -1234,6 +1241,37 @@ app.put('/api/produccion/encargo/:id',requiere('gestionar_produccion'),(req,res)
   db.prepare(`UPDATE encargos SET ${sets.join(',')} WHERE id=? AND workspace_id=?`).run(...vals);
   logs.forEach(t=>addHist(enc.p_id,t,req.wsId,act));
   res.json({ok:true});
+});
+
+// ── INVENTARIO DESDE PRODUCCIÓN (v3.0 Fase 5) — consumo real, híbrido ──
+// El operario registra el material físico usado en un encargo. Descuenta stock exacto y deja
+// un registro reversible. Convive con el descuento automático del producto (compatibilidad).
+app.post('/api/produccion/encargo/:id/consumo',requiere('consumir_inventario'),(req,res)=>{
+  const enc=db.prepare('SELECT e.numero, e.id AS e_id, p.cerrado AS p_cerrado, p.id AS p_id FROM encargos e JOIN pedidos p ON p.id=e.pedido_id WHERE e.id=? AND e.workspace_id=?').get(req.params.id,req.wsId);
+  if(!enc)return res.status(404).json({error:'Encargo no encontrado'});
+  if(enc.p_cerrado)return res.status(409).json({error:'El pedido está cerrado'});
+  const b=req.body||{}; const cant=Number(b.cantidad);
+  if(!b.item_inv_id)return res.status(400).json({error:'Elige un ítem de inventario'});
+  if(!(cant>0))return res.status(400).json({error:'La cantidad debe ser mayor a 0'});
+  const it=db.prepare('SELECT * FROM items_inventario WHERE id=? AND workspace_id=?').get(b.item_inv_id,req.wsId);
+  if(!it)return res.status(404).json({error:'Ítem de inventario no encontrado'});
+  if(it.stock_actual==null)return res.status(400).json({error:'Ese ítem no lleva control de stock'});
+  const act=actorDe(req); const id=uid();
+  db.prepare('UPDATE items_inventario SET stock_actual=stock_actual-? WHERE id=? AND workspace_id=?').run(cant,it.id,req.wsId);
+  db.prepare('INSERT INTO consumo_inventario(id,workspace_id,pedido_id,encargo_id,item_inv_id,item_nombre,unidad,cantidad,usuario_id,usuario_nombre)VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .run(id,req.wsId,enc.p_id,enc.e_id,it.id,it.nombre,it.unidad_medida||'',cant,act.id||'',act.nombre||'');
+  addHist(enc.p_id,`Producción · Encargo #${enc.numero}: consumió ${cant} ${it.unidad_medida||''} de "${it.nombre}"`,req.wsId,act);
+  res.json({ok:true, consumo:{id,item_inv_id:it.id,item_nombre:it.nombre,unidad:it.unidad_medida||'',cantidad:cant}, item_inv_id:it.id, stock_actual:it.stock_actual-cant});
+});
+app.delete('/api/produccion/consumo/:id',requiere('consumir_inventario'),(req,res)=>{
+  const c=db.prepare('SELECT c.*, p.cerrado AS p_cerrado, e.numero AS enc_num FROM consumo_inventario c JOIN pedidos p ON p.id=c.pedido_id LEFT JOIN encargos e ON e.id=c.encargo_id WHERE c.id=? AND c.workspace_id=?').get(req.params.id,req.wsId);
+  if(!c)return res.status(404).json({error:'Consumo no encontrado'});
+  if(c.p_cerrado)return res.status(409).json({error:'El pedido está cerrado'});
+  const act=actorDe(req);
+  db.prepare('UPDATE items_inventario SET stock_actual=stock_actual+? WHERE id=? AND workspace_id=?').run(c.cantidad,c.item_inv_id,req.wsId);
+  db.prepare('DELETE FROM consumo_inventario WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  addHist(c.pedido_id,`Producción · Encargo #${c.enc_num||''}: revirtió consumo de ${c.cantidad} ${c.unidad||''} de "${c.item_nombre}"`,req.wsId,act);
+  res.json({ok:true, stock_restaurado:c.cantidad, item_inv_id:c.item_inv_id});
 });
 
 // Archivos

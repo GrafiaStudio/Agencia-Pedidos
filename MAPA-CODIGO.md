@@ -161,6 +161,30 @@ Spec: `docs/superpowers/specs/2026-07-10-fase4-modulo-produccion-design.md`.
 
 ---
 
+## 🆕 v3.0 Fase 5 — Inventario desde Producción (híbrido)
+
+### server.js
+| Qué | Dónde |
+|---|---|
+| `CREATE TABLE consumo_inventario` (ledger reversible) | tras migración de Producción |
+| PERMISOS_FASE1 +`consumir_inventario` | catálogo |
+| `consumos:[...]` por tarjeta en GET /produccion | dentro del forEach de encargos |
+| **POST /produccion/encargo/:id/consumo** (descuenta stock, 409 si cerrado, historial), **DELETE /produccion/consumo/:id** (devuelve stock) | tras PUT /produccion/encargo/:id |
+| Descuento automático `descontarStock` SIN cambios (compatibilidad) | — |
+
+### public/index.html
+| Qué | Dónde |
+|---|---|
+| CSS `.pcx-stock/.pcx-stk-*` | tras `.prod-avatar` |
+| `PERM_LABELS.consumir_inventario` | ~1490 |
+| Botón 📦 + panel `.pcx-stock` en la tarjeta; `prodConsumosHTML`, `prodInvOptions` | en `prodCardHTMLp` |
+| `PROD_INV` + carga de `/inventario-items` en `cargarProduccion` | ~2238/2242 |
+| **funcs** `prodToggleStock, prodReabrirStock, prodConsumir, prodQuitarConsumo` | tras `prodGuardarObs` |
+
+Spec: `docs/superpowers/specs/2026-07-10-fase5-inventario-desde-produccion-design.md`.
+
+---
+
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
 | Archivo | Peso | Qué contiene |
