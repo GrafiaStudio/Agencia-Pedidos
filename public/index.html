@@ -1086,19 +1086,16 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <div id="prod-paso-form" style="display:none">
     <button class="btn-ghost" id="prod-btn-cambiar-tipo" style="margin-bottom:10px" onclick="document.getElementById('prod-paso-tipo').style.display='block';document.getElementById('prod-paso-form').style.display='none'"><i class="ti ti-arrow-left"></i>Cambiar tipo</button>
-    <div class="fg" style="display:grid;grid-template-columns:118px 1.5fr 1fr auto;gap:14px;align-items:end">
+    <div class="fg" style="display:grid;grid-template-columns:100px 1.5fr 1fr 1.2fr auto;gap:12px;align-items:end">
       <div><label>Código</label><input type="text" id="prod-codigo" placeholder="Auto" style="font-family:'DM Mono',monospace;text-transform:uppercase"></div>
       <div><label>Nombre del producto</label><input type="text" id="prod-nombre" placeholder="Ej: Retablo 10x15cm"></div>
       <div><label>Categoría</label><select id="prod-cat-sel" onchange="setProdCat(this.value)"></select></div>
+      <div><label>Descuenta inventario</label><select id="prod-inv-item" onchange="onProdInvChange()"><option value="">— No descuenta —</option></select></div>
       <div style="padding-bottom:1px"><div class="ck-box" style="display:inline-flex"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div></div>
     </div>
-    <div class="fr2 fg">
-      <div><label>Vincular con inventario (opcional)</label>
-        <select id="prod-inv-item" onchange="onProdInvChange()"><option value="">— No descuenta inventario —</option></select>
-        <div style="font-size:9.5px;color:var(--muted);margin-top:3px">Al confirmar un pedido descuenta del ítem físico elegido. Varios productos pueden usar el mismo.</div>
-      </div>
-      <div id="prod-inv-cant-wrap" style="display:none"><label>Cantidad que consume por unidad</label>
-        <input type="text" id="prod-inv-cant" placeholder="Ej: 1 · acepta decimales (0.7)"></div>
+    <div id="prod-inv-cant-wrap" style="display:none;max-width:300px;margin-top:10px"><label>Cantidad que consume por unidad</label>
+      <input type="text" id="prod-inv-cant" placeholder="Ej: 1 · acepta decimales (0.7)">
+      <div style="font-size:9.5px;color:var(--muted);margin-top:3px">Al confirmar un pedido descuenta esta cantidad del ítem físico elegido.</div>
     </div>
 
     <div id="prod-modo-calc-wrap" style="display:none">
