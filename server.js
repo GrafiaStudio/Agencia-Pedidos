@@ -117,6 +117,16 @@ try { db.exec("ALTER TABLE costos ADD COLUMN cantidad TEXT DEFAULT ''"); } catch
 try { db.exec("ALTER TABLE costos ADD COLUMN valor_unitario TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN valor_unitario_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN auto INTEGER DEFAULT 0"); } catch(e){}
+// ── VERSIONADO DE PEDIDOS (v3.0 Fase 2b) ──
+db.exec(`CREATE TABLE IF NOT EXISTS pedido_versiones(
+  id TEXT PRIMARY KEY, pedido_id TEXT, workspace_id TEXT,
+  version INTEGER, snapshot TEXT,
+  usuario_id TEXT DEFAULT '', usuario_nombre TEXT DEFAULT '', rol TEXT DEFAULT '', motivo TEXT DEFAULT '',
+  creado TEXT DEFAULT(datetime('now','localtime')))`);
+try { db.exec("ALTER TABLE historial ADD COLUMN usuario_id TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE historial ADD COLUMN usuario_nombre TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE historial ADD COLUMN rol TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE historial ADD COLUMN motivo TEXT DEFAULT ''"); } catch(e){}
 // ── WORKSPACES (aislamiento multi-tenant) ──
 // Cada PIN mapea a un workspace independiente. 'main' es el negocio real (PIN=APP_PIN);
 // los 'prueba-N' son accesos temporales para testers, con su propio espacio aislado.
@@ -507,6 +517,7 @@ function pedidoCompleto(p){
   p.valor_sugerido=calcValorSugerido(encargos);
   p.valor_total=valorOficialPedido(p,p.valor_sugerido);
   if(p.cliente_id){const cli=db.prepare('SELECT nit,email,direccion,contacto FROM clientes WHERE id=?').get(p.cliente_id);if(cli){p.cli_nit=cli.nit||'';p.cli_email=cli.email||'';p.cli_direccion=cli.direccion||'';p.cli_contacto=cli.contacto||'';}}
+  try{p.version=db.prepare('SELECT MAX(version) m FROM pedido_versiones WHERE pedido_id=?').get(p.id).m||0;}catch(e){p.version=0;}
   return p;
 }
 // CORR 006 — texto de historial para una cancelación (motivo + reintegro sí/no)
@@ -514,8 +525,29 @@ function txtCancelacion(motivo,reint,monto){
   return 'Pedido cancelado'+((motivo||'').trim()?` — Motivo: ${String(motivo).trim()}`:'')+(reint?` · Reintegro al cliente: Sí${(monto||'').trim()?' ('+String(monto).trim()+')':''}`:' · Sin reintegro (el dinero recibido queda como ingreso real, para auditoría)');
 }
 
-function addHist(pid,txt,wsId){
-  db.prepare('INSERT INTO historial(id,pedido_id,texto,fecha,hora,workspace_id)VALUES(?,?,?,?,?,?)').run(uid(),pid,txt,hoy(wsId),ahora(),wsId);
+function addHist(pid,txt,wsId,actor,motivo){
+  const a=actor||{};
+  db.prepare('INSERT INTO historial(id,pedido_id,texto,fecha,hora,workspace_id,usuario_id,usuario_nombre,rol,motivo)VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .run(uid(),pid,txt,hoy(wsId),ahora(),wsId,a.id||'',a.nombre||'',a.rol||'',motivo||'');
+}
+// v3.0 Fase 2b — versionado de pedidos
+function actorDe(req){ const u=req&&req.usuario; return {id:u?u.id:'',nombre:u?(u.nombre||u.usuario||''):'',rol:req&&req.rol?req.rol.nombre:''}; }
+// Firma de lo que cuenta como "cambio clave": cliente, valores e ítems (no urgente/notas/estado).
+function firmaClave(pc){
+  if(!pc)return '';
+  const items=[];
+  (pc.encargos||[]).forEach(e=>(e.items||[]).forEach(it=>items.push({c:it.cantidad||'',d:it.detalle||'',v:it.valor_unitario_calc||it.valor_unitario||'',f:it.ficha_id||''})));
+  return JSON.stringify({cli:pc.cliente_id||'',nom:pc.nombre||'',val:pc.valor_total||0,vf:pc.valor_final_calc||'',items});
+}
+function crearVersion(pid,wsId,actor,motivo){
+  const pc=pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid));
+  if(!pc)return null;
+  const max=db.prepare('SELECT MAX(version) m FROM pedido_versiones WHERE pedido_id=?').get(pid).m||0;
+  const version=max+1;
+  const a=actor||{};
+  db.prepare('INSERT INTO pedido_versiones(id,pedido_id,workspace_id,version,snapshot,usuario_id,usuario_nombre,rol,motivo)VALUES(?,?,?,?,?,?,?,?,?)')
+    .run(uid(),pid,wsId,version,JSON.stringify(pc),a.id||'',a.nombre||'',a.rol||'',motivo||'');
+  return version;
 }
 
 function saveEncargos(pid,encargos,wsId){
@@ -1014,6 +1046,11 @@ app.get('/api/pedidos/:id',(req,res)=>{
   if(!p)return res.status(404).json({error:'No encontrado'});
   res.json(pedidoCompleto(p));
 });
+// v3.0 Fase 2b — lista liviana de versiones (sin snapshot)
+app.get('/api/pedidos/:id/versiones',(req,res)=>{
+  const rows=db.prepare('SELECT version,usuario_nombre,rol,motivo,creado FROM pedido_versiones WHERE pedido_id=? AND workspace_id=? ORDER BY version DESC').all(req.params.id,req.wsId);
+  res.json(rows);
+});
 
 app.post('/api/pedidos',requiere('crear_pedidos'),(req,res)=>{
   try{
@@ -1039,10 +1076,12 @@ app.post('/api/pedidos',requiere('crear_pedidos'),(req,res)=>{
       db.prepare('UPDATE pedidos SET cancel_motivo=?,cancel_reintegro=?,cancel_monto=?,cancel_monto_calc=? WHERE id=?')
         .run(b.cancel_motivo||'',b.cancel_reintegro?1:0,b.cancel_monto||'',normCalc(String(b.cancel_monto||'').replace(/[$\s]/g,'')),id);
     }
-    addHist(id,'Pedido creado',req.wsId);
-    if(b.cancelado)addHist(id,txtCancelacion(b.cancel_motivo,b.cancel_reintegro,b.cancel_monto),req.wsId);
-    (b.pagos_nuevos||[]).forEach(pg=>addHist(id,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
-    (b.precio_edits||[]).forEach(ed=>addHist(id,`PAM · Precio ajustado manualmente en "${ed.detalle}": sugerido ${ed.sugerido} → final ${ed.nuevo}${ed.dif?' (dif '+ed.dif+')':''}`,req.wsId));
+    const act=actorDe(req);
+    addHist(id,'Pedido creado',req.wsId,act);
+    if(b.cancelado)addHist(id,txtCancelacion(b.cancel_motivo,b.cancel_reintegro,b.cancel_monto),req.wsId,act);
+    (b.pagos_nuevos||[]).forEach(pg=>addHist(id,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId,act));
+    (b.precio_edits||[]).forEach(ed=>addHist(id,`PAM · Precio ajustado manualmente en "${ed.detalle}": sugerido ${ed.sugerido} → final ${ed.nuevo}${ed.dif?' (dif '+ed.dif+')':''}`,req.wsId,act));
+    crearVersion(id,req.wsId,act,'Creación del pedido'); // v1 = estado inicial
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(id)));
   }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
 });
@@ -1054,17 +1093,19 @@ app.put('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
     if(!p)return res.status(404).json({error:'No encontrado'});
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    const act=actorDe(req);
+    const firmaAntes=firmaClave(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid))); // v3.0 Fase 2b
     const cid=asegurarCliente(b.nombre||p.nombre,b.tel,b.cliente_id||p.cliente_id,req.wsId,{nit:b.cli_nit,email:b.cli_email,direccion:b.cli_direccion,contacto:b.cli_contacto});
     // Log cambios de estado checkboxes
-    if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado',req.wsId);
-    if(b.cancelado&&!p.cancelado)addHist(pid,txtCancelacion(b.cancel_motivo,b.cancel_reintegro,b.cancel_monto),req.wsId);
+    if(b.entregado&&!p.entregado)addHist(pid,'Pedido marcado como entregado',req.wsId,act);
+    if(b.cancelado&&!p.cancelado)addHist(pid,txtCancelacion(b.cancel_motivo,b.cancel_reintegro,b.cancel_monto),req.wsId,act);
     // CORR 006 — persistir datos de cancelación
     if(b.cancel_motivo!==undefined||b.cancel_reintegro!==undefined||b.cancel_monto!==undefined){
       db.prepare('UPDATE pedidos SET cancel_motivo=?,cancel_reintegro=?,cancel_monto=?,cancel_monto_calc=? WHERE id=? AND workspace_id=?')
         .run(b.cancel_motivo||'',b.cancel_reintegro?1:0,b.cancel_monto||'',normCalc(String(b.cancel_monto||'').replace(/[$\s]/g,'')),pid,req.wsId);
     }
-    (b.pagos_nuevos||[]).forEach(pg=>addHist(pid,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId));
-    (b.precio_edits||[]).forEach(ed=>addHist(pid,`Precio editado en "${ed.detalle}": sugerido ${ed.sugerido} → ${ed.nuevo}`,req.wsId));
+    (b.pagos_nuevos||[]).forEach(pg=>addHist(pid,`Abono registrado: ${pg.monto} · ${pg.forma}${pg.nota?' — '+pg.nota:''}`,req.wsId,act));
+    (b.precio_edits||[]).forEach(ed=>addHist(pid,`Precio editado en "${ed.detalle}": sugerido ${ed.sugerido} → ${ed.nuevo}`,req.wsId,act));
     db.prepare(`UPDATE pedidos SET nombre=?,tel=?,cliente_id=?,urgente=?,entregado=?,cancelado=?,pendiente_pago=?,es_cotizacion=?,costos_manual=?,valor_final=?,valor_final_calc=?,fecha_entrega=?,notas=?,modificado=datetime('now','localtime') WHERE id=? AND workspace_id=?`)
       .run(b.nombre||p.nombre,(b.tel!==undefined?b.tel:p.tel),cid,b.urgente?1:0,b.entregado?1:0,b.cancelado?1:0,b.pendiente_pago?1:0,b.es_cotizacion?1:0,(b.costos_manual!==undefined?(b.costos_manual?1:0):p.costos_manual),(b.valor_final!==undefined?normVF(b.valor_final):p.valor_final),(b.valor_final!==undefined?normCalc(b.valor_final):p.valor_final_calc),(b.fecha_entrega!==undefined?b.fecha_entrega:p.fecha_entrega),b.notas!==undefined?b.notas:p.notas,pid,req.wsId);
     if(b.encargos!==undefined)saveEncargos(pid,b.encargos,req.wsId);
@@ -1082,6 +1123,12 @@ app.put('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
       if(stockConsumidoActual)restaurarStock(stockConsumidoActual,req.wsId);
       const consumo=descontarStock(pid,req.wsId);
       db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),pid);
+    }
+    // v3.0 Fase 2b — versionar solo si cambió algo clave (cliente, valores o ítems)
+    const firmaDespues=firmaClave(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
+    if(firmaDespues!==firmaAntes){
+      const v=crearVersion(pid,req.wsId,act,b.motivo||'');
+      addHist(pid,`Versión ${v} guardada`,req.wsId,act,b.motivo||'');
     }
     res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
   }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}

@@ -1028,7 +1028,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <input type="file" id="file-inp" accept="image/*,.pdf,.ai,.svg" multiple style="display:none" onchange="subirArchivos(event)">
       </div>
       <div class="ped-side-card">
-        <div class="msec" style="margin-top:0"><span class="tri"></span>Historial</div>
+        <div class="msec" style="margin-top:0"><span class="tri"></span>Historial<span id="ped-version-badge" style="display:none;margin-left:8px;font-size:9px;font-weight:800;color:#6A5AE0;background:#EDE9FB;padding:2px 7px;border-radius:6px;text-transform:none;letter-spacing:0"></span></div>
         <div class="hist-list" id="hist-list"></div>
       </div>
     </div><!-- /ped-side -->
@@ -1036,6 +1036,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
    </div><!-- /ped-grid -->
   </div>
   <div class="mfoot">
+    <div id="f-motivo-wrap" style="display:none;flex:1;max-width:420px">
+      <input type="text" id="f-motivo" placeholder="Motivo del cambio (opcional)" style="width:100%;font-size:12px" title="Se guarda en el historial de la nueva versión">
+    </div>
     <div style="display:flex;gap:7px;margin-left:auto">
       <button class="btn-ghost" onclick="cerrar()">Cancelar</button>
       <button class="btn-pri" onclick="guardar()"><i class="ti ti-device-floppy"></i>Guardar</button>
@@ -4014,14 +4017,19 @@ function renderArchivos(){
 }
 
 /* ══ HISTORIAL ══ */
-function renderHist(hist){
+function renderHist(hist,version){
+  // Badge de versión actual (v3.0 Fase 2b)
+  const badge=document.getElementById('ped-version-badge');
+  if(badge){ if(version>0){badge.textContent='Versión '+version;badge.style.display='';}else{badge.style.display='none';} }
   const el=document.getElementById('hist-list');
   if(!hist?.length){el.innerHTML='<div style="font-size:10px;color:var(--muted);padding:4px 0">Sin actividad aún.</div>';return}
-  el.innerHTML=hist.map(h=>`
-    <div class="hist-item">
+  el.innerHTML=hist.map(h=>{
+    const quien=(h.usuario_nombre||'').trim()?`<span style="color:var(--teal-dk);font-weight:700">${escHtml(h.usuario_nombre)}</span>${h.rol?' · '+escHtml(h.rol):''}`:'';
+    const mot=(h.motivo||'').trim()?`<div style="font-size:9.5px;color:var(--muted);font-style:italic">Motivo: ${escHtml(h.motivo)}</div>`:'';
+    return `<div class="hist-item">
       <div class="hist-dot"><i class="ti ti-point"></i></div>
-      <div class="hist-body"><div class="hist-txt">${h.texto}</div><div class="hist-date">${fd(h.fecha)} ${h.hora||''}</div></div>
-    </div>`).join('');
+      <div class="hist-body"><div class="hist-txt">${escHtml(h.texto)}</div>${mot}<div class="hist-date">${fd(h.fecha)} ${h.hora||''}${quien?' · '+quien:''}</div></div>
+    </div>`;}).join('');
 }
 
 /* ══ MODAL ══ */
@@ -4049,6 +4057,8 @@ function abrirNuevo(){
   document.getElementById('m-tit').textContent='Nuevo pedido';
   document.getElementById('m-ref').textContent='';
   ['btn-del','btn-pdf','btn-wa','btn-print'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  const mw=document.getElementById('f-motivo-wrap'); if(mw)mw.style.display='none'; // motivo solo al editar
+  const vb=document.getElementById('ped-version-badge'); if(vb)vb.style.display='none';
   // Empezar con un encargo vacío
   addEnc();
   renderPagos();renderCostos();renderArchivos();aplicarVistaCotizacion();
@@ -4111,7 +4121,9 @@ async function abrirEditar(id){
   document.getElementById('btn-wa').style.display=p.cancelado?'none':'inline-flex';
   window._pedidoActualDoc=p;
   document.getElementById('btn-del').style.display='flex';
-  renderEncs();renderPagos();renderCostos();renderArchivos();renderHist(p.historial);
+  // v3.0 Fase 2b — el motivo del cambio solo aplica al editar un pedido existente
+  const mw=document.getElementById('f-motivo-wrap'); if(mw){mw.style.display='';document.getElementById('f-motivo').value='';}
+  renderEncs();renderPagos();renderCostos();renderArchivos();renderHist(p.historial,p.version);
   actualizarValorTotal();actualizarProgreso();
   document.getElementById('ovP').classList.add('open');
   document.getElementById('ovP').scrollTop=0;
@@ -4166,6 +4178,7 @@ async function guardar(){
     costos:fCostos.map(c=>({...c,auto:c._auto?1:0})),
     costos_manual:fCostosManual,
     precio_edits:collectPrecioEdits(),
+    motivo:(document.getElementById('f-motivo')?.value||'').trim(), // v3.0 Fase 2b
   };
   const errExpr=validarExpresionesBody(body);
   if(errExpr){toast(errExpr,false);return}
