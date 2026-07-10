@@ -163,6 +163,18 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .b-done{background:var(--green-lt);color:#1A6B45;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .b-canc{background:var(--line-lt);color:var(--muted);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 
+/* CIERRE DE PEDIDO (Fase 3) */
+.lock-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:#5E708A;background:#EEF2F7;border:1px solid #DCE5EF;padding:3px 9px;border-radius:20px;letter-spacing:.03em}
+.lock-badge i{font-size:12px}
+.btn-cerrar{color:var(--teal-dk)!important;font-weight:700}
+.cerrado-banner{display:flex;align-items:center;gap:9px;background:linear-gradient(180deg,#F7FAFD,#EDF2F8);border:1px solid #DCE5EF;border-radius:var(--r);padding:10px 15px;margin-bottom:16px;font-size:11.5px;color:var(--slate);line-height:1.45}
+.cerrado-banner i{font-size:17px;color:#5E708A;flex-shrink:0}
+.cerrado-banner b{color:var(--navy);font-weight:800}
+/* Modo cerrado: campos como valor plano de solo lectura, no como input gris */
+.ped-cerrado .mbody input:disabled,.ped-cerrado .mbody textarea:disabled,.ped-cerrado .mbody select:disabled{background:#F4F7FB;border-color:transparent;color:var(--navy);opacity:1;-webkit-text-fill-color:var(--navy);cursor:default}
+.ped-cerrado .mbody select:disabled{background-image:none;padding-right:13px}
+.ped-cerrado .mbody button:disabled{opacity:.4;cursor:default}
+
 /* Tags de categoría */
 .tags{display:flex;gap:3px;flex-wrap:wrap;margin:4px 0 2px}
 .ttag{font-size:8px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;color:#fff}
@@ -906,10 +918,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 <div class="modal">
   <div class="mhead">
     <div class="mhead-l">
-      <div class="mtitle" id="m-tit">Nuevo pedido</div>
+      <div style="display:flex;align-items:center;gap:9px"><div class="mtitle" id="m-tit">Nuevo pedido</div><span id="ped-cerrado-badge" class="lock-badge" style="display:none"><i class="ti ti-lock"></i>Cerrado</span></div>
       <div class="mref" id="m-ref"></div>
     </div>
     <div class="mhead-actions">
+      <button class="btn-ghost" id="btn-reabrir" style="display:none" onclick="reabrirPedido()"><i class="ti ti-lock-open"></i>Reabrir</button>
+      <button class="btn-ghost btn-cerrar" id="btn-cerrar" style="display:none" onclick="cerrarPedido()"><i class="ti ti-lock"></i>Cerrar pedido</button>
       <button class="btn-ghost" id="btn-print" style="display:none" onclick="imprimirPedido()"><i class="ti ti-printer"></i>Imprimir</button>
       <button class="btn-ghost" id="btn-pdf" style="display:none" onclick="generarPdfPedido()"><i class="ti ti-download"></i>Descargar PDF</button>
       <button class="btn-ghost" id="btn-wa" style="display:none" onclick="compartirPedido()"><i class="ti ti-share"></i>Compartir</button>
@@ -918,6 +932,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     </div>
   </div>
   <div class="mbody">
+   <div id="ped-cerrado-banner" class="cerrado-banner" style="display:none"></div>
    <div class="ped-grid">
     <div class="ped-main">
 
@@ -1487,7 +1502,7 @@ function showCfgTab(tab){
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
-const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
+const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
 // Mapa vista -> permiso requerido (para el gating de navegación)
 const VIEW_PERM={registros:'ver_registros',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
@@ -2063,6 +2078,7 @@ function buscar(q){busq=q;filtroAct='todos';renderFiltros();cargarPedidos()}
 /* Estado general derivado de los encargos */
 function estadoGeneral(p){
   if(p.cancelado)return'Cancelado';
+  if(p.cerrado)return'Cerrado';
   if(p.entregado)return'Entregado';
   if(p.es_cotizacion)return'Cotización';
   const items=(p.encargos||[]).flatMap(e=>e.items||[]);
@@ -2106,7 +2122,7 @@ async function cargarPedidos(){
 function renderLista(){
   const el=document.getElementById('lista');
   if(!pedidos.length){el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i><p>Sin pedidos aquí</p></div>';return}
-  const EG_COL={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb',Cotización:'#7B6EF6'};
+  const EG_COL={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cerrado:'#4A6FA5',Cancelado:'#bbb',Cotización:'#7B6EF6'};
   const rows=pedidos.map(p=>{
     const val=p.valor_total||0;
     const eg=estadoGeneral(p);
@@ -2116,7 +2132,7 @@ function renderLista(){
     const isDone=p.entregado,isCan=p.cancelado,isUrg=p.urgente&&!isDone&&!isCan;
     const nEnc=(p.encargos||[]).length;
     return`<tr class="${isDone?'r-done':''} ${isCan?'r-canc':''}" onclick="abrirEditar('${p.id}')">
-      <td><div class="pt-ref">${isUrg?'<span style="color:var(--red)">⚡</span> ':''}#${p.ref}</div><div class="pt-date">${fd(p.fecha_pedido)}</div></td>
+      <td><div class="pt-ref">${isUrg?'<span style="color:var(--red)">⚡</span> ':''}${p.cerrado?'<i class="ti ti-lock" style="color:#4A6FA5;font-size:12px;vertical-align:-1px"></i> ':''}#${p.ref}</div><div class="pt-date">${fd(p.fecha_pedido)}</div></td>
       <td><div class="pt-name">${p.nombre}</div>${p.tel?`<div class="pt-tel">${p.tel}</div>`:''}</td>
       <td><div class="tags" style="margin:0">${tags||'<span style="color:var(--muted);font-size:10px">—</span>'}</div>${nEnc?`<div class="pt-date">${nEnc} ${nEnc===1?'encargo':'encargos'}</div>`:''}</td>
       <td>${pagoHTML(p)||''}<div style="display:flex;align-items:center;margin-top:4px"><span class="pt-dot" style="background:${egCol}"></span><span style="font-size:11px;font-weight:600;color:var(--slate)">${eg}</span></div></td>
@@ -4056,7 +4072,8 @@ function abrirNuevo(){
   editId=null;resetForm();
   document.getElementById('m-tit').textContent='Nuevo pedido';
   document.getElementById('m-ref').textContent='';
-  ['btn-del','btn-pdf','btn-wa','btn-print'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  ['btn-del','btn-pdf','btn-wa','btn-print','btn-cerrar','btn-reabrir'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  aplicarModoCerrado(false,null); // v3.0 Fase 3 — un pedido nuevo nunca está cerrado
   const mw=document.getElementById('f-motivo-wrap'); if(mw)mw.style.display='none'; // motivo solo al editar
   const vb=document.getElementById('ped-version-badge'); if(vb)vb.style.display='none';
   // Empezar con un encargo vacío
@@ -4121,10 +4138,16 @@ async function abrirEditar(id){
   document.getElementById('btn-wa').style.display=p.cancelado?'none':'inline-flex';
   window._pedidoActualDoc=p;
   document.getElementById('btn-del').style.display='flex';
+  // v3.0 Fase 3 — cierre de pedido
+  const puedeCerrar=p.entregado&&!p.cancelado&&!p.cerrado&&puede('editar_pedidos');
+  const puedeReabrir=!!p.cerrado&&puede('reabrir_pedidos');
+  const bc=document.getElementById('btn-cerrar'); if(bc)bc.style.display=puedeCerrar?'inline-flex':'none';
+  const br=document.getElementById('btn-reabrir'); if(br)br.style.display=puedeReabrir?'inline-flex':'none';
   // v3.0 Fase 2b — el motivo del cambio solo aplica al editar un pedido existente
   const mw=document.getElementById('f-motivo-wrap'); if(mw){mw.style.display='';document.getElementById('f-motivo').value='';}
   renderEncs();renderPagos();renderCostos();renderArchivos();renderHist(p.historial,p.version);
   actualizarValorTotal();actualizarProgreso();
+  aplicarModoCerrado(!!p.cerrado,p); // v3.0 Fase 3 — bloquea el form si está cerrado (tras render de listas)
   document.getElementById('ovP').classList.add('open');
   document.getElementById('ovP').scrollTop=0;
 }
@@ -4194,6 +4217,49 @@ async function eliminarPed(){
   if(!editId||!confirm('¿Eliminar este pedido?'))return;
   try{await api('DELETE',`/pedidos/${editId}`);toast('Pedido eliminado');cerrar();await Promise.all([cargarStats(),cargarPedidos()]);}
   catch(e){toast('Error al eliminar',false)}
+}
+/* ══ CIERRE DE PEDIDO (v3.0 Fase 3) ══ */
+function aplicarModoCerrado(cerrado,p){
+  const modal=document.querySelector('#ovP .modal');
+  if(modal)modal.classList.toggle('ped-cerrado',!!cerrado);
+  // Solo lectura: deshabilitar toda entrada del cuerpo (marcando lo que tocamos, para re-habilitar exacto)
+  const body=document.querySelector('#ovP .mbody');
+  if(body)body.querySelectorAll('input,textarea,select,button').forEach(el=>{
+    if(cerrado){ if(!el.disabled){el.dataset._roDisabled='1';el.disabled=true;} }
+    else if(el.dataset._roDisabled){ el.disabled=false; delete el.dataset._roDisabled; }
+  });
+  const badge=document.getElementById('ped-cerrado-badge'); if(badge)badge.style.display=cerrado?'inline-flex':'none';
+  const banner=document.getElementById('ped-cerrado-banner');
+  if(banner){
+    if(cerrado){
+      const cuando=(p&&p.cerrado_en)?fd(String(p.cerrado_en).slice(0,10)):'';
+      const quien=(p&&p.cerrado_por)?p.cerrado_por:'';
+      banner.style.display='flex';
+      banner.innerHTML=`<i class="ti ti-lock"></i><span>Pedido <b>cerrado</b>${cuando?` el <b>${cuando}</b>`:''}${quien?` por <b>${quien}</b>`:''}. Está en <b>solo lectura</b>.${puede('reabrir_pedidos')?' Usa <b>Reabrir</b> para poder editarlo de nuevo.':' Pídele a un administrador que lo reabra si necesitas cambios.'}</span>`;
+    } else banner.style.display='none';
+  }
+  const foot=document.querySelector('#ovP .mfoot'); if(foot)foot.style.display=cerrado?'none':'';
+}
+async function cerrarPedido(){
+  if(!editId)return;
+  if(!confirm('¿Cerrar este pedido? Quedará finalizado y en solo lectura. Podrás reabrirlo si tienes permiso.'))return;
+  try{
+    const p=await api('POST',`/pedidos/${editId}/cerrar`,{});
+    toast('Pedido cerrado ✓');
+    await abrirEditar(editId); // recarga el detalle ya en modo cerrado
+    cargarPedidos();
+  }catch(e){toast('Error: '+e.message,false)}
+}
+async function reabrirPedido(){
+  if(!editId)return;
+  const motivo=prompt('Reabrir el pedido para editarlo.\nMotivo (opcional):','');
+  if(motivo===null)return; // canceló
+  try{
+    await api('POST',`/pedidos/${editId}/reabrir`,{motivo:(motivo||'').trim()});
+    toast('Pedido reabierto ✓');
+    await abrirEditar(editId);
+    cargarPedidos();
+  }catch(e){toast('Error: '+e.message,false)}
 }
 async function archivarPed(){
   if(!editId||!confirm('¿Archivar este pedido? No estará activo pero se podrá restaurar desde Archivo.'))return;

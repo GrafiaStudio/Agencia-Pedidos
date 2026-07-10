@@ -127,6 +127,11 @@ try { db.exec("ALTER TABLE historial ADD COLUMN usuario_id TEXT DEFAULT ''"); } 
 try { db.exec("ALTER TABLE historial ADD COLUMN usuario_nombre TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE historial ADD COLUMN rol TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE historial ADD COLUMN motivo TEXT DEFAULT ''"); } catch(e){}
+// ── CIERRE DE PEDIDO (v3.0 Fase 3) ──
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado INTEGER DEFAULT 0"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado_por TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado_en TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado_motivo TEXT DEFAULT ''"); } catch(e){}
 // ── WORKSPACES (aislamiento multi-tenant) ──
 // Cada PIN mapea a un workspace independiente. 'main' es el negocio real (PIN=APP_PIN);
 // los 'prueba-N' son accesos temporales para testers, con su propio espacio aislado.
@@ -156,7 +161,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
   activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
 function permisosDeRol(rol){
   if(!rol) return {};
   if(rol.es_admin) return {__admin:true};
@@ -509,7 +514,7 @@ function pedidoCompleto(p){
   p.costos  =db.prepare('SELECT * FROM costos WHERE pedido_id=? ORDER BY creado').all(p.id);
   p.historial=db.prepare('SELECT * FROM historial WHERE pedido_id=? ORDER BY creado DESC').all(p.id);
   p.archivos =db.prepare('SELECT * FROM archivos WHERE pedido_id=? ORDER BY creado').all(p.id);
-  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago; p.es_cotizacion=!!p.es_cotizacion; p.costos_manual=!!p.costos_manual; p.cancel_reintegro=!!p.cancel_reintegro;
+  p.urgente=!!p.urgente; p.entregado=!!p.entregado; p.cancelado=!!p.cancelado; p.pendiente_pago=!!p.pendiente_pago; p.es_cotizacion=!!p.es_cotizacion; p.costos_manual=!!p.costos_manual; p.cancel_reintegro=!!p.cancel_reintegro; p.cerrado=!!p.cerrado;
   encargos.forEach(enc=>{
     enc.valor_referencial=calcReferencialEncargo(enc);
     enc.valor_efectivo=calcValorEncargoEfectivo(enc);
@@ -1091,6 +1096,7 @@ app.put('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
     const b=req.body; const pid=req.params.id;
     const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(pid,req.wsId);
     if(!p)return res.status(404).json({error:'No encontrado'});
+    if(p.cerrado)return res.status(409).json({error:'Este pedido está cerrado. Reábrelo para poder editarlo.'}); // v3.0 Fase 3
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const act=actorDe(req);
@@ -1140,6 +1146,33 @@ app.delete('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
   if(p.stock_consumido)restaurarStock(p.stock_consumido,req.wsId);
   db.prepare('DELETE FROM pedidos WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   res.json({ok:true});
+});
+
+// ── CIERRE DE PEDIDO (v3.0 Fase 3) ──
+// Cerrar: cualquiera que pueda editar. Solo pedidos entregados y no cancelados.
+app.post('/api/pedidos/:id/cerrar',requiere('editar_pedidos'),(req,res)=>{
+  const pid=req.params.id;
+  const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(pid,req.wsId);
+  if(!p)return res.status(404).json({error:'No encontrado'});
+  if(p.cerrado)return res.status(409).json({error:'El pedido ya está cerrado'});
+  if(p.cancelado)return res.status(400).json({error:'Un pedido cancelado no se cierra'});
+  if(!p.entregado)return res.status(400).json({error:'Solo se puede cerrar un pedido entregado'});
+  const act=actorDe(req);
+  db.prepare("UPDATE pedidos SET cerrado=1,cerrado_por=?,cerrado_en=datetime('now','localtime') WHERE id=? AND workspace_id=?").run(act.nombre,pid,req.wsId);
+  addHist(pid,'Pedido cerrado',req.wsId,act,(req.body&&req.body.motivo)||'');
+  res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
+});
+// Reabrir: permiso dedicado (más sensible).
+app.post('/api/pedidos/:id/reabrir',requiere('reabrir_pedidos'),(req,res)=>{
+  const pid=req.params.id;
+  const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(pid,req.wsId);
+  if(!p)return res.status(404).json({error:'No encontrado'});
+  if(!p.cerrado)return res.status(409).json({error:'El pedido no está cerrado'});
+  const act=actorDe(req);
+  const motivo=String((req.body&&req.body.motivo)||'').trim();
+  db.prepare('UPDATE pedidos SET cerrado=0,cerrado_motivo=? WHERE id=? AND workspace_id=?').run(motivo,pid,req.wsId);
+  addHist(pid,'Pedido reabierto'+(motivo?` — Motivo: ${motivo}`:''),req.wsId,act,motivo);
+  res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
 });
 
 // Archivos

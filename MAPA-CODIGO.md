@@ -112,6 +112,33 @@
 | 4153 | `guardar()` — envía `motivo` (Fase 2b) |
 | markup | login ~533; tab "Usuarios y Roles" en Config; sidebar con `data-perm`; sección "Costo por medida" en form producto; card Historial con `#ped-version-badge`; footer editor con `#f-motivo` |
 
+## 🆕 v3.0 Fase 3 — Cierre de pedido (commit tras 2026-07-10)
+
+### server.js
+| Línea aprox | Qué |
+|---|---|
+| ~131–135 | Migración `pedidos`: `cerrado`, `cerrado_por`, `cerrado_en`, `cerrado_motivo` |
+| PERMISOS_FASE1 | +`reabrir_pedidos` (cerrar=editar_pedidos; reabrir=permiso dedicado) |
+| pedidoCompleto | expone `p.cerrado` (bool) |
+| PUT /api/pedidos/:id | **409** si `p.cerrado` (bloqueo de edición) |
+| tras DELETE pedido | **POST /:id/cerrar** (requiere editar_pedidos; exige entregado) y **POST /:id/reabrir** (requiere reabrir_pedidos) |
+
+### public/index.html
+| Qué | Dónde |
+|---|---|
+| `PERM_LABELS.reabrir_pedidos` | ~1490 |
+| CSS `.lock-badge/.cerrado-banner/.ped-cerrado` | tras `.b-canc` (~165) |
+| Header editor: `#btn-cerrar`, `#btn-reabrir`, badge `#ped-cerrado-badge` | ~912 |
+| Banner `#ped-cerrado-banner` | inicio de `.mbody` |
+| `estadoGeneral` → 'Cerrado' + EG_COL + candado en ref lista | ~2065, ~2109, ~2119 |
+| `abrirEditar`: visibilidad botones + `aplicarModoCerrado` | ~4130 |
+| `abrirNuevo`: oculta botones + limpia modo cerrado | ~4059 |
+| **funcs** `aplicarModoCerrado`, `cerrarPedido`, `reabrirPedido` | antes de `archivarPed` (~4200) |
+
+Spec: `docs/superpowers/specs/2026-07-10-fase3-cierre-pedido-design.md`.
+
+---
+
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
 | Archivo | Peso | Qué contiene |
