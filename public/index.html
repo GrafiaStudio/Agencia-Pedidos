@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>GRAFÍA Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
@@ -36,7 +36,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 /* LAYOUT */
 .layout{display:flex;min-height:100vh}
 .sidebar{width:220px;flex-shrink:0;background:linear-gradient(180deg,#3D4C7A 0%,#232C4C 52%,#161B2E 100%);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50;overflow-y:auto}
-.main{margin-left:220px;flex:1}
+.main{margin-left:220px;flex:1;min-width:0}
 
 /* SIDEBAR */
 .sb-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,.07);text-align:center}
@@ -610,12 +610,33 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .mas-item:hover{background:#e8edf2}
 .mas-item i{font-size:16px;color:var(--muted);margin-right:2px}
 
+/* ══ MÓVIL (rediseño 2026-07-10) ══ */
+.pmob-cards{display:none}
 @media(max-width:768px){
   .sidebar{display:none}.main{margin-left:0;padding-bottom:64px}
-  .topbar{padding:0 12px}.content{padding:12px}
-  .stats{flex-direction:row}
-  .sc-mini{min-width:0;flex:1;padding:10px 14px}
+  .content{padding:12px}
   .mob-nav{display:block}
+  /* Topbar limpia: solo título + buscador (lo demás vive en la barra inferior y en Más) */
+  .topbar{padding:0 12px;gap:8px}
+  .tb-title{font-size:14px;white-space:nowrap;flex-shrink:0}
+  html,body{overflow-x:hidden}
+  .tb-right{flex:1;justify-content:flex-end;min-width:0}
+  .tb-right .icon-btn,.tb-right .btn-new{display:none!important}
+  .search-b{flex:1;max-width:none;min-width:0}
+  .search-b input{max-width:none;width:100%;min-width:0}
+  /* Stats compactas: grid 2 columnas, nunca desbordan */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .sc-mini{min-width:0;padding:10px 12px;gap:9px}
+  .sc-mini .num{font-size:19px}
+  .sc-mini .lbl{font-size:8px}
+  .sc-mini .ico{width:28px;height:28px;font-size:14px}
+  /* Lista de pedidos: tabla → tarjetas */
+  .ped-table-wrap{display:none}
+  .pmob-cards{display:flex;flex-direction:column;gap:9px}
+  /* Filtros con tap-target cómodo y scroll horizontal en una línea */
+  .pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  .pill{padding:7px 14px;font-size:11px;flex-shrink:0}
+  /* Formularios */
   .fr2{grid-template-columns:1fr}.fr3{grid-template-columns:1fr 1fr}
   .cat-row{grid-template-columns:repeat(3,1fr)}
   .checks-row{grid-template-columns:1fr 1fr}
@@ -623,11 +644,44 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   .pago-grid{grid-template-columns:1fr 1fr}
   .cli-grid{grid-template-columns:1fr}
   .reg-stats{grid-template-columns:1fr 1fr}
+  .cli-edit-grid{grid-template-columns:1fr}
+  /* Editor de pedido */
   .mbody{padding:14px;max-height:calc(100vh - 130px)}
-  .mhead{padding:14px 16px}.mfoot{padding:10px 16px}
+  .mhead{padding:12px 12px;gap:6px}.mfoot{padding:10px 12px;flex-wrap:wrap;gap:7px}
+  .mhead-actions{flex-wrap:wrap;justify-content:flex-end;gap:5px}
+  /* Botones de acción solo-ícono (el texto se oculta, el ícono conserva su tamaño) */
+  .mhead-actions .btn-ghost,.mhead-actions .btn-danger,.mhead-actions .btn-cerrar{font-size:0;gap:0;padding:9px 10px}
+  .mhead-actions .btn-ghost i,.mhead-actions .btn-danger i{font-size:16px}
+  #f-motivo-wrap{max-width:none;flex-basis:100%}
+  #cli-more{grid-template-columns:1fr 1fr!important}
+  .det-grid{grid-template-columns:1fr 1fr!important}
   .enc-top{grid-template-columns:1fr;gap:8px}
   .enc-left{flex-direction:row;justify-content:flex-start;padding-top:0}
+  /* Tablas dentro de modales/vistas: scroll horizontal contenido (nunca desborda la página) */
+  .mbody table,.items-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* Producción: paneles deslizables con snap (estilo Discord) */
+  .prod-board{scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;gap:10px}
+  .prod-col{flex:0 0 86vw;width:86vw;scroll-snap-align:center;max-height:calc(100vh - 235px)}
+  .prod-bar{gap:6px}
+  .prod-bar select{min-width:0!important;flex:1}
+  /* Dashboard */
+  .dash-hello{flex-direction:column;align-items:flex-start;gap:8px}
+  .dash-hi{font-size:18px}
+  .dash-kpis{grid-template-columns:1fr 1fr;gap:9px}
+  .dash-fin{gap:14px;padding:13px 14px}
+  .dash-fin .tit{flex-basis:100%}
+  .dash-fin .marg{margin-left:0}
 }
+/* Tarjeta de pedido (móvil) */
+.pmob-card{background:linear-gradient(180deg,#FDFEFF,#F4F8FC);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);cursor:pointer}
+.pmob-card.r-done,.pmob-card.r-canc{opacity:.55}
+.pm-top{display:flex;align-items:center;gap:8px}
+.pm-fecha{font-size:9.5px;color:var(--muted)}
+.pm-total{margin-left:auto;font-size:13.5px;font-weight:800;color:var(--navy)}
+.pm-nom{font-size:13.5px;font-weight:700;color:var(--navy);margin-top:3px}
+.pm-foot{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.pm-ent{margin-left:auto;text-align:right}
+.pm-ent .pt-date{display:none}
 /* ══ PANTALLA PIN ══ */
 .pin-screen{display:none;position:fixed;inset:0;background:var(--navy);z-index:500;align-items:center;justify-content:center;padding:16px}
 .pin-box{background:var(--white);border-radius:var(--r-lg);box-shadow:var(--sh-lg);padding:36px 32px;max-width:340px;width:100%;text-align:center}
@@ -1050,12 +1104,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 <div class="modal" style="max-width:340px">
   <div class="mhead"><div class="mhead-l"><div class="mtitle">Más</div></div><button class="mclose" onclick="cerrarMas()"><i class="ti ti-x"></i></button></div>
   <div class="mbody">
+    <button class="mas-item" data-perm="ver_dashboard" onclick="irDesdeMas('dashboard')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+    <button class="mas-item" data-perm="ver_produccion" onclick="irDesdeMas('produccion')"><i class="ti ti-tools"></i>Producción</button>
     <button class="mas-item" data-perm="gestionar_productos" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
     <button class="mas-item" data-perm="gestionar_inventario" onclick="irDesdeMas('inventario')"><i class="ti ti-packages"></i>Inventario</button>
+    <button class="mas-item" onclick="irDesdeMas('archivo')"><i class="ti ti-archive"></i>Archivo</button>
+    <button class="mas-item" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
     <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="mas-item" data-perm="configurar_sistema" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
-    <button class="mas-item" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
-    <button class="mas-item" onclick="cerrarMas();cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
+    <button class="mas-item" style="color:var(--red)" onclick="cerrarMas();cerrarSesion()"><i class="ti ti-logout" style="color:var(--red)"></i>Cerrar sesión</button>
   </div>
 </div>
 </div>
@@ -1106,7 +1163,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
     <!-- Detalles generales -->
     <div class="msec"><span class="tri"></span>Detalles del pedido</div>
-    <div class="fg" style="display:grid;grid-template-columns:1fr 1.1fr 1fr auto .65fr;gap:16px;align-items:start">
+    <div class="fg det-grid" style="display:grid;grid-template-columns:1fr 1.1fr 1fr auto .65fr;gap:16px;align-items:start">
       <div><label>Fecha de entrega</label><input type="date" id="f-fecha"></div>
       <div>
         <label>Valor del pedido</label>
@@ -2191,7 +2248,7 @@ function showView(v){
   const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',produccion:'Producción',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
-  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,productos:4,inventario:4,ayuda:4,configuracion:4}[v]??0]?.classList.add('active');
+  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,dashboard:4,produccion:4,productos:4,inventario:4,ayuda:4,configuracion:4,archivo:4}[v]??0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
@@ -2295,9 +2352,28 @@ function renderLista(){
       <td style="text-align:center;color:var(--muted);width:30px"><i class="ti ti-dots-vertical"></i></td>
     </tr>`;
   }).join('');
+  // Móvil: los mismos pedidos como tarjetas (la tabla se oculta por CSS bajo 768px)
+  const mobCards=pedidos.map(p=>{
+    const val=p.valor_total||0;
+    const eg=estadoGeneral(p); const egCol=EG_COL[eg]||'#8A9EAD';
+    const cats=[...new Set([...(p.encargos||[]).flatMap(e=>e.categorias||[]),...(p.encargos||[]).flatMap(e=>(e.items||[]).flatMap(it=>(it.categoria||'').split(',').map(s=>s.trim()).filter(Boolean)))])];
+    const tags=cats.map(c=>{const cat=CATS.find(x=>x.id===c);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
+    const isDone=p.entregado,isCan=p.cancelado,isUrg=p.urgente&&!isDone&&!isCan;
+    return`<div class="pmob-card ${isDone?'r-done':''} ${isCan?'r-canc':''}" onclick="abrirEditar('${p.id}')">
+      <div class="pm-top"><span class="pt-ref">${isUrg?'<span style="color:var(--red)">⚡</span> ':''}${p.cerrado?'<i class="ti ti-lock" style="color:#4A6FA5;font-size:11px"></i> ':''}#${p.ref}</span><span class="pm-fecha">${fd(p.fecha_pedido)}</span><span class="pm-total">${val?fCOP(val):'—'}</span></div>
+      <div class="pm-nom">${p.nombre}</div>
+      ${tags?`<div class="tags" style="margin:4px 0 0">${tags}</div>`:''}
+      <div class="pm-foot">
+        <span style="display:inline-flex;align-items:center"><span class="pt-dot" style="background:${egCol}"></span><span style="font-size:10.5px;font-weight:700;color:var(--slate)">${eg}</span></span>
+        ${pagoHTML(p)||''}
+        <span class="pm-ent">${entregaCell(p)}</span>
+      </div>
+    </div>`;
+  }).join('');
   el.innerHTML=`<div class="ped-table-wrap"><table class="ped-table">
     <thead><tr><th>Pedido</th><th>Cliente</th><th>Categorías</th><th>Estado</th><th>Entrega</th><th style="text-align:right">Total</th><th></th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
+    <tbody>${rows}</tbody></table></div>
+    <div class="pmob-cards">${mobCards}</div>`;
 }
 function entregaCell(p){
   if(!p.fecha_entrega)return '<span style="color:var(--muted)">—</span>';
@@ -2439,11 +2515,16 @@ function renderProduccion(){
   board.innerHTML=ENC_ESTS.map(est=>{
     const col=cards.filter(c=>c.estado===est);
     const cardsHtml=col.length? col.map(c=>prodCardHTMLp(c,editable)).join('') : '<div class="prod-col-empty">—</div>';
-    return `<div class="prod-col">
+    return `<div class="prod-col" data-n="${col.length}">
       <div class="prod-col-head"><span class="dot" style="background:${ECOL_MAP[est]||'#8A9EAD'}"></span>${est}<span class="cnt">${col.length}</span></div>
       <div class="prod-col-body">${cardsHtml}</div>
     </div>`;
   }).join('');
+  // Móvil: arrancar en la primera columna que tenga trabajos (no en una vacía)
+  if(window.matchMedia('(max-width:768px)').matches){
+    const first=board.querySelector('.prod-col[data-n]:not([data-n="0"])');
+    if(first)requestAnimationFrame(()=>{board.scrollLeft=first.offsetLeft-board.offsetLeft;});
+  }
 }
 function prodCardHTMLp(c,editable){
   const cats=(c.categorias||[]).map(cid=>{const cat=CATS.find(x=>x.id===cid);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
