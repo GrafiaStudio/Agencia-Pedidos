@@ -146,7 +146,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
   activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['administrar_usuarios','configurar_sistema','crear_pedidos','editar_pedidos','ver_costos','ver_utilidad','registrar_pagos'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
 function permisosDeRol(rol){
   if(!rol) return {};
   if(rol.es_admin) return {__admin:true};
@@ -986,7 +986,7 @@ app.get('/api/pedidos/:id',(req,res)=>{
   res.json(pedidoCompleto(p));
 });
 
-app.post('/api/pedidos',(req,res)=>{
+app.post('/api/pedidos',requiere('crear_pedidos'),(req,res)=>{
   try{
     const b=req.body;
     if(!b.nombre)return res.status(400).json({error:'Nombre requerido'});
@@ -1018,7 +1018,7 @@ app.post('/api/pedidos',(req,res)=>{
   }catch(e){logError('POST /api/pedidos',e);res.status(500).json({error:e.message})}
 });
 
-app.put('/api/pedidos/:id',(req,res)=>{
+app.put('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
   try{
     const b=req.body; const pid=req.params.id;
     const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(pid,req.wsId);
@@ -1058,7 +1058,7 @@ app.put('/api/pedidos/:id',(req,res)=>{
   }catch(e){logError('PUT /api/pedidos/:id',e);res.status(500).json({error:e.message})}
 });
 
-app.delete('/api/pedidos/:id',(req,res)=>{
+app.delete('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
   const p=db.prepare('SELECT stock_consumido FROM pedidos WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
   if(!p)return res.status(404).json({error:'No encontrado'});
   if(p.stock_consumido)restaurarStock(p.stock_consumido,req.wsId);
@@ -1133,7 +1133,7 @@ app.get('/api/stats',(req,res)=>{
 });
 
 // Export CSV
-app.get('/api/export/csv',(req,res)=>{
+app.get('/api/export/csv',requiere('ver_registros'),(req,res)=>{
   const{estado}=req.query;
   let sql='SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0'; const params=[req.wsId];
   if(estado==='entregado')sql+=' AND entregado=1';
@@ -1155,7 +1155,7 @@ app.get('/api/export/csv',(req,res)=>{
 });
 
 // Registros financieros
-app.get('/api/registros/utilidades',(req,res)=>{
+app.get('/api/registros/utilidades',requiere('ver_registros'),(req,res)=>{
   const pedidos=db.prepare('SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0').all(req.wsId).map(pedidoCompleto);
   const rows=pedidos.map(p=>{
     const ing=p.valor_total||0;
@@ -1217,7 +1217,7 @@ app.get('/api/configuracion',(req,res)=>{
   res.json(getConfiguracion(req.wsId));
 });
 
-app.put('/api/configuracion',(req,res)=>{
+app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
   try{
     const b=req.body||{};
     const errores=[];
@@ -1267,7 +1267,7 @@ app.put('/api/configuracion',(req,res)=>{
   }catch(e){logError('PUT /api/configuracion',e);res.status(500).json({error:e.message})}
 });
 
-app.post('/api/configuracion/logo',upload.single('logo'),(req,res)=>{
+app.post('/api/configuracion/logo',requiere('configurar_sistema'),upload.single('logo'),(req,res)=>{
   try{
     if(!req.file)return res.status(400).json({error:'No se recibió ningún archivo'});
     const ruta='/uploads/'+req.file.filename;
@@ -1281,7 +1281,7 @@ app.post('/api/configuracion/logo',upload.single('logo'),(req,res)=>{
 app.get('/api/etiquetas',(req,res)=>{
   res.json(getEtiquetas(req.wsId));
 });
-app.post('/api/etiquetas',(req,res)=>{
+app.post('/api/etiquetas',requiere('configurar_sistema'),(req,res)=>{
   try{
     const b=req.body;
     const errores=validarEtiqueta(b);
@@ -1293,7 +1293,7 @@ app.post('/api/etiquetas',(req,res)=>{
     res.json(getEtiquetas(req.wsId).find(e=>e.id===id));
   }catch(e){logError('POST /api/etiquetas',e);res.status(500).json({error:e.message})}
 });
-app.put('/api/etiquetas/:id',(req,res)=>{
+app.put('/api/etiquetas/:id',requiere('configurar_sistema'),(req,res)=>{
   try{
     const b=req.body; const eid=req.params.id;
     const f=db.prepare('SELECT * FROM etiquetas_negocio WHERE id=? AND workspace_id=?').get(eid,req.wsId);
@@ -1305,7 +1305,7 @@ app.put('/api/etiquetas/:id',(req,res)=>{
     res.json(getEtiquetas(req.wsId).find(e=>e.id===eid));
   }catch(e){logError('PUT /api/etiquetas/:id',e);res.status(500).json({error:e.message})}
 });
-app.delete('/api/etiquetas/:id',(req,res)=>{
+app.delete('/api/etiquetas/:id',requiere('configurar_sistema'),(req,res)=>{
   const r=db.prepare('DELETE FROM etiquetas_negocio WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrada'});
   res.json({ok:true});
@@ -1396,7 +1396,7 @@ function hojasVariantes(nodos){
   });
   return out;
 }
-app.post('/api/productos',(req,res)=>{
+app.post('/api/productos',requiere('gestionar_productos'),(req,res)=>{
   try{
     const b=req.body;
     if(!b.nombre)return res.status(400).json({error:'Nombre requerido'});
@@ -1415,7 +1415,7 @@ app.post('/api/productos',(req,res)=>{
   }catch(e){logError('POST /api/productos',e);res.status(500).json({error:e.message})}
 });
 
-app.put('/api/productos/:id',(req,res)=>{
+app.put('/api/productos/:id',requiere('gestionar_productos'),(req,res)=>{
   try{
     const b=req.body; const fid=req.params.id;
     const f=db.prepare('SELECT * FROM fichas_producto WHERE id=? AND workspace_id=?').get(fid,req.wsId);
@@ -1432,7 +1432,7 @@ app.put('/api/productos/:id',(req,res)=>{
   }catch(e){logError('PUT /api/productos/:id',e);res.status(500).json({error:e.message})}
 });
 
-app.delete('/api/productos/:id',(req,res)=>{
+app.delete('/api/productos/:id',requiere('gestionar_productos'),(req,res)=>{
   const r=db.prepare('DELETE FROM fichas_producto WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});
   res.json({ok:true});
@@ -1442,7 +1442,7 @@ app.delete('/api/productos/:id',(req,res)=>{
 app.get('/api/inventario-items',(req,res)=>{
   res.json(db.prepare('SELECT * FROM items_inventario WHERE workspace_id=? ORDER BY nombre').all(req.wsId));
 });
-app.post('/api/inventario-items',(req,res)=>{
+app.post('/api/inventario-items',requiere('gestionar_inventario'),(req,res)=>{
   const b=req.body||{};
   if(!b.nombre||!String(b.nombre).trim())return res.status(400).json({error:'Nombre requerido'});
   const id=uid();
@@ -1452,7 +1452,7 @@ app.post('/api/inventario-items',(req,res)=>{
     .run(id,req.wsId,String(b.nombre).trim(),b.descripcion||'',b.unidad_medida||'unidad',Number.isFinite(sa)?sa:null,Number.isFinite(sm)?sm:null,b.activo===0?0:1);
   res.json(db.prepare('SELECT * FROM items_inventario WHERE id=?').get(id));
 });
-app.put('/api/inventario-items/:id',(req,res)=>{
+app.put('/api/inventario-items/:id',requiere('gestionar_inventario'),(req,res)=>{
   const b=req.body||{};
   const ex=db.prepare('SELECT * FROM items_inventario WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
   if(!ex)return res.status(404).json({error:'No encontrado'});
@@ -1462,7 +1462,7 @@ app.put('/api/inventario-items/:id',(req,res)=>{
     .run(b.nombre!=null?String(b.nombre).trim():ex.nombre,b.descripcion!=null?b.descripcion:ex.descripcion,b.unidad_medida||ex.unidad_medida,b.stock_actual!==undefined?(Number.isFinite(sa)?sa:null):ex.stock_actual,b.stock_minimo!==undefined?(Number.isFinite(sm)?sm:null):ex.stock_minimo,b.activo===0?0:1,req.params.id,req.wsId);
   res.json(db.prepare('SELECT * FROM items_inventario WHERE id=?').get(req.params.id));
 });
-app.delete('/api/inventario-items/:id',(req,res)=>{
+app.delete('/api/inventario-items/:id',requiere('gestionar_inventario'),(req,res)=>{
   db.prepare("UPDATE fichas_producto SET inventario_item_id='' WHERE inventario_item_id=? AND workspace_id=?").run(req.params.id,req.wsId);
   const r=db.prepare('DELETE FROM items_inventario WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});

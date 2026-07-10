@@ -567,9 +567,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="nav-sec">Principal</div>
     <button class="nav-item active" data-view="pedidos" onclick="showView('pedidos')"><i class="ti ti-clipboard-list"></i>Pedidos<span class="nb g" id="sb-act">0</span></button>
     <button class="nav-item" data-view="clientes" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
-    <button class="nav-item" data-view="registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
-    <button class="nav-item" data-view="productos" onclick="showView('productos')"><i class="ti ti-box"></i>Productos</button>
-    <button class="nav-item" data-view="inventario" onclick="showView('inventario')"><i class="ti ti-packages"></i>Inventario</button>
+    <button class="nav-item" data-view="registros" data-perm="ver_registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
+    <button class="nav-item" data-view="productos" data-perm="gestionar_productos" onclick="showView('productos')"><i class="ti ti-box"></i>Productos</button>
+    <button class="nav-item" data-view="inventario" data-perm="gestionar_inventario" onclick="showView('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
     <button class="nav-item" onclick="filtroRapido('entregado')"><i class="ti ti-circle-check"></i>Entregados</button>
@@ -579,8 +579,8 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   <div class="sb-footer">
     <button class="nav-item" data-view="archivo" onclick="showView('archivo')"><i class="ti ti-archive"></i>Archivo</button>
     <button class="nav-item" data-view="ayuda" onclick="showView('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
-    <button class="nav-item" data-view="configuracion" onclick="showView('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
-    <button class="nav-item" onclick="abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
+    <button class="nav-item" data-view="configuracion" data-perm="configurar_sistema" onclick="showView('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
+    <button class="nav-item" data-perm="ver_registros" onclick="abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
     <div id="me-nombre" style="font-size:10px;color:var(--muted);padding:2px 12px 0"></div>
     <button class="nav-item" onclick="cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
   </div>
@@ -592,10 +592,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="tb-title" id="tb-title">Pedidos</div>
     <div class="tb-right">
       <div class="search-b"><i class="ti ti-search"></i><input type="text" id="s-inp" placeholder="Buscar…" oninput="buscar(this.value)"></div>
-      <button class="icon-btn" onclick="showView('productos')"><i class="ti ti-box"></i></button>
-      <button class="icon-btn" onclick="showView('configuracion')"><i class="ti ti-settings"></i></button>
-      <button class="icon-btn" onclick="abrirExp()"><i class="ti ti-download"></i></button>
-      <button class="btn-new" onclick="abrirNuevo()"><span class="tri"></span> Nuevo pedido</button>
+      <button class="icon-btn" data-perm="gestionar_productos" onclick="showView('productos')"><i class="ti ti-box"></i></button>
+      <button class="icon-btn" data-perm="configurar_sistema" onclick="showView('configuracion')"><i class="ti ti-settings"></i></button>
+      <button class="icon-btn" data-perm="ver_registros" onclick="abrirExp()"><i class="ti ti-download"></i></button>
+      <button class="btn-new" data-perm="crear_pedidos" onclick="abrirNuevo()"><span class="tri"></span> Nuevo pedido</button>
     </div>
   </div>
   <div class="content">
@@ -891,11 +891,11 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 <div class="modal" style="max-width:340px">
   <div class="mhead"><div class="mhead-l"><div class="mtitle">Más</div></div><button class="mclose" onclick="cerrarMas()"><i class="ti ti-x"></i></button></div>
   <div class="mbody">
-    <button class="mas-item" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
-    <button class="mas-item" onclick="irDesdeMas('inventario')"><i class="ti ti-packages"></i>Inventario</button>
+    <button class="mas-item" data-perm="gestionar_productos" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
+    <button class="mas-item" data-perm="gestionar_inventario" onclick="irDesdeMas('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
-    <button class="mas-item" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
-    <button class="mas-item" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
+    <button class="mas-item" data-perm="configurar_sistema" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
+    <button class="mas-item" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
     <button class="mas-item" onclick="cerrarMas();cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
   </div>
 </div>
@@ -996,7 +996,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div id="sec-cotiz-aviso" style="display:none;margin-top:8px;padding:12px 14px;border-radius:13px;background:var(--purple-lt);color:#4A3CB8;font-size:11px"><i class="ti ti-info-circle"></i> Es una cotización: solo información. No tiene pagos, saldos ni registro. Cuando reciba un abono se convertirá en pedido automáticamente.</div>
 
     <!-- REGISTRO DE COSTOS (interno · al final del lado izquierdo, no expuesto en la columna del cliente) -->
-    <div id="sec-registro">
+    <div id="sec-registro" data-perm="ver_costos">
     <div class="msec" style="margin-top:16px"><span class="tri"></span>Registro</div>
     <div class="collapsible">
       <div class="coll-head" onclick="toggleColl(this)">
@@ -1481,7 +1481,9 @@ function showCfgTab(tab){
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
-const PERM_LABELS={administrar_usuarios:'Administrar usuarios y roles',configurar_sistema:'Configurar el sistema',crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',ver_costos:'Ver costos',ver_utilidad:'Ver utilidad',registrar_pagos:'Registrar pagos'};
+const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
+// Mapa vista -> permiso requerido (para el gating de navegación)
+const VIEW_PERM={registros:'ver_registros',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
 function permLabel(k){ return PERM_LABELS[k]||k; }
 async function renderUsuariosRoles(){
@@ -1995,6 +1997,8 @@ function enviarWhatsAppPedido(){
 
 /* ══ VISTAS ══ */
 function showView(v){
+  // Guardia de permisos: si el rol no puede ver este módulo, redirige a Pedidos
+  if(VIEW_PERM[v]&&!puede(VIEW_PERM[v])){ toast('No tienes permiso para ver esa sección',false); v='pedidos'; }
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
@@ -3793,7 +3797,7 @@ function aplicarVistaCotizacion(){
   const esCotiz=esCotizacionModal();
   const sp=document.getElementById('sec-pagos'),sr=document.getElementById('sec-registro'),sa=document.getElementById('sec-cotiz-aviso');
   if(sp)sp.style.display=esCotiz?'none':'block';
-  if(sr)sr.style.display=esCotiz?'none':'block';
+  if(sr)sr.style.display=(esCotiz||!puede('ver_costos'))?'none':'block'; // Registro de costos: solo con permiso
   if(sa)sa.style.display=esCotiz?'block':'none';
   renderPagRes();
 }
