@@ -175,6 +175,39 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .ped-cerrado .mbody select:disabled{background-image:none;padding-right:13px}
 .ped-cerrado .mbody button:disabled{opacity:.4;cursor:default}
 
+/* MÓDULO PRODUCCIÓN (Fase 4) — tablero por estado */
+.prod-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.prod-bar select{background:var(--white);font-size:11px;font-weight:600}
+.prod-board{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;align-items:flex-start}
+.prod-col{flex:0 0 264px;width:264px;background:linear-gradient(180deg,#EFF3F9,#E9EFF7);border:1px solid var(--line);border-radius:var(--r-lg);display:flex;flex-direction:column;max-height:calc(100vh - 190px)}
+.prod-col-head{display:flex;align-items:center;gap:8px;padding:13px 15px 10px;font-size:11px;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0}
+.prod-col-head .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.prod-col-head .cnt{margin-left:auto;font-size:10px;font-weight:800;color:var(--slate);background:var(--white);border:1px solid var(--line);padding:1px 8px;border-radius:20px}
+.prod-col-body{padding:2px 10px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:9px;flex:1}
+.prod-col-empty{font-size:10px;color:var(--muted);text-align:center;padding:14px 6px;opacity:.7}
+.prodx-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;box-shadow:var(--sh);position:relative;transition:box-shadow .14s,transform .14s}
+.prodx-card:hover{box-shadow:var(--sh-lg);transform:translateY(-1px)}
+.prodx-card.urg{border-left:3px solid var(--red)}
+.prodx-card .pcx-top{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.prodx-card .pcx-ref{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);cursor:pointer}
+.prodx-card .pcx-ref:hover{color:var(--teal-dk);text-decoration:underline}
+.prodx-card .pcx-urg{color:var(--red);font-size:11px;margin-left:auto}
+.prodx-card .pcx-cli{font-size:13px;font-weight:700;color:var(--navy);letter-spacing:-.01em;line-height:1.2}
+.prodx-card .pcx-items{font-size:10.5px;color:var(--slate);margin-top:5px;line-height:1.45}
+.prodx-card .pcx-entrega{font-size:10px;font-weight:600;display:inline-flex;align-items:center;gap:4px;margin-top:6px}
+.prodx-card .pcx-row{display:flex;align-items:center;gap:6px;margin-top:9px}
+.prodx-card .pcx-row select{font-size:10.5px;padding:6px 8px;border-radius:8px;font-weight:600;height:auto}
+.prodx-card .pcx-resp{flex:1;min-width:0}
+.prodx-card .pcx-est{width:auto;min-width:96px}
+.pcx-obsbtn{background:none;border:1px solid var(--line);border-radius:8px;width:30px;height:30px;flex-shrink:0;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .12s}
+.pcx-obsbtn:hover{color:var(--teal-dk);border-color:var(--teal)}
+.pcx-obsbtn.has{color:var(--teal-dk);border-color:var(--teal);background:var(--teal-lt)}
+.pcx-obs{margin-top:8px;display:none}
+.pcx-obs.open{display:block}
+.pcx-obs textarea{font-size:11px;min-height:46px;background:#F8FAFD}
+.pcx-obs .hint{font-size:9px;color:var(--muted);margin-top:3px}
+.prod-avatar{width:22px;height:22px;border-radius:50%;background:var(--teal-lt);color:var(--teal-dk);font-size:9px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+
 /* Tags de categoría */
 .tags{display:flex;gap:3px;flex-wrap:wrap;margin:4px 0 2px}
 .ttag{font-size:8px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;color:#fff}
@@ -581,6 +614,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="clientes" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
     <button class="nav-item" data-view="registros" data-perm="ver_registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
     <button class="nav-item" data-view="productos" data-perm="gestionar_productos" onclick="showView('productos')"><i class="ti ti-box"></i>Productos</button>
+    <button class="nav-item" data-view="produccion" data-perm="ver_produccion" onclick="showView('produccion')"><i class="ti ti-tools"></i>Producción</button>
     <button class="nav-item" data-view="inventario" data-perm="gestionar_inventario" onclick="showView('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
@@ -691,6 +725,21 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <tbody id="inv-body"></tbody>
       </table>
       <div class="empty" id="inv-empty" style="display:none"><i class="ti ti-box-off"></i><p>Aún no hay ítems de inventario — crea el primero</p></div>
+    </div>
+
+    <!-- PRODUCCIÓN (Fase 4) -->
+    <div id="view-produccion" class="view">
+      <div class="prod-bar">
+        <div class="search-b" style="flex:1;min-width:180px;max-width:280px"><i class="ti ti-search"></i>
+          <input type="text" id="prod-q" placeholder="Buscar cliente o #pedido…" oninput="prodFiltrar()" style="max-width:100%">
+        </div>
+        <select id="prod-f-resp" onchange="prodFiltrar()" style="width:auto;min-width:150px"><option value="">Todos los responsables</option></select>
+        <select id="prod-f-cat" onchange="prodFiltrar()" style="width:auto;min-width:130px"><option value="">Todas las etiquetas</option></select>
+        <button class="pill" id="prod-f-urg" onclick="prodToggleUrg()"><i class="ti ti-bolt"></i> Urgentes</button>
+        <div style="margin-left:auto;font-size:11px;color:var(--muted)" id="prod-count"></div>
+      </div>
+      <div id="prod-board" class="prod-board"></div>
+      <div class="empty" id="prod-empty" style="display:none"><i class="ti ti-tools-off"></i><p>No hay trabajos en producción ahora mismo</p></div>
     </div>
 
     <!-- ARCHIVO -->
@@ -1502,9 +1551,9 @@ function showCfgTab(tab){
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
-const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
+const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
 // Mapa vista -> permiso requerido (para el gating de navegación)
-const VIEW_PERM={registros:'ver_registros',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
+const VIEW_PERM={registros:'ver_registros',produccion:'ver_produccion',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
 function permLabel(k){ return PERM_LABELS[k]||k; }
 async function renderUsuariosRoles(){
@@ -2036,7 +2085,7 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
+  const titles={pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',produccion:'Producción',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
   document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,productos:4,inventario:4,ayuda:4,configuracion:4}[v]??0]?.classList.add('active');
@@ -2044,6 +2093,7 @@ function showView(v){
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
   if(v==='productos')cargarProductos();
+  if(v==='produccion')cargarProduccion();
   if(v==='inventario')cargarInventario();
   if(v==='archivo')cargarArchivo();
 }
@@ -2168,6 +2218,113 @@ function buildEncSummary(encs){
     const cls=EST_CLS[s]||'es-nuevo';
     return`<span class="esc ${cls}">${n} ${s}</span>`;
   }).join('');
+}
+
+/* ══ PRODUCCIÓN (Fase 4) ══ */
+let PROD_CARDS=[], PROD_EQUIPO=[], prodFUrg=false;
+function pesc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+async function cargarProduccion(){
+  try{
+    const [cards,equipo]=await Promise.all([api('GET','/produccion'),api('GET','/produccion/equipo')]);
+    PROD_CARDS=cards||[]; PROD_EQUIPO=equipo||[];
+  }catch(e){ PROD_CARDS=[];PROD_EQUIPO=[]; toast('Error cargando producción: '+e.message,false); }
+  const rs=document.getElementById('prod-f-resp');
+  if(rs){ const cur=rs.value; rs.innerHTML='<option value="">Todos los responsables</option><option value="__none">Sin asignar</option>'+PROD_EQUIPO.map(u=>`<option value="${u.id}">${pesc(u.nombre)}</option>`).join(''); rs.value=cur; }
+  const cs=document.getElementById('prod-f-cat');
+  if(cs){ const cur=cs.value; cs.innerHTML='<option value="">Todas las etiquetas</option>'+CATS.map(c=>`<option value="${c.id}">${pesc(c.label)}</option>`).join(''); cs.value=cur; }
+  renderProduccion();
+}
+function prodToggleUrg(){ prodFUrg=!prodFUrg; document.getElementById('prod-f-urg').classList.toggle('active',prodFUrg); renderProduccion(); }
+function prodFiltrar(){ renderProduccion(); }
+function prodCardsFiltradas(){
+  const q=(document.getElementById('prod-q')?.value||'').trim().toLowerCase();
+  const resp=document.getElementById('prod-f-resp')?.value||'';
+  const cat=document.getElementById('prod-f-cat')?.value||'';
+  return PROD_CARDS.filter(c=>{
+    if(prodFUrg&&!c.urgente)return false;
+    if(resp==='__none'&&c.responsable_id)return false;
+    if(resp&&resp!=='__none'&&c.responsable_id!==resp)return false;
+    if(cat&&!(c.categorias||[]).includes(cat))return false;
+    if(q&&!((c.cliente||'').toLowerCase().includes(q)||('#'+c.ref).toLowerCase().includes(q)))return false;
+    return true;
+  });
+}
+function renderProduccion(){
+  const board=document.getElementById('prod-board');
+  const empty=document.getElementById('prod-empty');
+  if(!PROD_CARDS.length){ board.style.display='none'; empty.style.display=''; document.getElementById('prod-count').textContent=''; return; }
+  const cards=prodCardsFiltradas();
+  document.getElementById('prod-count').textContent = cards.length? `${cards.length} ${cards.length===1?'trabajo':'trabajos'}` : 'Sin resultados';
+  board.style.display='flex'; empty.style.display='none';
+  const editable=puede('gestionar_produccion');
+  board.innerHTML=ENC_ESTS.map(est=>{
+    const col=cards.filter(c=>c.estado===est);
+    const cardsHtml=col.length? col.map(c=>prodCardHTMLp(c,editable)).join('') : '<div class="prod-col-empty">—</div>';
+    return `<div class="prod-col">
+      <div class="prod-col-head"><span class="dot" style="background:${ECOL_MAP[est]||'#8A9EAD'}"></span>${est}<span class="cnt">${col.length}</span></div>
+      <div class="prod-col-body">${cardsHtml}</div>
+    </div>`;
+  }).join('');
+}
+function prodCardHTMLp(c,editable){
+  const cats=(c.categorias||[]).map(cid=>{const cat=CATS.find(x=>x.id===cid);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
+  const its=(c.items||[]).slice(0,3).map(it=>`${it.cantidad?pesc(it.cantidad)+'× ':''}${pesc(it.detalle||'—')}`).join(' · ')+((c.items||[]).length>3?' …':'');
+  const respOpts=`<option value="">Sin responsable</option>`+PROD_EQUIPO.map(u=>`<option value="${u.id}" ${u.id===c.responsable_id?'selected':''}>${pesc(u.nombre)}</option>`).join('');
+  const estOpts=ENC_ESTS.map(e=>`<option value="${e}" ${e===c.estado?'selected':''}>${e}</option>`).join('');
+  const dis=editable?'':'disabled';
+  const av=c.responsable_nombre?`<span class="prod-avatar" title="${pesc(c.responsable_nombre)}">${ini(c.responsable_nombre)}</span>`:'';
+  return `<div class="prodx-card ${c.urgente?'urg':''}">
+    <div class="pcx-top"><span class="pcx-ref" onclick="abrirEditar('${c.pedido_id}')">#${c.ref} · E${c.numero}</span>${c.urgente?'<span class="pcx-urg" title="Urgente"><i class="ti ti-bolt"></i></span>':''}</div>
+    <div class="pcx-cli">${pesc(c.cliente)}</div>
+    ${cats?`<div class="tags" style="margin:5px 0 0">${cats}</div>`:''}
+    ${its?`<div class="pcx-items">${its}</div>`:''}
+    ${prodEntrega(c)}
+    <div class="pcx-row">
+      ${av}
+      <select class="pcx-resp" ${dis} onchange="prodSetResp('${c.encargo_id}',this.value)" title="Responsable">${respOpts}</select>
+      <button class="pcx-obsbtn ${c.notas_tec?'has':''}" onclick="prodToggleObs('${c.encargo_id}')" title="Observación técnica"><i class="ti ti-note"></i></button>
+    </div>
+    <div class="pcx-row">
+      <select class="pcx-est" ${dis} onchange="prodSetEstado('${c.encargo_id}',this.value)" title="Estado de producción" style="flex:1">${estOpts}</select>
+    </div>
+    <div class="pcx-obs" id="obs-${c.encargo_id}">
+      <textarea ${dis} id="obstx-${c.encargo_id}" placeholder="Observaciones técnicas para producción…">${pesc(c.notas_tec||'')}</textarea>
+      ${editable?`<div style="display:flex;gap:6px;margin-top:6px"><button class="btn-add-row" style="padding:5px 10px" onclick="prodGuardarObs('${c.encargo_id}')"><i class="ti ti-check"></i> Guardar nota</button></div>`:'<div class="hint">Solo lectura</div>'}
+    </div>
+  </div>`;
+}
+function prodEntrega(c){
+  if(!c.fecha_entrega)return '';
+  const hoyD=new Date();hoyD.setHours(0,0,0,0);
+  const entD=new Date(c.fecha_entrega+'T00:00:00');
+  const d=Math.round((entD-hoyD)/86400000);
+  let lbl,col;
+  if(d<0){lbl='Vencido '+Math.abs(d)+'d';col='var(--red)';}
+  else if(d===0){lbl='Entrega hoy';col='var(--green)';}
+  else if(d===1){lbl='Entrega mañana';col='var(--amber)';}
+  else if(d<=7){lbl='Entrega en '+d+'d';col='var(--amber)';}
+  else{lbl='Entrega '+fd(c.fecha_entrega);col='var(--slate)';}
+  return `<div class="pcx-entrega" style="color:${col}"><i class="ti ti-calendar"></i>${lbl}</div>`;
+}
+async function prodSetEstado(encId,estado){
+  try{ await api('PUT',`/produccion/encargo/${encId}`,{estado});
+    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c)c.estado=estado;
+    renderProduccion(); toast('Estado actualizado ✓');
+  }catch(e){ toast('Error: '+e.message,false); cargarProduccion(); }
+}
+async function prodSetResp(encId,rid){
+  try{ await api('PUT',`/produccion/encargo/${encId}`,{responsable_id:rid});
+    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c){c.responsable_id=rid;const u=PROD_EQUIPO.find(x=>x.id===rid);c.responsable_nombre=u?u.nombre:'';}
+    renderProduccion(); toast('Responsable actualizado ✓');
+  }catch(e){ toast('Error: '+e.message,false); cargarProduccion(); }
+}
+function prodToggleObs(encId){ document.getElementById('obs-'+encId)?.classList.toggle('open'); }
+async function prodGuardarObs(encId){
+  const txt=document.getElementById('obstx-'+encId)?.value||'';
+  try{ await api('PUT',`/produccion/encargo/${encId}`,{notas_tec:txt});
+    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c)c.notas_tec=txt;
+    renderProduccion(); toast('Observación guardada ✓');
+  }catch(e){ toast('Error: '+e.message,false); }
 }
 
 /* ══ CLIENTES ══ */

@@ -139,6 +139,28 @@ Spec: `docs/superpowers/specs/2026-07-10-fase3-cierre-pedido-design.md`.
 
 ---
 
+## 🆕 v3.0 Fase 4 — Módulo Producción (por encargo)
+
+### server.js
+| Línea aprox | Qué |
+|---|---|
+| tras migración cerrado | `ALTER encargos ADD responsable_id, notas_tec` |
+| PERMISOS_FASE1 | +`ver_produccion`, `gestionar_produccion`; `const ENC_ESTADOS=[...]` |
+| `saveEncargos` | INSERT ahora incluye `responsable_id,notas_tec` (sobreviven a edición comercial) |
+| tras cerrar/reabrir | **GET /api/produccion** (tarjetas por encargo de pedidos activos), **GET /api/produccion/equipo**, **PUT /api/produccion/encargo/:id** (estado/responsable/notas; 409 si cerrado; historial) |
+
+### public/index.html
+| Qué | Dónde |
+|---|---|
+| CSS `.prod-board/.prod-col/.prodx-card/.pcx-*` (ojo: `prodx-card`, NO `prod-card` que es de Productos) | tras CSS de cierre (~181) |
+| Sidebar nav `data-view="produccion"` + vista `#view-produccion` (barra filtros + `#prod-board`) | sidebar / antes de view-archivo |
+| `PERM_LABELS` +ver/gestionar_produccion; `VIEW_PERM.produccion`; showView título + `cargarProduccion()` | ~1490, ~1507, ~2039 |
+| **funcs** `cargarProduccion, renderProduccion, prodCardHTMLp, prodEntrega, prodSetEstado, prodSetResp, prodToggleObs, prodGuardarObs, prodFiltrar/ToggleUrg, pesc` | antes de `/* ══ CLIENTES ══ */` |
+
+Spec: `docs/superpowers/specs/2026-07-10-fase4-modulo-produccion-design.md`.
+
+---
+
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
 | Archivo | Peso | Qué contiene |

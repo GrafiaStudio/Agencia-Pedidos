@@ -132,6 +132,9 @@ try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado INTEGER DEFAULT 0"); } cat
 try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado_por TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado_en TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE pedidos ADD COLUMN cerrado_motivo TEXT DEFAULT ''"); } catch(e){}
+// ── PRODUCCIÓN (v3.0 Fase 4) — responsable y observación técnica por encargo ──
+try { db.exec("ALTER TABLE encargos ADD COLUMN responsable_id TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE encargos ADD COLUMN notas_tec TEXT DEFAULT ''"); } catch(e){}
 // ── WORKSPACES (aislamiento multi-tenant) ──
 // Cada PIN mapea a un workspace independiente. 'main' es el negocio real (PIN=APP_PIN);
 // los 'prueba-N' son accesos temporales para testers, con su propio espacio aislado.
@@ -161,7 +164,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
   activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_produccion','gestionar_produccion','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
+const ENC_ESTADOS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 function permisosDeRol(rol){
   if(!rol) return {};
   if(rol.es_admin) return {__admin:true};
@@ -559,8 +563,8 @@ function saveEncargos(pid,encargos,wsId){
   db.prepare('DELETE FROM encargos WHERE pedido_id=? AND workspace_id=?').run(pid,wsId);
   (encargos||[]).forEach((enc,i)=>{
     const eid=enc.id||uid();
-    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,categorias,subcategorias,estado,valor,valor_calc,anotacion,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(eid,pid,enc.numero||i+1,'','',JSON.stringify(enc.categorias||[]),JSON.stringify(enc.subcategorias||[]),enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',i,wsId);
+    db.prepare('INSERT INTO encargos(id,pedido_id,numero,categoria,subcategoria,categorias,subcategorias,estado,valor,valor_calc,anotacion,responsable_id,notas_tec,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(eid,pid,enc.numero||i+1,'','',JSON.stringify(enc.categorias||[]),JSON.stringify(enc.subcategorias||[]),enc.estado||'Nuevo',enc.valor||'',normCalc(enc.valor),enc.anotacion||'',enc.responsable_id||'',enc.notas_tec||'',i,wsId);
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
       const cfg=(it._varPicks||it._ancho||it._alto||it._hojaSurf!==undefined&&it._hojaSurf!==''||it._hojaExtras)?JSON.stringify({varPicks:it._varPicks||null,ancho:it._ancho||'',alto:it._alto||'',hojaSurf:(it._hojaSurf!==undefined?it._hojaSurf:''),hojaExtras:it._hojaExtras||null}):'';
@@ -1173,6 +1177,63 @@ app.post('/api/pedidos/:id/reabrir',requiere('reabrir_pedidos'),(req,res)=>{
   db.prepare('UPDATE pedidos SET cerrado=0,cerrado_motivo=? WHERE id=? AND workspace_id=?').run(motivo,pid,req.wsId);
   addHist(pid,'Pedido reabierto'+(motivo?` — Motivo: ${motivo}`:''),req.wsId,act,motivo);
   res.json(pedidoCompleto(db.prepare('SELECT * FROM pedidos WHERE id=?').get(pid)));
+});
+
+// ── MÓDULO PRODUCCIÓN (v3.0 Fase 4) ──
+// Vista derivada (único origen de verdad = el Pedido). No duplica datos: lee los encargos
+// de los pedidos ACTIVOS (no entregado/cancelado/cotización/cerrado/archivado) como tarjetas.
+app.get('/api/produccion',requiere('ver_produccion'),(req,res)=>{
+  const peds=db.prepare("SELECT id,ref,nombre,tel,urgente,fecha_entrega,creado FROM pedidos WHERE workspace_id=? AND archivado=0 AND entregado=0 AND cancelado=0 AND es_cotizacion=0 AND cerrado=0 ORDER BY urgente DESC, (fecha_entrega='' OR fecha_entrega IS NULL) ASC, fecha_entrega ASC, creado DESC").all(req.wsId);
+  const uById={}; db.prepare('SELECT id,nombre,usuario FROM usuarios WHERE workspace_id=?').all(req.wsId).forEach(u=>uById[u.id]=u.nombre||u.usuario);
+  const tarjetas=[];
+  peds.forEach(p=>{
+    const encs=db.prepare('SELECT * FROM encargos WHERE pedido_id=? ORDER BY orden').all(p.id);
+    encs.forEach(enc=>{
+      resolverCategoriasEncargo(enc);
+      const items=db.prepare('SELECT cantidad,detalle FROM enc_items WHERE encargo_id=? ORDER BY orden').all(enc.id);
+      tarjetas.push({
+        pedido_id:p.id, ref:p.ref, cliente:p.nombre, tel:p.tel||'', urgente:!!p.urgente,
+        fecha_entrega:p.fecha_entrega||'', creado:p.creado,
+        encargo_id:enc.id, numero:enc.numero||1, estado:ENC_ESTADOS.includes(enc.estado)?enc.estado:'Nuevo',
+        categorias:enc.categorias||[], anotacion:enc.anotacion||'',
+        responsable_id:enc.responsable_id||'', responsable_nombre:uById[enc.responsable_id]||'',
+        notas_tec:enc.notas_tec||'', items
+      });
+    });
+  });
+  res.json(tarjetas);
+});
+// Equipo asignable (usuarios activos del workspace) — accesible con solo ver_produccion.
+app.get('/api/produccion/equipo',requiere('ver_produccion'),(req,res)=>{
+  res.json(db.prepare('SELECT id,nombre,usuario FROM usuarios WHERE workspace_id=? AND activo=1 ORDER BY nombre').all(req.wsId).map(u=>({id:u.id,nombre:u.nombre||u.usuario})));
+});
+// Actualizar un encargo desde Producción: estado / responsable / observación técnica.
+// NO toca información comercial (valores, cliente, pagos). Bloqueado si el pedido está cerrado.
+app.put('/api/produccion/encargo/:id',requiere('gestionar_produccion'),(req,res)=>{
+  const enc=db.prepare('SELECT e.*, p.cerrado AS p_cerrado, p.id AS p_id FROM encargos e JOIN pedidos p ON p.id=e.pedido_id WHERE e.id=? AND e.workspace_id=?').get(req.params.id,req.wsId);
+  if(!enc)return res.status(404).json({error:'Encargo no encontrado'});
+  if(enc.p_cerrado)return res.status(409).json({error:'El pedido está cerrado'});
+  const b=req.body||{}; const act=actorDe(req); const sets=[]; const vals=[]; const logs=[];
+  if(b.estado!==undefined && ENC_ESTADOS.includes(b.estado) && b.estado!==enc.estado){
+    logs.push(`Producción · Encargo #${enc.numero}: ${enc.estado||'Nuevo'} → ${b.estado}`);
+    sets.push('estado=?'); vals.push(b.estado);
+  }
+  if(b.responsable_id!==undefined && (b.responsable_id||'')!==(enc.responsable_id||'')){
+    const rid=b.responsable_id||'';
+    const u=rid?db.prepare('SELECT nombre,usuario FROM usuarios WHERE id=? AND workspace_id=?').get(rid,req.wsId):null;
+    if(rid&&!u)return res.status(400).json({error:'Responsable inválido'});
+    logs.push(rid?`Producción · Encargo #${enc.numero}: responsable → ${u.nombre||u.usuario}`:`Producción · Encargo #${enc.numero}: responsable quitado`);
+    sets.push('responsable_id=?'); vals.push(rid);
+  }
+  if(b.notas_tec!==undefined && String(b.notas_tec)!==(enc.notas_tec||'')){
+    logs.push(`Producción · Encargo #${enc.numero}: observación técnica actualizada`);
+    sets.push('notas_tec=?'); vals.push(String(b.notas_tec));
+  }
+  if(!sets.length)return res.json({ok:true,sinCambios:true});
+  vals.push(req.params.id,req.wsId);
+  db.prepare(`UPDATE encargos SET ${sets.join(',')} WHERE id=? AND workspace_id=?`).run(...vals);
+  logs.forEach(t=>addHist(enc.p_id,t,req.wsId,act));
+  res.json({ok:true});
 });
 
 // Archivos
