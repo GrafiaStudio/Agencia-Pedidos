@@ -6,7 +6,9 @@
 > - `server.js` = 1.350 líneas (~22k tokens) → lee tramos.
 >
 > Regenerar este mapa tras cambios grandes: grep de `function`/`app.(get|post|put|delete)` con `-n`.
-> Última sync: commit 334c5c1 (B1.4b). Si los números bailan ±20 líneas, sigue sirviendo para saltar cerca.
+> Última sync: commit 6d5fc0e (v3.0 Fase 1). server.js=1504 líneas, index.html=4354 líneas.
+> ⚠️ Tras Fase 1 las tablas de abajo (pre-v3.0) corrieron ~+30 líneas antes de la línea 800 y ~+50
+> después; sirven para saltar cerca. Los anclajes exactos de Fase 1 están en la sección v3.0 al final.
 
 ---
 
@@ -81,6 +83,23 @@
 | 4207–4221 | **init()** | arranque de la app |
 
 ---
+
+## 🆕 v3.0 Fase 1 — Usuarios y Roles (anclajes exactos, commit 6d5fc0e)
+
+### server.js
+| Línea | Qué |
+|---|---|
+| 136–182 | Tablas `roles`/`usuarios`, `PERMISOS_FASE1`, `permisosDeRol` 150, `sembrarUsuariosSiFalta` 156 |
+| 823–868 | Auth: `firmarUsuario` 824, login usuario+PIN 825, guard con permisos 834, `requiere(clave)` 868 |
+| 870–962 | Endpoints: `rolPublico`/`usuarioPublico` 871, GET /me 874, POST /me/pass 878, roles CRUD 888–917, usuarios CRUD 920–962 |
+
+### public/index.html
+| Línea | Qué |
+|---|---|
+| 1260–1276 | Globals `ME/PERMISOS/ES_ADMIN`, `puede()` 1261, `cargarMe()` 1262, `aplicarGatingPermisos` 1268 |
+| 1290–1331 | Login: `showPinScreen` 1290, `mostrarLoginPin/User` 1307, `intentarLogin` 1310, `intentarPin` 1321 |
+| 1486–1561 | Gestión: `renderUsuariosRoles` 1487, usuarios 1493–1521, roles 1523–1560 |
+| ~533 (markup) | Pantalla login (loginUserBox/loginPinBox); ~697 tab "Usuarios y Roles"; ~785 panel `cfg-usuarios` |
 
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
