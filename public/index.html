@@ -87,6 +87,46 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .reg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
 .reg-nota{display:flex;align-items:flex-start;gap:7px;font-size:10.5px;color:var(--slate);background:var(--teal-lt);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:12px;line-height:1.5}
 .reg-nota i{font-size:13px;color:var(--teal-dk);flex-shrink:0;margin-top:1px}
+
+/* USUARIOS Y ROLES — 3 columnas estilo Discord */
+.ur-grid{display:grid;grid-template-columns:1.1fr 0.9fr 1.6fr;gap:14px;align-items:start}
+@media(max-width:1000px){.ur-grid{grid-template-columns:1fr}}
+.ur-col{background:linear-gradient(180deg,#FDFEFF,#F4F8FC);border:1px solid var(--line);border-radius:var(--r-lg);padding:13px}
+.ur-col-h{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:800;color:var(--slate);text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px}
+.ur-col-h i{font-size:15px;color:var(--teal-dk)}
+.ur-cnt{margin-left:auto;font-size:9px;font-weight:800;background:var(--white);border:1px solid var(--line);color:var(--slate);padding:1px 8px;border-radius:20px}
+.ur-user{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--line);border-radius:11px;margin-bottom:7px;background:var(--white);cursor:pointer;transition:all .13s}
+.ur-user:hover{border-color:#CBD8E8;box-shadow:var(--sh)}
+.ur-user.off{opacity:.5}
+.ur-user.sel{border-color:var(--teal);box-shadow:0 0 0 3px rgba(91,127,166,.12)}
+.ur-av{width:30px;height:30px;border-radius:50%;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ur-uname{font-size:12px;font-weight:700;color:var(--navy);line-height:1.2}
+.ur-usub{font-size:9.5px;color:var(--muted);margin-top:1px}
+.ur-chip{font-size:8.5px;font-weight:800;padding:2px 8px;border-radius:20px;color:#fff;letter-spacing:.03em}
+.ur-acciones{display:flex;gap:6px;margin:2px 0 9px;padding:8px 10px;background:var(--line-lt);border-radius:10px;align-items:center;flex-wrap:wrap}
+.ur-rol{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--line);border-radius:11px;margin-bottom:7px;background:var(--white);cursor:pointer;transition:all .13s;font-size:12px;font-weight:700;color:var(--navy)}
+.ur-rol:hover{border-color:#CBD8E8}
+.ur-rol.sel{border-color:var(--teal);background:var(--teal-lt);box-shadow:0 0 0 3px rgba(91,127,166,.10)}
+.ur-rol .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ur-rol .n{margin-left:auto;font-size:9px;font-weight:800;color:var(--muted);background:var(--line-lt);padding:1px 7px;border-radius:20px}
+.ur-vacio{font-size:10.5px;color:var(--muted);text-align:center;padding:18px 8px}
+.ra-colores{display:flex;gap:7px;margin:4px 0 12px}
+.ra-color{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .12s}
+.ra-color:hover{transform:scale(1.15)}
+.ra-color.sel{border-color:var(--navy);box-shadow:0 0 0 2px #fff inset}
+.ra-grupo{border:1px solid var(--line);border-radius:11px;margin-bottom:8px;background:var(--white);overflow:hidden}
+.ra-grupo-h{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;font-size:11px;font-weight:800;color:var(--navy)}
+.ra-grupo-h:hover{background:var(--line-lt)}
+.ra-grupo-h i.gi{font-size:15px;color:var(--teal-dk)}
+.ra-grupo-h .st{margin-left:auto;font-size:9px;font-weight:700;color:var(--muted)}
+.ra-grupo-h .chev{font-size:13px;color:var(--muted);transition:transform .18s}
+.ra-grupo.open .chev{transform:rotate(90deg)}
+.ra-grupo-b{display:none;padding:4px 12px 11px;border-top:1px solid var(--line-lt)}
+.ra-grupo.open .ra-grupo-b{display:block}
+.ra-perm{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:11px;color:var(--navy);cursor:pointer}
+.ra-perm input{width:auto}
+.ra-mini{font-size:9px;font-weight:700;color:var(--teal-dk);cursor:pointer;margin-left:auto}
+.ra-mini:hover{text-decoration:underline}
 .sc{background:linear-gradient(180deg,#FDFEFF 0%,#F3F7FC 100%);border-radius:var(--r-lg);padding:18px 22px;border:1px solid transparent;position:relative;overflow:hidden;box-shadow:var(--sh);transition:box-shadow .15s,transform .15s}
 .sc:hover{box-shadow:var(--sh-lg);transform:translateY(-2px)}
 .sc.dk{background:var(--navy);border-color:var(--navy)}
@@ -1013,15 +1053,23 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
 
       <div id="cfg-usuarios" class="cfg-panel">
-        <div class="msec"><span class="tri"></span>Usuarios</div>
-        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px">Crea cuentas para tu equipo. Cada persona entra con su <b>usuario y contraseña</b> y solo ve lo que su <b>rol</b> le permite. Tú (administrador) puedes entrar también con el PIN.</div>
-        <div id="usuarios-lista"></div>
-        <button class="btn-add-row" onclick="abrirNuevoUsuario()"><i class="ti ti-user-plus"></i>Agregar usuario</button>
-
-        <div class="msec" style="margin-top:22px"><span class="tri"></span>Roles y permisos</div>
-        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px">Un <b>rol</b> es un conjunto de permisos (estilo Discord). Crea los que necesites y marca qué puede hacer cada uno. El rol <b>Administrador</b> siempre lo puede todo.</div>
-        <div id="roles-lista"></div>
-        <button class="btn-add-row" onclick="abrirNuevoRol()"><i class="ti ti-shield-plus"></i>Agregar rol</button>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:12px">Cada persona entra con su <b>usuario y contraseña</b> y solo ve lo que su <b>rol</b> le permite (estilo Discord). Selecciona un rol para ajustar sus permisos. El rol <b>Administrador</b> siempre lo puede todo.</div>
+        <div class="ur-grid">
+          <div class="ur-col">
+            <div class="ur-col-h"><i class="ti ti-users"></i>Usuarios<span class="ur-cnt" id="ur-cnt-usr"></span></div>
+            <div id="usuarios-lista"></div>
+            <button class="btn-add-row" style="width:100%;justify-content:center" onclick="abrirNuevoUsuario()"><i class="ti ti-user-plus"></i>Agregar usuario</button>
+          </div>
+          <div class="ur-col">
+            <div class="ur-col-h"><i class="ti ti-shield"></i>Roles<span class="ur-cnt" id="ur-cnt-rol"></span></div>
+            <div id="roles-lista"></div>
+            <button class="btn-add-row" style="width:100%;justify-content:center" onclick="abrirNuevoRol()"><i class="ti ti-shield-plus"></i>Agregar rol</button>
+          </div>
+          <div class="ur-col ur-col-aj">
+            <div class="ur-col-h"><i class="ti ti-adjustments-horizontal"></i>Ajustes del rol</div>
+            <div id="rol-ajustes"></div>
+          </div>
+        </div>
       </div>
 
       <button class="btn-pri" id="btn-guardar-config" style="margin-top:18px" onclick="guardarConfiguracion()"><i class="ti ti-device-floppy"></i> Guardar configuración</button>
@@ -1736,80 +1784,160 @@ const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos'
 const VIEW_PERM={registros:'ver_registros',dashboard:'ver_dashboard',produccion:'ver_produccion',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
 function permLabel(k){ return PERM_LABELS[k]||k; }
+/* Usuarios y Roles — panel en 3 columnas (Usuarios · Roles · Ajustes del rol) */
+const ROL_COLORES=['navy','teal','purple','green','amber','red','pink','slate'];
+const ROL_HEX={navy:'#222B46',teal:'#0BB5B0',purple:'#7B6EF6',green:'#2BAD72',amber:'#F5A623',red:'#E5484D',pink:'#E5599A',slate:'#5E708A'};
+function rolHex(c){ return ROL_HEX[c]||ROL_HEX.slate; }
+const PERM_GRUPOS=[
+  {t:'Pedidos',icon:'ti-clipboard-list',ks:['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos']},
+  {t:'Finanzas',icon:'ti-chart-bar',ks:['ver_costos','ver_utilidad','ver_registros','ver_dashboard']},
+  {t:'Producción e inventario',icon:'ti-tools',ks:['ver_produccion','gestionar_produccion','consumir_inventario','gestionar_inventario']},
+  {t:'Catálogo y clientes',icon:'ti-box',ks:['gestionar_productos','editar_clientes']},
+  {t:'Administración',icon:'ti-settings',ks:['configurar_sistema','administrar_usuarios']}
+];
+let rolSelId=null, usrSelId=null, raColorTmp='', raGruposAbiertos=new Set(['Pedidos']);
 async function renderUsuariosRoles(){
   try{ USUARIOS=await api('GET','/usuarios'); ROLES=await api('GET','/roles'); }
-  catch(e){ document.getElementById('usuarios-lista').innerHTML='<div style="color:var(--muted);font-size:11px">'+escHtml(e.message)+'</div>'; return; }
-  renderUsuariosLista(); renderRolesLista();
+  catch(e){ document.getElementById('usuarios-lista').innerHTML='<div class="ur-vacio">'+escHtml(e.message)+'</div>'; return; }
+  if(!rolSelId||!(ROLES.some(r=>r.id===rolSelId)||rolSelId==='__nuevo'))rolSelId=(ROLES.find(r=>!r.es_admin)||ROLES[0]||{}).id||null;
+  renderUsuariosLista(); renderRolesLista(); renderRolAjustes();
 }
 function rolOptions(sel){ return ROLES.map(r=>`<option value="${r.id}"${r.id===sel?' selected':''}>${escHtml(r.nombre)}</option>`).join(''); }
+function fdHora(s){ if(!s)return ''; const[f,h]=String(s).split(' '); return fd(f)+(h?' '+h.slice(0,5):''); }
 function renderUsuariosLista(){
   const cont=document.getElementById('usuarios-lista');
-  let html=USUARIOS.map(u=>`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px${u.activo?'':';opacity:.5'}">
-      <div style="flex:1;min-width:140px"><b>${escHtml(u.nombre||u.usuario)}</b><div style="font-size:10px;color:var(--muted)">@${escHtml(u.usuario)}${u.es_admin?' · Administrador':''}</div></div>
-      <select class="item-inp" style="width:150px" ${u.es_admin?'disabled':''} onchange="cambiarRolUsuario('${u.id}',this.value)">${rolOptions(u.rol_id)}</select>
+  const cnt=document.getElementById('ur-cnt-usr'); if(cnt)cnt.textContent=USUARIOS.filter(u=>u.activo).length;
+  let html=USUARIOS.map(u=>{
+    const hex=u.es_admin?ROL_HEX.navy:rolHex(u.rol_color);
+    const abierto=usrSelId===u.id;
+    return `<div class="ur-user ${u.activo?'':'off'} ${abierto?'sel':''}" onclick="urToggleUsr('${u.id}')">
+      <span class="ur-av" style="background:${hex}">${ini(u.nombre||u.usuario)}</span>
+      <div style="flex:1;min-width:0">
+        <div class="ur-uname">${escHtml(u.nombre||u.usuario)}</div>
+        <div class="ur-usub">@${escHtml(u.usuario)}${u.ultimo_login?` · último acceso ${fdHora(u.ultimo_login)}`:''}</div>
+      </div>
+      <span class="ur-chip" style="background:${hex}">${escHtml(u.rol_nombre||'—')}</span>
+    </div>
+    ${abierto?`<div class="ur-acciones" onclick="event.stopPropagation()">
+      <select class="item-inp" style="flex:1;min-width:120px" ${u.es_admin?'disabled':''} onchange="cambiarRolUsuario('${u.id}',this.value)">${rolOptions(u.rol_id)}</select>
       <button class="btn-ghost" title="Cambiar contraseña" onclick="cambiarPassUsuario('${u.id}')"><i class="ti ti-key"></i></button>
       ${u.es_admin?'':`<button class="btn-ghost" title="${u.activo?'Desactivar':'Reactivar'}" onclick="toggleActivoUsuario('${u.id}',${u.activo?0:1})"><i class="ti ${u.activo?'ti-user-off':'ti-user-check'}"></i></button>`}
-    </div>`).join('');
+    </div>`:''}`;
+  }).join('');
   if(nuevoUsrTmp){
-    html+=`<div style="padding:10px;border:1px dashed var(--teal);border-radius:8px;margin-bottom:6px">
+    html+=`<div style="padding:11px;border:1.5px dashed var(--teal);border-radius:11px;margin-bottom:6px;background:var(--white)">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><label>Usuario (para entrar)</label><input class="item-inp" id="nu-usuario" placeholder="ej: maria"></div>
         <div><label>Nombre visible</label><input class="item-inp" id="nu-nombre" placeholder="María López"></div>
         <div><label>Contraseña</label><input class="item-inp" id="nu-pass" type="text" placeholder="mínimo 4 caracteres"></div>
         <div><label>Rol</label><select class="item-inp" id="nu-rol">${rolOptions('')}</select></div>
       </div>
-      <div style="margin-top:8px;display:flex;gap:8px"><button class="btn-pri" onclick="guardarNuevoUsuario()"><i class="ti ti-check"></i> Crear usuario</button><button class="btn-ghost" onclick="nuevoUsrTmp=null;renderUsuariosLista()">Cancelar</button></div>
+      <div style="margin-top:9px;display:flex;gap:7px"><button class="btn-pri" onclick="guardarNuevoUsuario()"><i class="ti ti-check"></i> Crear</button><button class="btn-ghost" onclick="nuevoUsrTmp=null;renderUsuariosLista()">Cancelar</button></div>
     </div>`;
   }
-  cont.innerHTML=html||'<div style="color:var(--muted);font-size:11px">Aún no hay usuarios.</div>';
+  cont.innerHTML=html||'<div class="ur-vacio">Aún no hay usuarios.</div>';
 }
+function urToggleUsr(id){ usrSelId=(usrSelId===id)?null:id; renderUsuariosLista(); }
 function abrirNuevoUsuario(){ if(!ROLES.length){toast('Primero crea un rol',false);return} nuevoUsrTmp={}; renderUsuariosLista(); }
 async function guardarNuevoUsuario(){
   const b={usuario:document.getElementById('nu-usuario').value.trim(),nombre:document.getElementById('nu-nombre').value.trim(),pass:document.getElementById('nu-pass').value,rol_id:document.getElementById('nu-rol').value};
-  try{ await api('POST','/usuarios',b); nuevoUsrTmp=null; toast('Usuario creado'); await renderUsuariosRoles(); }
+  try{ await api('POST','/usuarios',b); nuevoUsrTmp=null; toast('Usuario creado ✓'); await renderUsuariosRoles(); }
   catch(e){ toast(e.message,false); }
 }
-async function cambiarRolUsuario(id,rol_id){ try{ await api('PUT','/usuarios/'+id,{rol_id}); toast('Rol actualizado'); }catch(e){ toast(e.message,false); renderUsuariosRoles(); } }
+async function cambiarRolUsuario(id,rol_id){ try{ await api('PUT','/usuarios/'+id,{rol_id}); toast('Rol actualizado ✓'); await renderUsuariosRoles(); }catch(e){ toast(e.message,false); renderUsuariosRoles(); } }
 async function toggleActivoUsuario(id,activo){ try{ await api('PUT','/usuarios/'+id,{activo:!!activo}); await renderUsuariosRoles(); }catch(e){ toast(e.message,false); } }
-async function cambiarPassUsuario(id){ const p=prompt('Nueva contraseña (mínimo 4 caracteres):'); if(p==null)return; try{ await api('PUT','/usuarios/'+id+'/pass',{pass:p}); toast('Contraseña cambiada'); }catch(e){ toast(e.message,false); } }
+async function cambiarPassUsuario(id){ const p=prompt('Nueva contraseña (mínimo 4 caracteres):'); if(p==null)return; try{ await api('PUT','/usuarios/'+id+'/pass',{pass:p}); toast('Contraseña cambiada ✓'); }catch(e){ toast(e.message,false); } }
 function renderRolesLista(){
   const cont=document.getElementById('roles-lista');
-  const cat=permCatalogo();
+  const cnt=document.getElementById('ur-cnt-rol'); if(cnt)cnt.textContent=ROLES.length;
+  const usoPorRol={}; USUARIOS.forEach(u=>{ if(u.activo)usoPorRol[u.rol_id]=(usoPorRol[u.rol_id]||0)+1; });
   let html=ROLES.map(r=>{
-    if(r.es_admin) return `<div style="padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--teal-lt)"><b>${escHtml(r.nombre)}</b> <span style="font-size:10px;color:var(--muted)">· acceso total (no editable)</span></div>`;
-    const checks=cat.map(k=>`<label class="ck-box" style="display:inline-flex;gap:5px;font-size:10.5px"><input type="checkbox" data-rol="${r.id}" data-perm-k="${k}" ${r.permisos&&r.permisos[k]?'checked':''}><span>${escHtml(permLabel(k))}</span></label>`).join('');
-    return `<div style="padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input class="item-inp" style="flex:1;font-weight:700" value="${escHtml(r.nombre)}" data-rolnombre="${r.id}">
-        <button class="btn-pri" onclick="guardarRol('${r.id}')"><i class="ti ti-device-floppy"></i> Guardar</button>
-        <button class="btn-ghost" title="Eliminar rol" onclick="eliminarRol('${r.id}')"><i class="ti ti-trash"></i></button></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px 14px">${checks}</div>
+    const hex=r.es_admin?ROL_HEX.navy:rolHex(r.color);
+    const n=usoPorRol[r.id]||0;
+    return `<div class="ur-rol ${rolSelId===r.id?'sel':''}" onclick="urSelRol('${r.id}')">
+      <span class="dot" style="background:${hex}"></span>${escHtml(r.nombre)}${r.es_admin?' <i class="ti ti-crown" style="color:#F5A623;font-size:12px"></i>':''}
+      <span class="n" title="Usuarios activos con este rol">${n} <i class="ti ti-user" style="font-size:9px"></i></span>
     </div>`;
   }).join('');
-  if(nuevoRolTmp){
-    const checks=cat.map(k=>`<label class="ck-box" style="display:inline-flex;gap:5px;font-size:10.5px"><input type="checkbox" id="nr-perm-${k}"><span>${escHtml(permLabel(k))}</span></label>`).join('');
-    html+=`<div style="padding:10px;border:1px dashed var(--teal);border-radius:8px;margin-bottom:6px">
-      <div style="margin-bottom:8px"><label>Nombre del rol</label><input class="item-inp" id="nr-nombre" placeholder="ej: Diseñador"></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px">${checks}</div>
-      <div style="display:flex;gap:8px"><button class="btn-pri" onclick="guardarNuevoRol()"><i class="ti ti-check"></i> Crear rol</button><button class="btn-ghost" onclick="nuevoRolTmp=null;renderRolesLista()">Cancelar</button></div>
-    </div>`;
-  }
-  cont.innerHTML=html||'<div style="color:var(--muted);font-size:11px">Aún no hay roles.</div>';
+  cont.innerHTML=html||'<div class="ur-vacio">Aún no hay roles.</div>';
 }
-function abrirNuevoRol(){ nuevoRolTmp={}; renderRolesLista(); }
-function leerPermisosDe(sel){ const p={}; document.querySelectorAll(sel).forEach(ch=>{ if(ch.checked) p[ch.getAttribute('data-perm-k')||ch.id.replace('nr-perm-','')]=true; }); return p; }
+function urSelRol(id){ rolSelId=id; raColorTmp=''; renderRolesLista(); renderRolAjustes(); }
+function abrirNuevoRol(){ rolSelId='__nuevo'; raColorTmp='teal'; renderRolesLista(); renderRolAjustes(); }
+function raPaletaHTML(colorSel){
+  return `<div class="ra-colores">${ROL_COLORES.map(c=>`<span class="ra-color ${colorSel===c?'sel':''}" style="background:${ROL_HEX[c]}" title="${c}" onclick="raSetColor('${c}')"></span>`).join('')}</div>`;
+}
+function raSetColor(c){ raColorTmp=c; renderRolAjustes(); }
+function raToggleGrupo(t){ if(raGruposAbiertos.has(t))raGruposAbiertos.delete(t); else raGruposAbiertos.add(t); renderRolAjustes(true); }
+function raGrupoHTML(g,permisos,disabled){
+  const marcados=g.ks.filter(k=>permisos&&permisos[k]).length;
+  const abierto=raGruposAbiertos.has(g.t);
+  return `<div class="ra-grupo ${abierto?'open':''}">
+    <div class="ra-grupo-h" onclick="raToggleGrupo('${g.t}')"><i class="ti ${g.icon} gi"></i>${g.t}<span class="st">${marcados}/${g.ks.length}</span><i class="ti ti-chevron-right chev"></i></div>
+    <div class="ra-grupo-b">
+      ${disabled?'':`<div style="display:flex;justify-content:flex-end;gap:12px;padding:4px 2px"><span class="ra-mini" onclick="raMarcarGrupo('${g.t}',true)">Marcar todos</span><span class="ra-mini" onclick="raMarcarGrupo('${g.t}',false)">Ninguno</span></div>`}
+      ${g.ks.map(k=>`<label class="ra-perm"><input type="checkbox" data-ra-k="${k}" data-ra-g="${g.t}" ${permisos&&permisos[k]?'checked':''} ${disabled?'disabled':''} onchange="raActualizarContador('${g.t}')"><span>${escHtml(permLabel(k))}</span></label>`).join('')}
+    </div>
+  </div>`;
+}
+function raMarcarGrupo(t,v){ document.querySelectorAll(`[data-ra-g="${t}"]`).forEach(ch=>ch.checked=v); raActualizarContador(t); }
+function raActualizarContador(t){
+  const g=PERM_GRUPOS.find(x=>x.t===t); if(!g)return;
+  const n=g.ks.filter(k=>document.querySelector(`[data-ra-k="${k}"]`)?.checked).length;
+  document.querySelectorAll('.ra-grupo').forEach(el=>{
+    const h=el.querySelector('.ra-grupo-h'); if(h&&h.textContent.includes(t)){const st=h.querySelector('.st');if(st)st.textContent=`${n}/${g.ks.length}`;}
+  });
+}
+function renderRolAjustes(keepScroll){
+  const cont=document.getElementById('rol-ajustes'); if(!cont)return;
+  const scrollY=keepScroll?cont.scrollTop:0;
+  if(rolSelId==='__nuevo'){
+    cont.innerHTML=`
+      <label>Nombre del rol</label><input class="item-inp" id="ra-nombre" placeholder="ej: Diseñador" style="margin-bottom:8px">
+      <label>Color</label>${raPaletaHTML(raColorTmp||'teal')}
+      ${PERM_GRUPOS.map(g=>raGrupoHTML(g,{},false)).join('')}
+      <div style="display:flex;gap:7px;margin-top:11px">
+        <button class="btn-pri" onclick="guardarNuevoRol()"><i class="ti ti-check"></i> Crear rol</button>
+        <button class="btn-ghost" onclick="rolSelId=null;renderUsuariosRoles()">Cancelar</button>
+      </div>`;
+    return;
+  }
+  const r=ROLES.find(x=>x.id===rolSelId);
+  if(!r){ cont.innerHTML='<div class="ur-vacio">Selecciona un rol de la lista para ver y editar sus permisos.</div>'; return; }
+  if(r.es_admin){
+    cont.innerHTML=`<div style="display:flex;align-items:center;gap:9px;margin-bottom:10px"><span class="ur-av" style="background:${ROL_HEX.navy}"><i class="ti ti-crown"></i></span><div><div class="ur-uname">${escHtml(r.nombre)}</div><div class="ur-usub">Acceso total — este rol no se edita</div></div></div>
+      ${PERM_GRUPOS.map(g=>raGrupoHTML(g,Object.fromEntries(g.ks.map(k=>[k,true])),true)).join('')}`;
+    return;
+  }
+  const colorAct=raColorTmp||r.color||'slate';
+  cont.innerHTML=`
+    <label>Nombre del rol</label><input class="item-inp" id="ra-nombre" value="${escHtml(r.nombre)}" style="margin-bottom:8px;font-weight:700">
+    <label>Color</label>${raPaletaHTML(colorAct)}
+    ${PERM_GRUPOS.map(g=>raGrupoHTML(g,r.permisos||{},false)).join('')}
+    <div style="display:flex;gap:7px;margin-top:11px;flex-wrap:wrap">
+      <button class="btn-pri" onclick="guardarRol('${r.id}')"><i class="ti ti-device-floppy"></i> Guardar</button>
+      <button class="btn-ghost" onclick="duplicarRol('${r.id}')" title="Crear una copia de este rol"><i class="ti ti-copy"></i> Duplicar</button>
+      <button class="btn-ghost" style="color:var(--red);margin-left:auto" onclick="eliminarRol('${r.id}')"><i class="ti ti-trash"></i></button>
+    </div>`;
+  if(keepScroll)cont.scrollTop=scrollY;
+}
+function raLeerPermisos(){ const p={}; document.querySelectorAll('[data-ra-k]').forEach(ch=>{ if(ch.checked)p[ch.getAttribute('data-ra-k')]=true; }); return p; }
 async function guardarNuevoRol(){
-  const nombre=document.getElementById('nr-nombre').value.trim();
-  const permisos={}; permCatalogo().forEach(k=>{ const el=document.getElementById('nr-perm-'+k); if(el&&el.checked)permisos[k]=true; });
-  try{ await api('POST','/roles',{nombre,permisos}); nuevoRolTmp=null; toast('Rol creado'); await renderUsuariosRoles(); }
+  const nombre=document.getElementById('ra-nombre').value.trim();
+  try{ const r=await api('POST','/roles',{nombre,permisos:raLeerPermisos(),color:raColorTmp||'teal'}); rolSelId=r.id; raColorTmp=''; toast('Rol creado ✓'); await renderUsuariosRoles(); }
   catch(e){ toast(e.message,false); }
 }
 async function guardarRol(id){
-  const nombre=document.querySelector(`[data-rolnombre="${id}"]`).value.trim();
-  const permisos={}; document.querySelectorAll(`[data-rol="${id}"]`).forEach(ch=>{ if(ch.checked)permisos[ch.getAttribute('data-perm-k')]=true; });
-  try{ await api('PUT','/roles/'+id,{nombre,permisos}); toast('Rol guardado'); await renderUsuariosRoles(); }
+  const nombre=document.getElementById('ra-nombre').value.trim();
+  const r=ROLES.find(x=>x.id===id);
+  try{ await api('PUT','/roles/'+id,{nombre,permisos:raLeerPermisos(),color:raColorTmp||r.color||''}); raColorTmp=''; toast('Rol guardado ✓'); await renderUsuariosRoles(); }
   catch(e){ toast(e.message,false); }
 }
-async function eliminarRol(id){ if(!confirm('¿Eliminar este rol?'))return; try{ await api('DELETE','/roles/'+id); toast('Rol eliminado'); await renderUsuariosRoles(); }catch(e){ toast(e.message,false); } }
+async function duplicarRol(id){
+  const r=ROLES.find(x=>x.id===id); if(!r)return;
+  try{ const nr=await api('POST','/roles',{nombre:'Copia de '+r.nombre,permisos:r.permisos||{},color:r.color||''}); rolSelId=nr.id; toast('Rol duplicado ✓'); await renderUsuariosRoles(); }
+  catch(e){ toast(e.message,false); }
+}
+async function eliminarRol(id){ if(!confirm('¿Eliminar este rol?'))return; try{ await api('DELETE','/roles/'+id); rolSelId=null; toast('Rol eliminado'); await renderUsuariosRoles(); }catch(e){ toast(e.message,false); } }
 
 let etqNuevaTmp=null;
 function abrirNuevaEtiqueta(){

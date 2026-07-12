@@ -168,6 +168,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS usuarios(
   id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, usuario TEXT NOT NULL,
   pass_hash TEXT NOT NULL, nombre TEXT DEFAULT '', rol_id TEXT,
   activo INTEGER DEFAULT 1, creado TEXT DEFAULT(datetime('now','localtime')))`);
+try { db.exec("ALTER TABLE roles ADD COLUMN color TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE usuarios ADD COLUMN ultimo_login TEXT DEFAULT ''"); } catch(e){}
+const ROL_COLORES=['navy','teal','purple','green','amber','red','pink','slate'];
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
 const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','editar_clientes','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
@@ -429,6 +432,14 @@ try {
 } catch(e){}
 
 app.use(cors());
+// Seguridad: headers básicos (sin dependencias nuevas)
+app.disable('x-powered-by');
+app.use((req,res,next)=>{
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','DENY');
+  res.setHeader('Referrer-Policy','same-origin');
+  next();
+});
 app.use(express.json({limit:'10mb'}));
 app.use(express.static(path.join(__dirname,'public')));
 app.use('/uploads',express.static(UP_DIR));
@@ -898,21 +909,31 @@ function validarPedido(b){
 
 // ── AUTENTICACIÓN (usuario+contraseña · con compat de PIN) ──
 function firmarUsuario(u){ return jwt.sign({wsId:u.workspace_id,userId:u.id,rolId:u.rol_id},JWT_SECRET,{expiresIn:'90d'}); }
+// Seguridad: rate-limit del login en memoria (frena fuerza bruta de PIN/contraseñas).
+// 8 intentos fallidos por IP en 10 min → bloqueo temporal. Se limpia al acertar.
+const _loginFails=new Map(); // ip -> {n, hasta}
+function loginBloqueado(ip){ const r=_loginFails.get(ip); if(!r)return false; if(Date.now()>r.hasta){_loginFails.delete(ip);return false;} return r.n>=8; }
+function loginFallo(ip){ const r=_loginFails.get(ip)||{n:0,hasta:0}; r.n++; r.hasta=Date.now()+10*60*1000; _loginFails.set(ip,r); }
+function marcarLogin(u){ try{ db.prepare("UPDATE usuarios SET ultimo_login=datetime('now','localtime') WHERE id=?").run(u.id); }catch(e){} }
 app.post('/api/auth/login',(req,res)=>{
+  const ip=req.headers['x-forwarded-for']||req.socket.remoteAddress||'?';
+  if(loginBloqueado(ip)) return res.status(429).json({error:'Demasiados intentos. Espera unos minutos e intenta de nuevo.'});
   const{usuario,pass,pin}=req.body||{};
   // 1) Login por usuario + contraseña
   if(usuario&&pass){
     const cands=db.prepare('SELECT * FROM usuarios WHERE usuario=? AND activo=1').all(String(usuario).trim());
     const u=cands.find(c=>{ try{ return bcrypt.compareSync(String(pass),c.pass_hash); }catch(e){ return false; } });
-    if(!u) return res.status(401).json({error:'Usuario o contraseña incorrectos'});
+    if(!u){ loginFallo(ip); return res.status(401).json({error:'Usuario o contraseña incorrectos'}); }
+    _loginFails.delete(ip); marcarLogin(u);
     return res.json({token:firmarUsuario(u)});
   }
   // 2) Login por PIN (compat) → entra como el usuario admin de ese workspace
   if(pin){
     const ws=db.prepare('SELECT id FROM workspaces WHERE pin=?').get(String(pin));
-    if(!ws) return res.status(401).json({error:'PIN incorrecto'});
+    if(!ws){ loginFallo(ip); return res.status(401).json({error:'PIN incorrecto'}); }
     const adm=db.prepare('SELECT * FROM usuarios WHERE workspace_id=? AND activo=1 ORDER BY (rol_id IN (SELECT id FROM roles WHERE es_admin=1)) DESC, creado ASC').get(ws.id);
-    if(!adm) return res.status(401).json({error:'PIN incorrecto'});
+    if(!adm){ loginFallo(ip); return res.status(401).json({error:'PIN incorrecto'}); }
+    _loginFails.delete(ip); marcarLogin(adm);
     return res.json({token:firmarUsuario(adm)});
   }
   return res.status(401).json({error:'Ingresa usuario y contraseña'});
@@ -944,8 +965,8 @@ app.use('/api',(req,res,next)=>{
 function requiere(clave){ return (req,res,next)=>{ const p=req.permisos||{}; if(p.__admin||p[clave]===true) return next(); return res.status(403).json({error:'No tienes permiso para esta acción'}); }; }
 
 // ── IDENTIDAD, USUARIOS Y ROLES (v3.0 Fase 1) ──
-function rolPublico(r){ return r?{id:r.id,nombre:r.nombre,es_admin:!!r.es_admin,permisos:permisosDeRol(r),orden:r.orden}:null; }
-function usuarioPublico(u,rolesPorId){ const r=rolesPorId?rolesPorId[u.rol_id]:null; return {id:u.id,usuario:u.usuario,nombre:u.nombre,activo:!!u.activo,rol_id:u.rol_id,rol_nombre:r?r.nombre:'',es_admin:r?!!r.es_admin:false}; }
+function rolPublico(r){ return r?{id:r.id,nombre:r.nombre,es_admin:!!r.es_admin,permisos:permisosDeRol(r),orden:r.orden,color:r.color||''}:null; }
+function usuarioPublico(u,rolesPorId){ const r=rolesPorId?rolesPorId[u.rol_id]:null; return {id:u.id,usuario:u.usuario,nombre:u.nombre,activo:!!u.activo,rol_id:u.rol_id,rol_nombre:r?r.nombre:'',rol_color:(r&&r.color)||'',es_admin:r?!!r.es_admin:false,ultimo_login:u.ultimo_login||'',creado:u.creado||''}; }
 
 app.get('/api/me',(req,res)=>{
   const u=req.usuario; if(!u) return res.status(401).json({error:'Sin sesión'});
@@ -966,20 +987,22 @@ app.get('/api/roles',requiere('administrar_usuarios'),(req,res)=>{
   res.json(rows.map(rolPublico));
 });
 app.post('/api/roles',requiere('administrar_usuarios'),(req,res)=>{
-  const{nombre,permisos}=req.body||{};
+  const{nombre,permisos,color}=req.body||{};
   if(!String(nombre||'').trim()) return res.status(400).json({error:'El rol necesita un nombre'});
   const perm={}; PERMISOS_FASE1.forEach(k=>{ if(permisos&&permisos[k]===true) perm[k]=true; });
+  const col=ROL_COLORES.includes(color)?color:'';
   const id=uid();
-  db.prepare('INSERT INTO roles(id,workspace_id,nombre,permisos,es_admin,orden)VALUES(?,?,?,?,0,?)').run(id,req.wsId,String(nombre).trim(),JSON.stringify(perm),Date.now());
+  db.prepare('INSERT INTO roles(id,workspace_id,nombre,permisos,es_admin,orden,color)VALUES(?,?,?,?,0,?,?)').run(id,req.wsId,String(nombre).trim(),JSON.stringify(perm),Date.now(),col);
   res.json(rolPublico(db.prepare('SELECT * FROM roles WHERE id=?').get(id)));
 });
 app.put('/api/roles/:id',requiere('administrar_usuarios'),(req,res)=>{
   const r=db.prepare('SELECT * FROM roles WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
   if(!r) return res.status(404).json({error:'Rol no encontrado'});
   if(r.es_admin) return res.status(400).json({error:'El rol Administrador no se puede modificar'});
-  const{nombre,permisos}=req.body||{};
+  const{nombre,permisos,color}=req.body||{};
   const perm={}; PERMISOS_FASE1.forEach(k=>{ if(permisos&&permisos[k]===true) perm[k]=true; });
-  db.prepare('UPDATE roles SET nombre=?,permisos=? WHERE id=?').run(String(nombre||r.nombre).trim(),JSON.stringify(perm),r.id);
+  const col=(color===undefined)?(r.color||''):(ROL_COLORES.includes(color)?color:'');
+  db.prepare('UPDATE roles SET nombre=?,permisos=?,color=? WHERE id=?').run(String(nombre||r.nombre).trim(),JSON.stringify(perm),col,r.id);
   res.json(rolPublico(db.prepare('SELECT * FROM roles WHERE id=?').get(r.id)));
 });
 app.delete('/api/roles/:id',requiere('administrar_usuarios'),(req,res)=>{
