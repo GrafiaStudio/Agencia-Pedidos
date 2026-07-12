@@ -284,8 +284,37 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .dash-fin .fm .fico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px}
 .dash-fin .fm .fv{font-size:17px;font-weight:700;color:var(--navy);line-height:1.1}
 .dash-fin .fm .fl{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.dash-fin .marg{margin-left:auto;text-align:right}
+.dash-fin .marg{margin-left:auto;display:flex;align-items:center;gap:10px}
 .dash-fin .marg .fv{font-size:20px}
+/* Gráficos del dashboard (SVG puro, sin librerías) */
+.dash-charts{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:900px){.dash-charts{grid-template-columns:1fr}}
+.dbar-wrap{display:flex;align-items:flex-end;gap:8px;height:120px;padding:6px 2px 0}
+.dbar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;height:100%;justify-content:flex-end}
+.dbar-v{font-size:8.5px;font-weight:700;color:var(--teal-dk);white-space:nowrap}
+.dbar{width:100%;max-width:38px;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#9DBBDC,#4A6FA5);transform-origin:bottom;animation:barUp .7s cubic-bezier(.2,.8,.3,1) both}
+.dbar.cero{background:var(--line);min-height:3px}
+.dbar-l{font-size:8.5px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.dbar-l.hoy{color:var(--teal-dk)}
+@keyframes barUp{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.hbar-row{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.hbar-lbl{width:82px;flex-shrink:0;font-size:10px;font-weight:700;color:var(--slate);display:flex;align-items:center;gap:5px}
+.hbar-track{flex:1;height:9px;background:var(--line-lt);border-radius:20px;overflow:hidden}
+.hbar-fill{height:100%;border-radius:20px;transition:width .8s cubic-bezier(.2,.8,.3,1);width:0}
+.hbar-n{width:22px;text-align:right;font-size:10.5px;font-weight:800;color:var(--navy)}
+.donut{transform:rotate(-90deg)}
+.donut .bg{stroke:var(--line)}
+.donut .val{transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.3,1)}
+/* Animaciones de entrada (sutiles) */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.view.active .dash-kpi{animation:fadeUp .45s ease both}
+.view.active .dash-kpi:nth-child(2){animation-delay:.06s}
+.view.active .dash-kpi:nth-child(3){animation-delay:.12s}
+.view.active .dash-kpi:nth-child(4){animation-delay:.18s}
+.view.active .dash-kpi:nth-child(5){animation-delay:.24s}
+.view.active .dash-fin,.view.active .dash-charts{animation:fadeUp .5s .15s ease both}
+.view.active .pmob-card,.view.active .prodx-card{animation:fadeUp .35s ease both}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .dash-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:14px;align-items:start}
 @media(max-width:1100px){.dash-grid{grid-template-columns:1fr}}
 .dash-row{display:flex;align-items:center;gap:9px;padding:8px 2px;border-bottom:1px solid var(--line-lt);cursor:pointer;border-radius:7px}
@@ -839,6 +868,16 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div id="dash-kpis" class="dash-kpis"></div>
       <div id="dash-fin" class="dash-fin"></div>
+      <div class="dash-charts" id="dash-charts">
+        <div class="ped-side-card dchart" style="margin:0">
+          <div class="msec" style="margin-top:0"><span class="tri"></span>Ingresos · últimos 7 días</div>
+          <div id="dash-chart-ing"></div>
+        </div>
+        <div class="ped-side-card dchart" style="margin:0">
+          <div class="msec" style="margin-top:0"><span class="tri"></span>Producción por etapa</div>
+          <div id="dash-chart-prod"></div>
+        </div>
+      </div>
       <div class="dash-grid">
         <div class="ped-side-card" style="margin:0">
           <div class="msec" style="margin-top:0"><span class="tri"></span>Pedidos recientes</div>
@@ -2695,7 +2734,10 @@ async function cargarDashboard(){
     <div class="fm"><div class="fico" style="background:var(--green-lt);color:#1A6B45"><i class="ti ti-arrow-down-left"></i></div><div><div class="fv">${fCOP(f.ingresos)}</div><div class="fl">Ingresos</div></div></div>
     <div class="fm"><div class="fico" style="background:var(--red-lt);color:var(--red)"><i class="ti ti-arrow-up-right"></i></div><div><div class="fv">${fCOP(f.costos)}</div><div class="fl">Costos</div></div></div>
     <div class="fm"><div class="fico" style="background:var(--teal-lt);color:var(--teal-dk)"><i class="ti ti-wallet"></i></div><div><div class="fv" style="color:${f.utilidad>=0?'#1A6B45':'var(--red)'}">${fCOP(f.utilidad)}</div><div class="fl">Utilidad</div></div></div>
-    <div class="marg"><div class="fv" style="color:${f.margen>=0?'var(--teal-dk)':'var(--red)'}">${f.margen}%</div><div class="fl">Margen</div></div>`;
+    <div class="marg">${dashDonut(f.margen)}<div><div class="fv" style="color:${f.margen>=0?'var(--teal-dk)':'var(--red)'}">${f.margen}%</div><div class="fl">Margen</div></div></div>`;
+  // Gráficos (SVG/CSS puros)
+  document.getElementById('dash-charts').style.display=verFin?'grid':'none';
+  if(verFin){ dashChartIngresos(d.serie7||[],d.hoy); dashChartProduccion(d.produccion||{}); }
   document.getElementById('dash-recientes').innerHTML=(d.recientes||[]).map(p=>{
     const[eg,col]=dashEstadoPed(p);
     const pagP=p.valor_total>0&&p.pagado>=p.valor_total?'<span class="badge b-ok">Pagado</span>':(p.pagado>0?'<span class="badge b-par">Abono</span>':'<span class="badge b-no">Sin pago</span>');
@@ -2707,6 +2749,47 @@ async function cargarDashboard(){
   }).join('')||'<div class="dash-empty">Sin entregas en los próximos 7 días</div>';
   document.getElementById('dash-actividad').innerHTML=(d.actividad||[]).map(a=>`
     <div class="dash-act"><div class="aico"><i class="ti ${dashActIcon(a.texto)}"></i></div><div class="atxt"><b>#${a.ref}</b> · ${pesc(a.texto)}<div class="asub">${pesc(a.usuario_nombre||'')}${a.usuario_nombre?' · ':''}${pesc((a.creado||'').slice(0,16))}</div></div></div>`).join('')||'<div class="dash-empty">Sin actividad todavía</div>';
+}
+
+/* Gráficos del dashboard — SVG/CSS puro, sin librerías */
+function dashDonut(margen){
+  const pct=Math.max(0,Math.min(100,margen||0));
+  const R=17, C=2*Math.PI*R, off=C*(1-pct/100);
+  return `<svg class="donut" width="44" height="44" viewBox="0 0 44 44" aria-label="Margen ${pct}%">
+    <circle class="bg" cx="22" cy="22" r="${R}" fill="none" stroke-width="6"></circle>
+    <circle class="val" cx="22" cy="22" r="${R}" fill="none" stroke="${margen>=0?'#3E5C82':'#E5484D'}" stroke-width="6" stroke-linecap="round"
+      stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" data-off="${off.toFixed(1)}"></circle>
+  </svg>`;
+}
+const DIAS_CORTOS=['dom','lun','mar','mié','jue','vie','sáb'];
+function dashChartIngresos(serie,hoyStr){
+  const el=document.getElementById('dash-chart-ing'); if(!el)return;
+  const max=Math.max(...serie.map(s=>s.v),1);
+  el.innerHTML=`<div class="dbar-wrap">${serie.map((s,i)=>{
+    const h=Math.round(s.v/max*88);
+    const dia=new Date(s.d+'T00:00:00');
+    const esHoy=s.d===hoyStr;
+    return `<div class="dbar-col" title="${fd(s.d)} · ${fCOP(s.v)}">
+      <div class="dbar-v">${s.v?fmtMiles(String(Math.round(s.v/1000)))+'k':''}</div>
+      <div class="dbar ${s.v?'':'cero'}" style="height:${Math.max(h,3)}px;animation-delay:${i*70}ms"></div>
+      <div class="dbar-l ${esHoy?'hoy':''}">${esHoy?'hoy':DIAS_CORTOS[dia.getDay()]}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+function dashChartProduccion(prod){
+  const el=document.getElementById('dash-chart-prod'); if(!el)return;
+  const total=ENC_ESTS.reduce((a,e)=>a+(prod[e]||0),0);
+  el.innerHTML=ENC_ESTS.map(e=>{
+    const n=prod[e]||0, pct=total?Math.round(n*100/total):0;
+    return `<div class="hbar-row"><div class="hbar-lbl"><span class="pt-dot" style="background:${ECOL_MAP[e]};margin:0"></span>${e}</div>
+      <div class="hbar-track"><div class="hbar-fill" data-w="${pct}%" style="background:${ECOL_MAP[e]}"></div></div>
+      <div class="hbar-n">${n}</div></div>`;
+  }).join('')+`<div style="font-size:9px;color:var(--muted);text-align:right;margin-top:2px">${total} encargo${total===1?'':'s'} activos</div>`;
+  // animar los anchos y el donut en el siguiente frame (transición CSS)
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    document.querySelectorAll('.hbar-fill').forEach(b=>b.style.width=b.dataset.w);
+    document.querySelectorAll('.donut .val').forEach(c=>c.style.strokeDashoffset=c.dataset.off);
+  }));
 }
 
 /* ══ PRODUCCIÓN (Fase 4) ══ */

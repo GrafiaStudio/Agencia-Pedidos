@@ -1418,7 +1418,15 @@ app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
   // Actividad reciente (historial cross-pedidos)
   const actividad=db.prepare(`SELECT h.texto,h.usuario_nombre,h.creado,p.ref FROM historial h JOIN pedidos p ON p.id=h.pedido_id
     WHERE h.workspace_id=? ORDER BY h.creado DESC LIMIT 8`).all(wsId);
-  res.json({hoy:hoyStr,periodo,kpis:{activos,urgentes,entregasHoy,cotizaciones:cotPeds.length,cotValor},finanzas:{desde,ingresos,costos,utilidad,margen},recientes,entregas,produccion,actividad});
+  // Serie: ingresos reales (pagos) por día, últimos 7 días — para el gráfico del dashboard
+  const serie7=[];
+  for(let i=6;i>=0;i--){
+    const dia=db.prepare('SELECT date(?, ?) d').get(hoyStr,`-${i} days`).d;
+    const v=db.prepare(`SELECT COALESCE(SUM(CAST(pg.monto_calc AS INTEGER)),0) s FROM pagos pg JOIN pedidos p ON p.id=pg.pedido_id
+      WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND pg.fecha=?`).get(wsId,dia).s;
+    serie7.push({d:dia,v});
+  }
+  res.json({hoy:hoyStr,periodo,kpis:{activos,urgentes,entregasHoy,cotizaciones:cotPeds.length,cotValor},finanzas:{desde,ingresos,costos,utilidad,margen},serie7,recientes,entregas,produccion,actividad});
 });
 
 // Export CSV
