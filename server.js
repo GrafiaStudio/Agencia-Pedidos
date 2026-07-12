@@ -970,7 +970,15 @@ function usuarioPublico(u,rolesPorId){ const r=rolesPorId?rolesPorId[u.rol_id]:n
 
 app.get('/api/me',(req,res)=>{
   const u=req.usuario; if(!u) return res.status(401).json({error:'Sin sesión'});
-  res.json({id:u.id,usuario:u.usuario,nombre:u.nombre,rol:req.rol?req.rol.nombre:'',rol_id:u.rol_id,es_admin:!!(req.permisos&&req.permisos.__admin),permisos:req.permisos||{},permisos_catalogo:PERMISOS_FASE1});
+  res.json({id:u.id,usuario:u.usuario,nombre:u.nombre,rol:req.rol?req.rol.nombre:'',rol_id:u.rol_id,rol_color:(req.rol&&req.rol.color)||'',es_admin:!!(req.permisos&&req.permisos.__admin),permisos:req.permisos||{},permisos_catalogo:PERMISOS_FASE1,ultimo_login:u.ultimo_login||'',creado:u.creado||''});
+});
+// Mi perfil: el usuario edita su propio nombre visible (sin permisos especiales)
+app.put('/api/me',(req,res)=>{
+  const u=req.usuario; if(!u) return res.status(401).json({error:'Sin sesión'});
+  const nombre=String((req.body||{}).nombre||'').trim();
+  if(!nombre) return res.status(400).json({error:'El nombre no puede quedar vacío'});
+  db.prepare('UPDATE usuarios SET nombre=? WHERE id=?').run(nombre,u.id);
+  res.json({ok:true,nombre});
 });
 app.post('/api/me/pass',(req,res)=>{
   const u=req.usuario; if(!u) return res.status(401).json({error:'Sin sesión'});

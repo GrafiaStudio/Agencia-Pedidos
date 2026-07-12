@@ -833,7 +833,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="ayuda" onclick="showView('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="nav-item" data-view="configuracion" data-perm="configurar_sistema" onclick="showView('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
     <button class="nav-item" data-perm="ver_registros" onclick="abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
-    <div id="me-nombre" style="font-size:10px;color:var(--muted);padding:2px 12px 0"></div>
+    <button class="nav-item" id="me-nombre" onclick="abrirPerfil()" title="Mi perfil" style="font-size:10px;color:rgba(255,255,255,.55)"></button>
     <button class="nav-item" onclick="cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
   </div>
 </aside>
@@ -1126,6 +1126,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
 
       <div id="help-manual" class="help-panel active">
+        <div class="search-b" style="max-width:340px;margin-bottom:14px"><i class="ti ti-search"></i>
+          <input type="text" id="help-q" placeholder="Buscar en el manual… (ej. pagos, stock, roles)" oninput="buscarAyuda(this.value)" style="max-width:100%">
+        </div>
+        <div id="help-sin" style="display:none;font-size:11px;color:var(--muted);padding:8px 2px 14px">No encontré nada con esa palabra. Prueba con otro término o escríbenos por <a href="#" onclick="showHelpTab('soporte');return false" style="color:var(--teal-dk);font-weight:700">Soporte</a>.</div>
         <div class="man-step">
           <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">1. Crear tu primer pedido</div><i class="ti ti-chevron-down man-chevron"></i></div>
           <div class="man-body">Ve a <b>Pedidos → Nuevo pedido</b>. Escribe el nombre y teléfono del cliente — si ya existe, la app lo reconoce solo. Agrega al menos un Encargo con sus ítems (cantidad, detalle, valor unitario) y guarda.</div>
@@ -1215,6 +1219,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="mas-item" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
     <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="mas-item" data-perm="configurar_sistema" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
+    <button class="mas-item" onclick="cerrarMas();abrirPerfil()"><i class="ti ti-user-circle"></i>Mi perfil</button>
     <button class="mas-item" style="color:var(--red)" onclick="cerrarMas();cerrarSesion()"><i class="ti ti-logout" style="color:var(--red)"></i>Cerrar sesión</button>
   </div>
 </div>
@@ -1383,6 +1388,14 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 <div class="modal" style="max-width:480px">
   <div class="mhead"><div class="mhead-l"><div class="mtitle" id="cli-nom"></div></div><div class="mhead-actions"><button class="btn-danger" onclick="archivarCli()"><i class="ti ti-archive"></i>Archivar</button><button class="mclose" onclick="cerrarCli()"><i class="ti ti-x"></i></button></div></div>
   <div class="mbody" id="cli-body"></div>
+</div>
+</div>
+
+<!-- MODAL MI PERFIL -->
+<div class="overlay" id="ovPerfil">
+<div class="modal" style="max-width:400px">
+  <div class="mhead"><div class="mhead-l"><div class="mtitle">Mi perfil</div></div><button class="mclose" onclick="cerrarPerfil()"><i class="ti ti-x"></i></button></div>
+  <div class="mbody" id="perfil-body"></div>
 </div>
 </div>
 
@@ -1599,7 +1612,7 @@ function puede(clave){ return !!(ES_ADMIN||PERMISOS[clave]===true); }
 async function cargarMe(){
   ME=await api('GET','/me');
   PERMISOS=ME.permisos||{}; ES_ADMIN=!!ME.es_admin;
-  const nb=document.getElementById('me-nombre'); if(nb) nb.textContent=(ME.nombre||ME.usuario||'')+(ME.rol?' · '+ME.rol:'');
+  const nb=document.getElementById('me-nombre'); if(nb) nb.innerHTML='<i class="ti ti-user-circle"></i>'+escHtml((ME.nombre||ME.usuario||'')+(ME.rol?' · '+ME.rol:''));
   aplicarGatingPermisos();
 }
 function aplicarGatingPermisos(){
@@ -2749,6 +2762,58 @@ async function cargarDashboard(){
   }).join('')||'<div class="dash-empty">Sin entregas en los próximos 7 días</div>';
   document.getElementById('dash-actividad').innerHTML=(d.actividad||[]).map(a=>`
     <div class="dash-act"><div class="aico"><i class="ti ${dashActIcon(a.texto)}"></i></div><div class="atxt"><b>#${a.ref}</b> · ${pesc(a.texto)}<div class="asub">${pesc(a.usuario_nombre||'')}${a.usuario_nombre?' · ':''}${pesc((a.creado||'').slice(0,16))}</div></div></div>`).join('')||'<div class="dash-empty">Sin actividad todavía</div>';
+}
+
+/* Ayuda: buscador del manual — filtra pasos y abre las coincidencias */
+function buscarAyuda(q){
+  q=(q||'').trim().toLowerCase();
+  let visibles=0;
+  document.querySelectorAll('#help-manual .man-step').forEach(st=>{
+    const txt=st.textContent.toLowerCase();
+    const hit=!q||txt.includes(q);
+    st.style.display=hit?'':'none';
+    if(hit)visibles++;
+    const body=st.querySelector('.man-body'), chev=st.querySelector('.man-chevron');
+    if(q&&hit){ if(body)body.style.display='block'; if(chev)chev.classList.add('open'); }
+    else if(!q){ if(body)body.style.display=''; if(chev)chev.classList.remove('open'); }
+  });
+  const sin=document.getElementById('help-sin'); if(sin)sin.style.display=(q&&!visibles)?'block':'none';
+}
+
+/* ══ MI PERFIL ══ */
+function abrirPerfil(){
+  if(!ME)return;
+  const hex=ME.es_admin?ROL_HEX.navy:rolHex(ME.rol_color);
+  document.getElementById('perfil-body').innerHTML=`
+    <div style="display:flex;align-items:center;gap:13px;margin-bottom:16px">
+      <span class="ur-av" style="width:46px;height:46px;font-size:15px;background:${hex}">${ini(ME.nombre||ME.usuario)}</span>
+      <div style="min-width:0">
+        <div style="font-size:14px;font-weight:800;color:var(--navy)">${escHtml(ME.nombre||ME.usuario)}</div>
+        <div style="font-size:10px;color:var(--muted)">@${escHtml(ME.usuario)} · <span class="ur-chip" style="background:${hex}">${escHtml(ME.rol||'')}</span></div>
+      </div>
+    </div>
+    <div class="cli-dato"><div class="dl">Último acceso</div><div class="dv">${ME.ultimo_login?fdHora(ME.ultimo_login):'—'}</div></div>
+    <div class="cli-dato"><div class="dl">Cuenta desde</div><div class="dv">${ME.creado?fd(String(ME.creado).slice(0,10)):'—'}</div></div>
+    <div style="margin:14px 0 4px"><label>Nombre visible</label><input class="item-inp" id="pf-nombre" value="${escHtml(ME.nombre||'')}" placeholder="Tu nombre"></div>
+    <button class="btn-ghost" style="margin:4px 0 14px" onclick="guardarPerfil()"><i class="ti ti-check"></i> Guardar nombre</button>
+    <div class="msec"><span class="tri"></span>Cambiar contraseña</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px">
+      <div><label>Actual</label><input class="item-inp" id="pf-pass-act" type="password" autocomplete="current-password"></div>
+      <div><label>Nueva (mín. 4)</label><input class="item-inp" id="pf-pass-new" type="password" autocomplete="new-password"></div>
+    </div>
+    <button class="btn-pri" onclick="cambiarMiPass()"><i class="ti ti-lock"></i> Actualizar contraseña</button>`;
+  document.getElementById('ovPerfil').classList.add('open');
+}
+function cerrarPerfil(){document.getElementById('ovPerfil').classList.remove('open')}
+async function guardarPerfil(){
+  const nombre=document.getElementById('pf-nombre').value.trim();
+  try{ await api('PUT','/me',{nombre}); ME.nombre=nombre; toast('Nombre actualizado ✓'); cargarMe&&cargarMe(); abrirPerfil(); }
+  catch(e){ toast(e.message,false); }
+}
+async function cambiarMiPass(){
+  const actual=document.getElementById('pf-pass-act').value, nueva=document.getElementById('pf-pass-new').value;
+  try{ await api('POST','/me/pass',{actual,nueva}); toast('Contraseña actualizada ✓'); document.getElementById('pf-pass-act').value='';document.getElementById('pf-pass-new').value=''; }
+  catch(e){ toast(e.message,false); }
 }
 
 /* Gráficos del dashboard — SVG/CSS puro, sin librerías */
