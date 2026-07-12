@@ -2126,6 +2126,9 @@ function cargarImagenPDF(url){
     img.src=url;
   });
 }
+// Rediseño 2026-07-10 (Feed Back 2): documento con la identidad de las guías GRAFÍA —
+// encabezado con chip del tipo de documento, tarjetas Cliente/Detalles, tabla navy,
+// total destacado, notas del pedido y pie con métodos de pago. Mismos datos de siempre.
 async function construirPdfPedido(){
   const p=window._pedidoActualDoc;
   if(!p)return null;
@@ -2139,72 +2142,155 @@ async function construirPdfPedido(){
   }
   const{jsPDF}=window.jspdf;
   const doc=new jsPDF({format:'letter'});
-  let y=18;
-  // CORR 003 — logo del negocio en el encabezado (si se subió en Configuración)
+  const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
+  const M=15, CW=W-M*2;
+  const NAVY=[34,43,70], SLATE=[94,112,138], MUTED=[147,163,185], LINE=[229,236,244], CARD=[244,248,252], RED=[200,50,55], GREEN=[26,107,69];
+  const ink=c=>doc.setTextColor(c[0],c[1],c[2]);
+  const F=(s,b)=>{doc.setFontSize(s);doc.setFont('helvetica',b||'normal');};
+  let y=16;
+  const salto=h=>{ if(y+h>H-22){doc.addPage();y=16;} };
+
+  // ── Encabezado: negocio a la izquierda · chip del documento + ref a la derecha ──
   const logoData=await cargarImagenPDF(CFG.logo_ruta);
-  let headX=14, headBottom=y;
+  let headX=M, logoBottom=y;
   if(logoData){
-    const maxH=16,maxW=42,ratio=(logoData.w||1)/(logoData.h||1);
+    const maxH=15,maxW=40,ratio=(logoData.w||1)/(logoData.h||1);
     let lh=maxH,lw=lh*ratio; if(lw>maxW){lw=maxW;lh=lw/ratio;}
-    try{doc.addImage(logoData.dataURL,'PNG',14,12,lw,lh);headX=14+lw+6;headBottom=12+lh;}catch(e){}
+    try{doc.addImage(logoData.dataURL,'PNG',M,y-3,lw,lh);headX=M+lw+6;logoBottom=y-3+lh;}catch(e){}
   }
-  if(CFG.nombre_negocio){doc.setFontSize(15);doc.text(CFG.nombre_negocio,headX,y);y+=7}
-  doc.setFontSize(9);
-  [CFG.nit&&`NIT: ${CFG.nit}`,CFG.telefono&&`Tel: ${CFG.telefono}`,CFG.email,CFG.direccion].filter(Boolean).forEach(linea=>{doc.text(linea,headX,y);y+=5});
-  y=Math.max(y,headBottom+2)+5;
-  doc.setFontSize(14);doc.text(tipo,14,y);y+=8;
-  doc.setFontSize(10);
-  doc.text(`Pedido #${p.ref}`,14,y);doc.text(`Fecha: ${fd(p.fecha_pedido)}`,120,y);y+=6;
-  doc.text(`Cliente: ${p.nombre}`,14,y);y+=6;
-  if(p.tel){doc.text(`Teléfono: ${p.tel}`,14,y);y+=6}
-  if(p.fecha_entrega){doc.text(`Fecha de entrega: ${fd(p.fecha_entrega)}`,14,y);y+=6}
-  if(tipo==='COTIZACIÓN'&&p.fecha_pedido){doc.text(`Válida hasta: ${fd(sumarDias(p.fecha_pedido,CFG.dias_validez_cotizacion))}`,14,y);y+=6}
-  y+=4;
+  let yl=y+2;
+  if(CFG.nombre_negocio){F(13,'bold');ink(NAVY);doc.text(CFG.nombre_negocio,headX,yl);yl+=5.5;}
+  F(8);ink(SLATE);
+  [CFG.nit&&`NIT: ${CFG.nit}`,CFG.telefono&&`Tel: ${CFG.telefono}`,CFG.email,CFG.direccion].filter(Boolean).forEach(l=>{doc.text(String(l),headX,yl);yl+=4;});
+  // Chip del tipo de documento (derecha)
+  F(10,'bold');
+  const chipW=doc.getTextWidth(tipo)+10, chipX=W-M-chipW;
+  doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]);
+  doc.roundedRect(chipX,y-3,chipW,8.5,2,2,'F');
+  doc.setTextColor(255,255,255);doc.text(tipo,chipX+5,y+2.8);
+  F(14,'bold');ink(NAVY);doc.text(`#${p.ref}`,W-M,y+13,{align:'right'});
+  F(8.5);ink(MUTED);doc.text(fd(p.fecha_pedido),W-M,y+18,{align:'right'});
+  y=Math.max(yl,logoBottom+4,y+20)+3;
+  doc.setDrawColor(NAVY[0],NAVY[1],NAVY[2]);doc.setLineWidth(0.7);doc.line(M,y,W-M,y);
+  y+=7;
+
+  // ── Tarjetas: Cliente · Detalles ──
+  const cardW=(CW-6)/2;
+  const cliLineas=[
+    ['',p.nombre],
+    p.tel&&['Teléfono',p.tel], p.cli_nit&&['NIT / CC',p.cli_nit],
+    p.cli_email&&['Email',p.cli_email], p.cli_direccion&&['Dirección',p.cli_direccion],
+    p.cli_contacto&&['Contacto',p.cli_contacto]
+  ].filter(Boolean);
+  const val=p.valor_total||0;
+  const pagado=(p.pagos||[]).reduce((a,x)=>a+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0);
+  const estadoPago=!val?'—':(pagado>=val?'Pagado':(pagado>0?'Abono registrado':'Sin pago'));
+  const detLineas=[
+    ['Fecha del pedido',fd(p.fecha_pedido)],
+    p.fecha_entrega&&['Fecha de entrega',fd(p.fecha_entrega)],
+    (tipo==='COTIZACIÓN'&&p.fecha_pedido)&&['Válida hasta',fd(sumarDias(p.fecha_pedido,CFG.dias_validez_cotizacion))],
+    ['Estado de pago',estadoPago]
+  ].filter(Boolean);
+  const cardH=Math.max(cliLineas.length,detLineas.length)*4.6+11;
+  salto(cardH+4);
+  const pintarCard=(x,titulo,lineas)=>{
+    doc.setFillColor(CARD[0],CARD[1],CARD[2]);
+    doc.roundedRect(x,y,cardW,cardH,2.5,2.5,'F');
+    F(7,'bold');ink(MUTED);doc.text(titulo.toUpperCase(),x+5,y+5.5);
+    let yy=y+11;
+    lineas.forEach(([lab,valr],i)=>{
+      if(!lab&&i===0){F(10,'bold');ink(NAVY);doc.text(String(valr),x+5,yy);}
+      else{F(8);ink(MUTED);doc.text(lab+':',x+5,yy);F(8,'bold');ink(NAVY);doc.text(String(valr),x+5+doc.getTextWidth(lab+': ')+1,yy);}
+      yy+=4.6;
+    });
+  };
+  pintarCard(M,'Cliente',cliLineas);
+  pintarCard(M+cardW+6,'Detalles del pedido',detLineas);
+  y+=cardH+7;
+
+  // ── Tabla de ítems ──
   doc.autoTable({
-    startY:y,
+    startY:y,margin:{left:M,right:M},
     head:[['Cant.','Detalle','V. Unitario','V. Total']],
     body:lineasDocumento(p,fichasPorId).map(l=>[l.cant||'',l.descripcion,l.unit?fCOP(l.unit):'',fCOP(l.monto)]),
-    styles:{fontSize:9},
-    columnStyles:{0:{cellWidth:14,halign:'center'},2:{cellWidth:28,halign:'right'},3:{cellWidth:28,halign:'right'}},
-    headStyles:{halign:'left'}
+    styles:{fontSize:9,textColor:NAVY,lineColor:LINE,lineWidth:0.15,cellPadding:2.6},
+    headStyles:{fillColor:NAVY,textColor:255,halign:'left',fontSize:8,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[249,251,253]},
+    columnStyles:{0:{cellWidth:15,halign:'center'},2:{cellWidth:30,halign:'right'},3:{cellWidth:30,halign:'right',fontStyle:'bold'}}
   });
-  let finalY=doc.lastAutoTable.finalY+8;
-  doc.setFontSize(11);
+  y=doc.lastAutoTable.finalY+7;
+
+  // ── Totales (derecha; el total en píldora navy) ──
+  const totW=70, totX=W-M-totW;
+  salto(26);
   if(CFG.iva_activo&&CFG.iva_desglosado){
-    const{subtotal,iva,total}=calcularIVA(p.valor_total||0,CFG.iva_porcentaje);
-    doc.setFontSize(9);
-    doc.text(`Subtotal: ${fCOP(subtotal)}`,196,finalY,{align:'right'});finalY+=5;
-    doc.text(`IVA (${CFG.iva_porcentaje}%): ${fCOP(iva)}`,196,finalY,{align:'right'});finalY+=6;
-    doc.setFontSize(12);doc.text(`Total: ${fCOP(total)}`,196,finalY,{align:'right'});
-  }else{
-    doc.setFontSize(12);doc.text(`Total: ${fCOP(p.valor_total||0)}`,196,finalY,{align:'right'});
+    const{subtotal,iva}=calcularIVA(val,CFG.iva_porcentaje);
+    F(8.5);ink(SLATE);
+    doc.text('Subtotal',totX,y);doc.text(fCOP(subtotal),W-M,y,{align:'right'});y+=5;
+    doc.text(`IVA (${CFG.iva_porcentaje}%)`,totX,y);doc.text(fCOP(iva),W-M,y,{align:'right'});y+=4;
   }
-  finalY+=10;
+  doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]);
+  doc.roundedRect(totX-4,y-1,totW+4,10,2,2,'F');
+  F(9,'bold');doc.setTextColor(255,255,255);doc.text('TOTAL',totX,y+5.3);
+  F(12,'bold');doc.text(fCOP(val),W-M-2,y+5.6,{align:'right'});
+  y+=16;
+
+  // ── Pagos y saldo ──
   if((p.pagos||[]).length){
+    salto(20);
+    F(7,'bold');ink(MUTED);doc.text('PAGOS Y ABONOS',M,y);y+=2.5;
     doc.autoTable({
-      startY:finalY,
+      startY:y,margin:{left:M,right:M},
       head:[['Fecha','Forma de pago','Monto']],
       body:p.pagos.map(pg=>[fd(pg.fecha),metodoLabel(pg.tipo),fCOP(parseInt(String(pg.monto_calc||0).replace(/\D/g,''))||0)]),
-      styles:{fontSize:9}
+      styles:{fontSize:8.5,textColor:NAVY,lineColor:LINE,lineWidth:0.15,cellPadding:2.2},
+      headStyles:{fillColor:CARD,textColor:SLATE,fontSize:7.5,fontStyle:'bold'},
+      columnStyles:{2:{halign:'right'}}
     });
-    finalY=doc.lastAutoTable.finalY+6;
-    const totalPagado=p.pagos.reduce((a,x)=>a+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0);
-    const saldo=Math.max(0,(p.valor_total||0)-totalPagado);
-    doc.setFontSize(10);
-    doc.text(`Pagado: ${fCOP(totalPagado)}`,196,finalY,{align:'right'});finalY+=5;
-    doc.setFontSize(11);doc.text(`Saldo pendiente: ${fCOP(saldo)}`,196,finalY,{align:'right'});
-    finalY+=10;
+    y=doc.lastAutoTable.finalY+6;
+    const saldo=Math.max(0,val-pagado);
+    F(9,'bold');ink(GREEN);doc.text(`Pagado: ${fCOP(pagado)}`,W-M,y,{align:'right'});y+=5.5;
+    if(saldo>0){F(10,'bold');ink(RED);doc.text(`Saldo pendiente: ${fCOP(saldo)}`,W-M,y,{align:'right'});y+=6;}
+    else{F(9,'bold');ink(GREEN);doc.text('✓ Sin saldo pendiente',W-M,y,{align:'right'});y+=6;}
+    y+=3;
   }
-  doc.setFontSize(9);
+
+  // ── Notas del pedido (Feed Back 2) ──
+  if((p.notas||'').trim()){
+    const notas=doc.splitTextToSize(String(p.notas).trim(),CW-10);
+    const nh=notas.length*4+11;
+    salto(nh+4);
+    doc.setFillColor(CARD[0],CARD[1],CARD[2]);
+    doc.roundedRect(M,y,CW,nh,2.5,2.5,'F');
+    F(7,'bold');ink(MUTED);doc.text('NOTAS',M+5,y+5.5);
+    F(8.5);ink(NAVY);doc.text(notas,M+5,y+10.5);
+    y+=nh+7;
+  }
+
+  // ── Métodos de pago + info del negocio ──
   const activos=metodosPagoActivos();
   if(activos.length){
-    doc.text('Métodos de pago aceptados:',14,finalY);finalY+=5;
-    activos.forEach(m=>{doc.text('• '+m.label+(m.datos?' — '+m.datos:''),16,finalY);finalY+=5;});
+    salto(12+activos.length*4);
+    F(7,'bold');ink(MUTED);doc.text('MÉTODOS DE PAGO',M,y);y+=4.5;
+    F(8);ink(SLATE);
+    activos.forEach(m=>{doc.text('•  '+m.label+(m.datos?'  —  '+m.datos:''),M+1,y);y+=4;});
+    y+=3;
   }
-  // CORR 004 — información extra de la empresa
   if((CFG.info_pdf||'').trim()){
-    finalY+=3;
-    String(CFG.info_pdf).split('\n').filter(l=>l.trim()).forEach(l=>{doc.text(l.trim(),14,finalY);finalY+=5;});
+    const info=String(CFG.info_pdf).split('\n').filter(l=>l.trim());
+    salto(info.length*4+4);
+    F(7.5,'italic');ink(MUTED);
+    info.forEach(l=>{doc.text(l.trim(),M,y);y+=4;});
+  }
+
+  // ── Pie de página (todas las páginas) ──
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);
+    doc.setDrawColor(LINE[0],LINE[1],LINE[2]);doc.setLineWidth(0.3);doc.line(M,H-14,W-M,H-14);
+    F(7);ink(MUTED);
+    doc.text(`${CFG.nombre_negocio||''}  ·  ${tipo} #${p.ref}`,M,H-9);
+    doc.text(`Página ${i} de ${pages}`,W-M,H-9,{align:'right'});
   }
   return {doc,tipo,p,filename:`${tipo.replace(/\s+/g,'_')}_${p.ref}.pdf`};
 }
