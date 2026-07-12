@@ -84,7 +84,9 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .sc-mini.dark .lbl{color:rgba(255,255,255,.35)}
 .sc-mini.light .lbl{color:var(--muted)}
 /* legacy classes kept for Registros view */
-.reg-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.reg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.reg-nota{display:flex;align-items:flex-start;gap:7px;font-size:10.5px;color:var(--slate);background:var(--teal-lt);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:12px;line-height:1.5}
+.reg-nota i{font-size:13px;color:var(--teal-dk);flex-shrink:0;margin-top:1px}
 .sc{background:linear-gradient(180deg,#FDFEFF 0%,#F3F7FC 100%);border-radius:var(--r-lg);padding:18px 22px;border:1px solid transparent;position:relative;overflow:hidden;box-shadow:var(--sh);transition:box-shadow .15s,transform .15s}
 .sc:hover{box-shadow:var(--sh-lg);transform:translateY(-2px)}
 .sc.dk{background:var(--navy);border-color:var(--navy)}
@@ -847,10 +849,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         </div>
       </div>
       <div class="reg-tabs">
-        <button class="rtab active" onclick="showReg('ingresos')">Ingresos</button>
+        <button class="rtab active" onclick="showReg('ingresos')">Ventas</button>
         <button class="rtab" onclick="showReg('costos')">Costos</button>
         <button class="rtab" onclick="showReg('utilidades')">Utilidades</button>
-        <button class="rtab" onclick="showReg('abonos')">Abonos</button>
+        <button class="rtab" onclick="showReg('abonos')">Ingresos</button>
         <button class="rtab" onclick="showReg('saldos')">Saldos</button>
       </div>
       <div id="reg-ingresos" class="reg-panel active"></div>
@@ -5012,13 +5014,16 @@ function showReg(tab){
 function buildRegPanel(tab){
   const todos=regPedidosFiltrados();
   const el=document.getElementById('reg-'+tab);if(!el)return;
-  if(tab==='ingresos'){
+  if(tab==='ingresos'){ // pestaña "Ventas": lo FACTURADO (valor de los pedidos por fecha del pedido)
     const rows=todos.filter(p=>p.valor_total>0);
     const total=rows.reduce((a,p)=>a+(p.valor_total||0),0);
-    el.innerHTML=`<div class="reg-stats">
-      <div class="sc tl"><div class="sc-l">Total</div><div class="sc-n" style="font-size:18px">${fCOP(total)}</div></div>
-      <div class="sc"><div class="sc-l">Pedidos</div><div class="sc-n">${rows.length}</div></div>
-      <div class="sc"><div class="sc-l">Promedio</div><div class="sc-n" style="font-size:16px">${fCOP(rows.length?Math.round(total/rows.length):0)}</div></div>
+    const recibido=rows.reduce((a,p)=>a+(p.pagos||[]).reduce((s,x)=>s+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0),0);
+    el.innerHTML=`<div class="reg-nota"><i class="ti ti-info-circle"></i>Ventas = valor de los pedidos del período (facturado). El dinero que realmente entró está en <b>Ingresos</b>.</div>
+    <div class="reg-stats">
+      <div class="sc tl"><div class="sc-l">Ventas del período</div><div class="sc-n" style="font-size:18px">${fCOP(total)}</div></div>
+      <div class="sc gn"><div class="sc-l">Ya recibido</div><div class="sc-n" style="font-size:16px">${fCOP(Math.min(recibido,total))}</div></div>
+      <div class="sc am"><div class="sc-l">Por cobrar</div><div class="sc-n" style="font-size:16px">${fCOP(Math.max(0,total-recibido))}</div></div>
+      <div class="sc"><div class="sc-l">Pedidos</div><div class="sc-n">${rows.length}</div><div class="sc-s">Promedio ${fCOP(rows.length?Math.round(total/rows.length):0)}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>#</th><th>Cliente</th><th>F. Pedido</th><th style="text-align:right">Valor</th></tr></thead>
     <tbody>${rows.map(p=>`<tr><td style="font-family:'DM Mono',monospace;font-size:10px">#${p.ref}</td><td style="font-weight:600">${p.nombre}</td><td>${fd(p.fecha_pedido)}</td><td style="text-align:right" class="mpos">${fCOP(p.valor_total)}</td></tr>`).join('')}</tbody></table>`;
@@ -5040,21 +5045,32 @@ function buildRegPanel(tab){
       return{...p,ing,cos,gan:ing-cos};
     }).filter(r=>r.ing||r.cos);
     const tI=rows.reduce((a,r)=>a+r.ing,0),tC=rows.reduce((a,r)=>a+r.cos,0);
-    el.innerHTML=`<div class="reg-stats">
-      <div class="sc tl"><div class="sc-l">Ingresos</div><div class="sc-n" style="font-size:16px">${fCOP(tI)}</div></div>
+    el.innerHTML=`<div class="reg-nota"><i class="ti ti-info-circle"></i>Utilidad = Ventas del período − Costos de esos pedidos (independiente de si ya te pagaron).</div>
+    <div class="reg-stats">
+      <div class="sc tl"><div class="sc-l">Ventas</div><div class="sc-n" style="font-size:16px">${fCOP(tI)}</div></div>
       <div class="sc rd"><div class="sc-l">Costos</div><div class="sc-n" style="font-size:16px">${fCOP(tC)}</div></div>
-      <div class="sc ${tI-tC>=0?'gn':'rd'}"><div class="sc-l">Utilidad</div><div class="sc-n" style="font-size:16px">${fCOP(tI-tC)}</div></div>
+      <div class="sc ${tI-tC>=0?'gn':'rd'}"><div class="sc-l">Utilidad</div><div class="sc-n" style="font-size:16px">${fCOP(tI-tC)}</div><div class="sc-s">Margen ${tI>0?Math.round((tI-tC)*100/tI):0}%</div></div>
     </div>
-    <table class="rtable"><thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Costos</th><th style="text-align:right">Ganancia</th></tr></thead>
+    <table class="rtable"><thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Ventas</th><th style="text-align:right">Costos</th><th style="text-align:right">Ganancia</th></tr></thead>
     <tbody>${rows.map(r=>`<tr><td style="font-family:'DM Mono',monospace;font-size:10px">#${r.ref}</td><td style="font-weight:600">${r.nombre}</td><td style="text-align:right;color:var(--green);font-weight:600">${fCOP(r.ing)}</td><td style="text-align:right;color:var(--red);font-weight:600">${fCOP(r.cos)}</td><td style="text-align:right" class="${r.gan>=0?'mpos':'mneg'}">${fCOP(r.gan)}</td></tr>`).join('')}</tbody></table>`;
   }
-  if(tab==='abonos'){
-    const all=[];todos.forEach(p=>(p.pagos||[]).forEach(pg=>all.push({...pg,ref:p.ref,nom:p.nombre})));
+  if(tab==='abonos'){ // pestaña "Ingresos": dinero REAL recibido, filtrado por fecha del pago (no del pedido)
+    const base=(window._rPeds||[]).filter(p=>!p.es_cotizacion);
+    const all=[];base.forEach(p=>(p.pagos||[]).forEach(pg=>{
+      const f=pg.fecha||'';
+      if(regFiltro.desde&&f<regFiltro.desde)return;
+      if(regFiltro.hasta&&f>regFiltro.hasta)return;
+      all.push({...pg,ref:p.ref,nom:p.nombre});
+    }));
     all.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
     const total=all.reduce((a,x)=>a+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0);
-    el.innerHTML=`<div class="reg-stats">
-      <div class="sc tl"><div class="sc-l">Total recibido</div><div class="sc-n" style="font-size:16px">${fCOP(total)}</div></div>
+    // Desglose por forma de pago (útil para cuadre de caja)
+    const porForma={};all.forEach(x=>{const k=metodoLabel(x.tipo);porForma[k]=(porForma[k]||0)+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0)});
+    el.innerHTML=`<div class="reg-nota"><i class="ti ti-info-circle"></i>Ingresos = dinero que <b>realmente entró</b> (abonos y pagos), por la fecha del pago. Lo facturado está en <b>Ventas</b>.</div>
+    <div class="reg-stats">
+      <div class="sc gn"><div class="sc-l">Ingresos del período</div><div class="sc-n" style="font-size:16px">${fCOP(total)}</div></div>
       <div class="sc"><div class="sc-l">Pagos</div><div class="sc-n">${all.length}</div></div>
+      <div class="sc tl"><div class="sc-l">Por forma</div><div class="sc-s" style="margin-top:4px;line-height:1.6">${Object.entries(porForma).map(([k,v])=>`${k}: <b>${fCOP(v)}</b>`).join('<br>')||'—'}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>Fecha</th><th>Pedido</th><th>Forma</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
     <tbody>${all.map(pg=>`<tr><td>${fd(pg.fecha)}</td><td><span style="font-family:'DM Mono',monospace;font-size:10px">#${pg.ref}</span> ${pg.nom}</td><td>${metodoLabel(pg.tipo)}</td><td style="color:var(--muted);font-size:10px">${pg.nota||'—'}</td><td style="text-align:right" class="mpos">${fCOP(pg.monto_calc)}</td></tr>`).join('')}</tbody></table>`;
