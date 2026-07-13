@@ -1721,6 +1721,46 @@ app.post('/api/encargo-estados/reordenar',requiere('configurar_sistema'),(req,re
   }catch(e){logError('POST /api/encargo-estados/reordenar',e);res.status(500).json({error:e.message})}
 });
 
+// ── CENTRO DE COSTOS (v4.0) — vista derivada de las fichas: no crea datos, solo los organiza ──
+app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
+  try{
+    const filas=db.prepare('SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0 ORDER BY nombre').all(req.wsId);
+    const productos=filas.map(f=>{
+      fichaCompleta(f);
+      const insumos=(f.insumos||[]).map(i=>{
+        const unit=toNum(i.costo_unitario_calc), cant=parseFloat(i.cantidad_usada)||0;
+        return {nombre:i.nombre_insumo||'',proveedor:String(i.proveedor||'').trim(),unidad:i.unidad_medida||'',
+          variable:!!i.es_variable,costo_unit:unit,cantidad:cant,subtotal:Math.round(unit*(cant||1))};
+      });
+      const fijos=(f.costos_fijos||[]).map(c=>({nombre:c.nombre||'',valor:c.valor_calc!=null?toNum(c.valor_calc):(evalExpr(c.valor)||0)}));
+      // Variantes hoja: costo propio + heredado de grupos (los costos de un grupo aplican a sus hijas)
+      const hojas=[];
+      const walk=(nodos,herencia,ruta)=>{(nodos||[]).forEach(v=>{
+        const propios=(v.costos||[]).reduce((a,c)=>a+(evalExpr(c.valor)||0),0);
+        const acum=herencia+propios;
+        const nombre=[...ruta,String(v.nombre||'—')];
+        if(v.hijos&&v.hijos.length){ walk(v.hijos,acum,nombre); }
+        else{
+          let precio=toNum(v.precio_calc);
+          if(v.modo==='hoja'){ const pz=parseInt(v.piezas,10)||0; if(pz>0)precio=Math.round(toNum(v.precio_calc)/pz); }
+          else if((v.tramos||[]).length){ const p1=detectarPrecioEscalonado(v.tramos,1); if(p1!=null)precio=p1; }
+          hojas.push({nombre:nombre.join(' › '),precio,costo_extra:Math.round(acum)});
+        }
+      });};
+      walk(f.variantes||[],0,[]);
+      const esMedidas=f.tipo_precio==='medidas';
+      const precio=esMedidas?toNum(f.medida_tarifa_calc):toNum(f.precio_oficial);
+      const costo=esMedidas?toNum(f.costo_medida_tarifa_calc):toNum(f.costo_total);
+      const margen=(precio>0&&costo>0)?precio-costo:null;
+      return {id:f.id,nombre:f.nombre,codigo:f.codigo||'',categoria_id:f.categoria_id||'',
+        tipo_precio:f.tipo_precio||'unitario',activo:!!f.activo,medida_unidad:f.medida_unidad||'',
+        precio,costo,margen,margen_pct:(margen!=null&&precio>0)?Math.round(margen*100/precio):null,
+        insumos,fijos,variantes:hojas};
+    });
+    res.json({productos});
+  }catch(e){logError('GET /api/costos',e);res.status(500).json({error:e.message})}
+});
+
 // ── PRODUCTOS (fichas de producto) ──
 app.get('/api/productos',(req,res)=>{
   const{q,activo}=req.query; let sql='SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0'; const params=[req.wsId];

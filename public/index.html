@@ -323,6 +323,45 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pag-t .n{font-size:10px;background:var(--line-lt);border-radius:10px;padding:1px 8px}
 .pag-t.atra{color:var(--red)}
 .pag-t.hoy{color:var(--teal-dk)}
+/* CENTRO DE COSTOS (v4.0) */
+.cx-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.cx-kpi{background:linear-gradient(180deg,#FDFEFF,#F3F7FC);border-radius:var(--r-lg);padding:12px 15px;box-shadow:var(--sh)}
+.cx-kpi .num{font-size:20px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
+.cx-kpi .lbl{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.cx-lista{display:flex;flex-direction:column;gap:9px}
+.cx-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);cursor:pointer;transition:box-shadow .14s}
+.cx-card:hover{box-shadow:var(--sh-lg)}
+.cx-card.open{cursor:default}
+.cx-head{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;flex-wrap:wrap}
+.cx-head>i{color:var(--muted);font-size:13px;flex-shrink:0}
+.cx-head .nom{font-size:12.5px;font-weight:700;color:var(--navy)}
+.cx-inact{font-size:9px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:1px 7px}
+.cx-cifras{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;flex-wrap:wrap}
+.cx-cifras .c{color:var(--slate)}
+.cx-cifras .pr{color:var(--navy)}
+.cx-cifras>i{color:var(--muted);font-size:12px}
+.cx-nsub{font-size:10px;color:var(--muted);font-weight:600}
+.cx-mg{font-size:10px;font-weight:800;border-radius:12px;padding:2px 8px}
+.cx-mg.ok{color:#1A6B45;background:var(--green-lt)}
+.cx-mg.mid{color:#9B6500;background:var(--amber-lt)}
+.cx-mg.low{color:var(--red);background:var(--red-lt)}
+.cx-na{color:var(--muted);font-size:10px}
+.cx-des{border-top:1px solid var(--line-lt);padding:8px 14px 12px;cursor:default}
+.cx-sec{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:9px 0 4px}
+.cx-fila{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line-lt);font-size:11px}
+.cx-fila:last-child{border-bottom:none}
+.cx-fila .n{color:var(--navy);font-weight:600}
+.cx-fila .prov{color:var(--slate);font-size:10.5px}
+.cx-fila .calc{color:var(--muted);font-size:10.5px}
+.cx-fila .sub{font-weight:700;color:var(--navy);text-align:right;white-space:nowrap}
+.cx-fila.cx-tot{background:#F6F9FC;border-radius:8px;padding:6px 8px;margin:2px -8px}
+.cx-fila.cx-tot .n{font-weight:800}
+.cx-varb{font-size:8.5px;font-weight:800;color:var(--purple);background:var(--purple-lt);border-radius:8px;padding:1px 6px;vertical-align:1px}
+.cx-mgv{font-size:9.5px;color:var(--muted);font-weight:600}
+.cx-link{color:var(--teal-dk);cursor:pointer;font-weight:700}
+.cx-link:hover{text-decoration:underline}
+.cx-editar{margin-top:10px;background:none;border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:10.5px;font-weight:700;color:var(--slate);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.cx-editar:hover{border-color:var(--teal);color:var(--teal-dk)}
 
 /* DASHBOARD (Fase 6) */
 .dash-hello{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
@@ -820,6 +859,11 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   .pcal-cell .pcal-dots .pcal-mas{display:inline}
   .pcrono-lbl{width:118px}
   .pcrono-lbl .cli{font-size:10px}
+  /* Centro de Costos en móvil */
+  .cx-fila{grid-template-columns:1fr auto;row-gap:2px}
+  .cx-fila .prov{grid-column:1/-1;order:3}
+  .cx-fila .calc{order:4;grid-column:1/-1}
+  .cx-cifras{width:100%;margin-left:22px}
   /* Dashboard */
   .dash-hello{flex-direction:column;align-items:flex-start;gap:8px}
   .dash-hi{font-size:18px}
@@ -899,6 +943,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="clientes" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
     <button class="nav-item" data-view="registros" data-perm="ver_registros" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
     <button class="nav-item" data-view="productos" data-perm="gestionar_productos" onclick="showView('productos')"><i class="ti ti-box"></i>Productos</button>
+    <button class="nav-item" data-view="costos" data-perm="ver_costos" onclick="showView('costos')"><i class="ti ti-calculator"></i>Costos</button>
     <button class="nav-item" data-view="produccion" data-perm="ver_produccion" onclick="showView('produccion')"><i class="ti ti-tools"></i>Producción</button>
     <button class="nav-item" data-view="inventario" data-perm="gestionar_inventario" onclick="showView('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <div class="nav-sec">Rápido</div>
@@ -1078,6 +1123,22 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div id="prod-crono" style="display:none"></div>
       <div id="prod-agenda" style="display:none"></div>
       <div class="empty" id="prod-empty" style="display:none"><i class="ti ti-tools-off"></i><p>No hay trabajos en producción ahora mismo</p></div>
+    </div>
+
+    <!-- CENTRO DE COSTOS (v4.0) -->
+    <div id="view-costos" class="view">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;max-width:780px">Todos los costos de tus productos en un solo lugar — por producto, por proveedor o por categoría. No crea datos nuevos: organiza lo que ya definiste en cada ficha de producto.</div>
+      <div id="cx-resumen" class="cx-kpis"></div>
+      <div class="prod-bar">
+        <div class="prod-vistas" style="margin:0 auto 0 0;flex-shrink:1">
+          <button class="pv-tab active" data-cx="producto" onclick="cxSetTab('producto')"><i class="ti ti-box"></i>Por producto</button>
+          <button class="pv-tab" data-cx="proveedor" onclick="cxSetTab('proveedor')"><i class="ti ti-truck"></i>Por proveedor</button>
+          <button class="pv-tab" data-cx="categoria" onclick="cxSetTab('categoria')"><i class="ti ti-tags"></i>Por categoría</button>
+        </div>
+        <div class="search-b" style="min-width:170px"><i class="ti ti-search"></i><input type="text" id="cx-q" placeholder="Producto, insumo o proveedor…" oninput="renderCentroCostos()"></div>
+      </div>
+      <div id="cx-cont"></div>
+      <div class="empty" id="cx-empty" style="display:none"><i class="ti ti-calculator"></i><p>Aún no hay productos con costos definidos.<br>Defínelos en la ficha de cada producto (Desglose de costos).</p></div>
     </div>
 
     <!-- ARCHIVO -->
@@ -1313,6 +1374,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="mas-item" data-perm="ver_dashboard" onclick="irDesdeMas('dashboard')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
     <button class="mas-item" data-perm="ver_produccion" onclick="irDesdeMas('produccion')"><i class="ti ti-tools"></i>Producción</button>
     <button class="mas-item" data-perm="gestionar_productos" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
+      <button class="mas-item" data-perm="ver_costos" onclick="irDesdeMas('costos')"><i class="ti ti-calculator"></i>Costos</button>
     <button class="mas-item" data-perm="gestionar_inventario" onclick="irDesdeMas('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <button class="mas-item" onclick="irDesdeMas('archivo')"><i class="ti ti-archive"></i>Archivo</button>
     <button class="mas-item" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
@@ -1944,7 +2006,7 @@ function showCfgTab(tab){
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
 const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_dashboard:'Ver Dashboard ejecutivo',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',editar_clientes:'Editar clientes (ficha y datos en pedidos)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
 // Mapa vista -> permiso requerido (para el gating de navegación)
-const VIEW_PERM={registros:'ver_registros',dashboard:'ver_dashboard',produccion:'ver_produccion',productos:'gestionar_productos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
+const VIEW_PERM={registros:'ver_registros',dashboard:'ver_dashboard',produccion:'ver_produccion',productos:'gestionar_productos',costos:'ver_costos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
 function permLabel(k){ return PERM_LABELS[k]||k; }
 /* Usuarios y Roles — panel en 3 columnas (Usuarios · Roles · Ajustes del rol) */
@@ -2702,6 +2764,111 @@ function enviarWhatsAppPedido(){
   window.open(`https://wa.me/${numero}?text=${texto}`,'_blank');
 }
 
+/* ══ CENTRO DE COSTOS (v4.0) — organiza costos existentes, no crea datos ══ */
+let CX_DATA=null, cxTab='producto', cxAbiertos=new Set();
+async function cargarCostos(){
+  try{ CX_DATA=await api('GET','/costos'); }
+  catch(e){ CX_DATA={productos:[]}; toast('Error cargando costos: '+e.message,false); }
+  renderCentroCostos();
+}
+function cxSetTab(t){ cxTab=t; document.querySelectorAll('#view-costos .pv-tab').forEach(b=>b.classList.toggle('active',b.dataset.cx===t)); renderCentroCostos(); }
+function cxToggle(id){ if(cxAbiertos.has(id))cxAbiertos.delete(id); else cxAbiertos.add(id); renderCentroCostos(); }
+function cxUnidad(p){ return p.tipo_precio==='medidas'?(' / '+(p.medida_unidad==='m'?'m lineal':'m²')):''; }
+function cxMargen(m,pct){
+  if(m==null)return '<span class="cx-na">—</span>';
+  const cl=pct>=30?'ok':pct>=10?'mid':'low';
+  return `<span class="cx-mg ${cl}">${fCOP(m)}${pct!=null?' · '+pct+'%':''}</span>`;
+}
+function renderCentroCostos(){
+  const cont=document.getElementById('cx-cont'), empty=document.getElementById('cx-empty');
+  const q=(document.getElementById('cx-q')?.value||'').trim().toLowerCase();
+  const todos=(CX_DATA&&CX_DATA.productos)||[];
+  const conCosto=todos.filter(p=>p.costo>0||p.insumos.length);
+  const provs=new Set(); todos.forEach(p=>p.insumos.forEach(i=>{if(i.proveedor)provs.add(i.proveedor.toLowerCase())}));
+  const margenes=todos.filter(p=>p.margen_pct!=null).map(p=>p.margen_pct);
+  const mgProm=margenes.length?Math.round(margenes.reduce((a,b)=>a+b,0)/margenes.length):null;
+  document.getElementById('cx-resumen').innerHTML=`
+    <div class="cx-kpi"><div class="num">${todos.length}</div><div class="lbl">Productos</div></div>
+    <div class="cx-kpi"><div class="num">${conCosto.length}</div><div class="lbl">Con costos definidos</div></div>
+    <div class="cx-kpi"><div class="num">${provs.size}</div><div class="lbl">Proveedores</div></div>
+    <div class="cx-kpi"><div class="num">${mgProm!=null?mgProm+'%':'—'}</div><div class="lbl">Margen promedio</div></div>`;
+  if(!todos.length){ cont.innerHTML=''; empty.style.display=''; return; }
+  empty.style.display='none';
+  const fil=todos.filter(p=>!q||p.nombre.toLowerCase().includes(q)||p.insumos.some(i=>i.nombre.toLowerCase().includes(q)||i.proveedor.toLowerCase().includes(q)));
+  if(cxTab==='producto')renderCxProducto(cont,fil);
+  else if(cxTab==='proveedor')renderCxProveedor(cont,fil);
+  else renderCxCategoria(cont,fil);
+}
+function renderCxProducto(cont,lista){
+  if(!lista.length){ cont.innerHTML='<div class="prod-col-empty" style="padding:18px">Sin resultados</div>'; return; }
+  cont.innerHTML='<div class="cx-lista">'+lista.map(p=>{
+    const abierto=cxAbiertos.has(p.id);
+    const cat=CATS.find(c=>c.id===p.categoria_id);
+    let des='';
+    if(abierto){
+      const filaIns=p.insumos.map(i=>`<div class="cx-fila"><span class="n">${pesc(i.nombre)}${i.variable?' <span class="cx-varb">variable</span>':''}</span><span class="prov">${i.proveedor?pesc(i.proveedor):'<span class=cx-na>—</span>'}</span><span class="calc">${i.cantidad||1} ${pesc(i.unidad)} × ${fCOP(i.costo_unit)}</span><span class="sub">${fCOP(i.subtotal)}</span></div>`).join('');
+      const filaFij=p.fijos.map(c=>`<div class="cx-fila"><span class="n">${pesc(c.nombre)}</span><span></span><span></span><span class="sub">${fCOP(c.valor)}</span></div>`).join('');
+      const filaVar=p.variantes.map(v=>{
+        const mgV=(v.precio>0&&p.costo>0)?v.precio-p.costo-v.costo_extra:null;
+        return `<div class="cx-fila"><span class="n">${pesc(v.nombre)}</span><span></span><span class="calc">${v.costo_extra?'+'+fCOP(v.costo_extra)+' costo propio':''}</span><span class="sub">${v.precio?fCOP(v.precio):'—'}${mgV!=null?` <span class="cx-mgv">margen ${fCOP(mgV)}</span>`:''}</span></div>`;
+      }).join('');
+      des=`<div class="cx-des">
+        ${p.insumos.length?'<div class="cx-sec">Insumos</div>'+filaIns:''}
+        ${p.fijos.length?'<div class="cx-sec">Costos fijos por trabajo</div>'+filaFij:''}
+        <div class="cx-fila cx-tot"><span class="n">Costo total</span><span></span><span></span><span class="sub">${p.costo?fCOP(p.costo)+cxUnidad(p):'—'}</span></div>
+        <div class="cx-fila"><span class="n">Precio público</span><span></span><span></span><span class="sub">${p.precio?fCOP(p.precio)+cxUnidad(p):'—'}</span></div>
+        <div class="cx-fila cx-tot"><span class="n">Margen</span><span></span><span></span><span class="sub">${cxMargen(p.margen,p.margen_pct)}</span></div>
+        ${p.variantes.length?'<div class="cx-sec">Variantes</div>'+filaVar:''}
+        ${puede('gestionar_productos')?`<button class="cx-editar" onclick="event.stopPropagation();showView('productos');setTimeout(()=>abrirEditarProducto('${p.id}'),250)">Editar ficha <i class="ti ti-arrow-right"></i></button>`:''}
+      </div>`;
+    }
+    return `<div class="cx-card ${abierto?'open':''}" onclick="cxToggle('${p.id}')">
+      <div class="cx-head">
+        <i class="ti ti-chevron-${abierto?'down':'right'}"></i>
+        <span class="nom">${pesc(p.nombre)}${p.activo?'':' <span class="cx-inact">inactivo</span>'}</span>
+        ${cat?`<span class="ttag ${cat.tc}">${pesc(cat.label)}</span>`:''}
+        <span class="cx-cifras"><span class="c">${p.costo?fCOP(p.costo):'—'}</span><i class="ti ti-arrow-narrow-right"></i><span class="pr">${p.precio?fCOP(p.precio):'—'}</span>${cxMargen(p.margen,p.margen_pct)}</span>
+      </div>${des}
+    </div>`;
+  }).join('')+'</div>';
+}
+function renderCxProveedor(cont,lista){
+  const grupos={};
+  lista.forEach(p=>p.insumos.forEach(i=>{
+    const k=i.proveedor||'— Sin proveedor —';
+    (grupos[k]=grupos[k]||[]).push({...i,producto:p.nombre,producto_id:p.id});
+  }));
+  const keys=Object.keys(grupos).sort((a,b)=>a.localeCompare(b));
+  if(!keys.length){ cont.innerHTML='<div class="prod-col-empty" style="padding:18px">Ningún insumo registrado todavía. El proveedor se define en cada insumo dentro de la ficha del producto.</div>'; return; }
+  cont.innerHTML='<div class="cx-lista">'+keys.map(k=>{
+    const items=grupos[k];
+    return `<div class="cx-card open">
+      <div class="cx-head" style="cursor:default"><i class="ti ti-truck"></i><span class="nom">${pesc(k)}</span><span class="cx-cifras"><span class="cx-nsub">${items.length} insumo${items.length===1?'':'s'}</span></span></div>
+      <div class="cx-des">${items.map(i=>`<div class="cx-fila"><span class="n">${pesc(i.nombre)}</span><span class="prov">en <a class="cx-link" onclick="event.stopPropagation();cxAbiertos.add('${i.producto_id}');cxSetTab('producto')">${pesc(i.producto)}</a></span><span class="calc">${pesc(i.unidad)}</span><span class="sub">${fCOP(i.costo_unit)}</span></div>`).join('')}</div>
+    </div>`;
+  }).join('')+'</div>';
+}
+function renderCxCategoria(cont,lista){
+  const grupos={};
+  lista.forEach(p=>{ const k=p.categoria_id||'__sin'; (grupos[k]=grupos[k]||[]).push(p); });
+  const keys=Object.keys(grupos).sort((a,b)=>{
+    const la=a==='__sin'?'\uffff':((CATS.find(c=>c.id===a)||{}).label||a);
+    const lb=b==='__sin'?'\uffff':((CATS.find(c=>c.id===b)||{}).label||b);
+    return la.localeCompare(lb);
+  });
+  if(!keys.length){ cont.innerHTML='<div class="prod-col-empty" style="padding:18px">Sin resultados</div>'; return; }
+  cont.innerHTML='<div class="cx-lista">'+keys.map(k=>{
+    const cat=CATS.find(c=>c.id===k);
+    const items=grupos[k];
+    const margs=items.filter(p=>p.margen_pct!=null).map(p=>p.margen_pct);
+    const mgP=margs.length?Math.round(margs.reduce((a,b)=>a+b,0)/margs.length):null;
+    return `<div class="cx-card open">
+      <div class="cx-head" style="cursor:default">${cat?`<span class="ttag ${cat.tc}">${pesc(cat.label)}</span>`:'<span class="nom">Sin categoría</span>'}<span class="cx-cifras"><span class="cx-nsub">${items.length} producto${items.length===1?'':'s'}${mgP!=null?' · margen prom. '+mgP+'%':''}</span></span></div>
+      <div class="cx-des">${items.map(p=>`<div class="cx-fila"><span class="n"><a class="cx-link" onclick="event.stopPropagation();cxAbiertos.add('${p.id}');cxSetTab('producto')">${pesc(p.nombre)}</a></span><span class="prov"></span><span class="calc">${p.costo?fCOP(p.costo):'—'} → ${p.precio?fCOP(p.precio):'—'}</span><span class="sub">${cxMargen(p.margen,p.margen_pct)}</span></div>`).join('')}</div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
 /* ══ VISTAS ══ */
 function showView(v){
   // Guardia de permisos: si el rol no puede ver este módulo, redirige a Pedidos
@@ -2710,15 +2877,16 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',produccion:'Producción',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
+  const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',costos:'Centro de Costos',produccion:'Producción',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
-  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,dashboard:4,produccion:4,productos:4,inventario:4,ayuda:4,configuracion:4,archivo:4}[v]??0]?.classList.add('active');
+  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,dashboard:4,produccion:4,productos:4,costos:4,inventario:4,ayuda:4,configuracion:4,archivo:4}[v]??0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
   if(v==='dashboard')cargarDashboard();
   if(v==='productos')cargarProductos();
+  if(v==='costos')cargarCostos();
   if(v==='produccion')cargarProduccion();
   if(v==='inventario')cargarInventario();
   if(v==='archivo')cargarArchivo();
