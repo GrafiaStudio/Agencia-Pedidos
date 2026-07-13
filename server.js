@@ -1504,6 +1504,19 @@ app.get('/api/app-info',(req,res)=>{
   res.json({...APP_INFO,version:require('./package.json').version});
 });
 
+// ── RESPALDO DE BASE DE DATOS ──
+// Descarga una copia consistente del .db completo (usa el backup API de SQLite, seguro con WAL).
+// Solo el admin del workspace principal: el archivo contiene TODOS los workspaces.
+app.get('/api/backup/db',requiere('configurar_sistema'),async(req,res)=>{
+  if(req.wsId!=='main')return res.status(403).json({error:'El respaldo completo solo está disponible para el workspace principal'});
+  try{
+    const stamp=new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');
+    const tmp=path.join(require('os').tmpdir(),`agencia-backup-${stamp}-${Math.random().toString(36).slice(2,8)}.db`);
+    await db.backup(tmp);
+    res.download(tmp,`agencia-backup-${stamp}.db`,()=>{ try{fs.unlinkSync(tmp)}catch(e){} });
+  }catch(e){logError('GET /api/backup/db',e);res.status(500).json({error:e.message})}
+});
+
 // ── ETIQUETAS DEL NEGOCIO (categorías y subcategorías personalizables) ──
 const PALETA_ETIQUETAS=['purple','amber','orange','teal','green','slate','red','pink','blue','yellow','brown','indigo'];
 const ETIQUETAS_DEFAULT=[
