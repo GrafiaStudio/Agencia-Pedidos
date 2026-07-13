@@ -351,6 +351,25 @@ db.exec(`CREATE TABLE IF NOT EXISTS encargo_estados(
   requiere_responsable INTEGER DEFAULT 0,
   activo INTEGER DEFAULT 1
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS costo_listas(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  proveedor TEXT NOT NULL,
+  titulo TEXT DEFAULT '',
+  notas TEXT DEFAULT '',
+  activo INTEGER DEFAULT 1,
+  creado TEXT DEFAULT(datetime('now','localtime')),
+  actualizado TEXT DEFAULT(datetime('now','localtime'))
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS costo_lista_items(
+  id TEXT PRIMARY KEY,
+  lista_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  descripcion TEXT NOT NULL,
+  precio TEXT DEFAULT '',
+  precio_calc INTEGER DEFAULT 0,
+  orden INTEGER DEFAULT 0
+)`);
 
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
 const SEPARADORES_MILES=['.',','];
@@ -1804,6 +1823,55 @@ app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
     });
     res.json({productos});
   }catch(e){logError('GET /api/costos',e);res.status(500).json({error:e.message})}
+});
+
+// ── LISTAS DE COSTOS DE PROVEEDORES (base de datos de precios, informativa) ──
+function listaConItems(l){
+  l.items=db.prepare('SELECT id,descripcion,precio,precio_calc,orden FROM costo_lista_items WHERE lista_id=? ORDER BY orden').all(l.id);
+  l.activo=!!l.activo;
+  return l;
+}
+function guardarItemsLista(listaId,wsId,items){
+  db.prepare('DELETE FROM costo_lista_items WHERE lista_id=?').run(listaId);
+  const ins=db.prepare('INSERT INTO costo_lista_items(id,lista_id,workspace_id,descripcion,precio,precio_calc,orden)VALUES(?,?,?,?,?,?,?)');
+  (items||[]).forEach((it,i)=>{
+    const desc=String(it.descripcion||'').trim();
+    if(!desc)return;
+    const precioRaw=String(it.precio||'').trim();
+    ins.run(uid(),listaId,wsId,desc,precioRaw,toNum(precioRaw),i);
+  });
+}
+app.get('/api/costo-listas',requiere('ver_costos'),(req,res)=>{
+  const listas=db.prepare('SELECT * FROM costo_listas WHERE workspace_id=? AND activo=1 ORDER BY proveedor,titulo').all(req.wsId);
+  res.json(listas.map(listaConItems));
+});
+app.post('/api/costo-listas',requiere('gestionar_productos'),(req,res)=>{
+  try{
+    const b=req.body||{};
+    if(!String(b.proveedor||'').trim())return res.status(400).json({error:'El proveedor es obligatorio'});
+    const id=uid();
+    db.prepare('INSERT INTO costo_listas(id,workspace_id,proveedor,titulo,notas)VALUES(?,?,?,?,?)')
+      .run(id,req.wsId,String(b.proveedor).trim(),String(b.titulo||'').trim(),String(b.notas||'').trim());
+    guardarItemsLista(id,req.wsId,b.items);
+    res.json(listaConItems(db.prepare('SELECT * FROM costo_listas WHERE id=?').get(id)));
+  }catch(e){logError('POST /api/costo-listas',e);res.status(500).json({error:e.message})}
+});
+app.put('/api/costo-listas/:id',requiere('gestionar_productos'),(req,res)=>{
+  try{
+    const f=db.prepare('SELECT * FROM costo_listas WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+    if(!f)return res.status(404).json({error:'Lista no encontrada'});
+    const b=req.body||{};
+    if(!String(b.proveedor||'').trim())return res.status(400).json({error:'El proveedor es obligatorio'});
+    db.prepare("UPDATE costo_listas SET proveedor=?,titulo=?,notas=?,actualizado=datetime('now','localtime') WHERE id=? AND workspace_id=?")
+      .run(String(b.proveedor).trim(),String(b.titulo||'').trim(),String(b.notas||'').trim(),f.id,req.wsId);
+    if(b.items!==undefined)guardarItemsLista(f.id,req.wsId,b.items);
+    res.json(listaConItems(db.prepare('SELECT * FROM costo_listas WHERE id=?').get(f.id)));
+  }catch(e){logError('PUT /api/costo-listas/:id',e);res.status(500).json({error:e.message})}
+});
+app.delete('/api/costo-listas/:id',requiere('gestionar_productos'),(req,res)=>{
+  const r=db.prepare('UPDATE costo_listas SET activo=0 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'Lista no encontrada'});
+  res.json({ok:true});
 });
 
 // ── PRODUCTOS (fichas de producto) ──

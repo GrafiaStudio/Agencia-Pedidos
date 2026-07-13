@@ -362,6 +362,17 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cx-link:hover{text-decoration:underline}
 .cx-editar{margin-top:10px;background:none;border:1px solid var(--line);border-radius:9px;padding:6px 12px;font-size:10.5px;font-weight:700;color:var(--slate);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
 .cx-editar:hover{border-color:var(--teal);color:var(--teal-dk)}
+/* Listas de proveedores */
+.cxl-form-top{display:flex;gap:10px;flex-wrap:wrap}
+.cxl-lbl{display:block;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.cxl-pega{width:100%;min-height:88px;font-size:11px;background:#F8FAFD;border:1.5px dashed var(--line);border-radius:10px;padding:10px;resize:vertical}
+.cxl-pega:focus{border-color:var(--teal);border-style:solid}
+.cxl-row{display:flex;gap:6px;align-items:center;margin-bottom:5px}
+.cxl-row .cxl-item-desc{flex:1;min-width:0}
+.cxl-row .cxl-item-precio{width:110px;flex-shrink:0;text-align:right}
+.cxl-nota{margin-top:8px;font-size:10.5px;color:var(--slate);background:var(--amber-lt);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:6px}
+.cxl-nota i{color:#9B6500;flex-shrink:0}
+.cx-head .pcx-obsbtn{width:26px;height:26px;font-size:12px}
 
 /* DASHBOARD (Fase 6) */
 .dash-hello{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
@@ -1134,6 +1145,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
           <button class="pv-tab active" data-cx="producto" onclick="cxSetTab('producto')"><i class="ti ti-box"></i>Por producto</button>
           <button class="pv-tab" data-cx="proveedor" onclick="cxSetTab('proveedor')"><i class="ti ti-truck"></i>Por proveedor</button>
           <button class="pv-tab" data-cx="categoria" onclick="cxSetTab('categoria')"><i class="ti ti-tags"></i>Por categoría</button>
+          <button class="pv-tab" data-cx="listas" onclick="cxSetTab('listas')"><i class="ti ti-truck-delivery"></i>Listas de proveedores</button>
         </div>
         <div class="search-b" style="min-width:170px"><i class="ti ti-search"></i><input type="text" id="cx-q" placeholder="Producto, insumo o proveedor…" oninput="renderCentroCostos()"></div>
       </div>
@@ -2765,10 +2777,11 @@ function enviarWhatsAppPedido(){
 }
 
 /* ══ CENTRO DE COSTOS (v4.0) — organiza costos existentes, no crea datos ══ */
-let CX_DATA=null, cxTab='producto', cxAbiertos=new Set();
+let CX_DATA=null, CX_LISTAS=[], cxTab='producto', cxAbiertos=new Set(), cxListaEdit=null, cxListaTmp=null;
 async function cargarCostos(){
   try{ CX_DATA=await api('GET','/costos'); }
   catch(e){ CX_DATA={productos:[]}; toast('Error cargando costos: '+e.message,false); }
+  try{ CX_LISTAS=await api('GET','/costo-listas'); }catch(e){ CX_LISTAS=[]; }
   renderCentroCostos();
 }
 function cxSetTab(t){ cxTab=t; document.querySelectorAll('#view-costos .pv-tab').forEach(b=>b.classList.toggle('active',b.dataset.cx===t)); renderCentroCostos(); }
@@ -2785,6 +2798,7 @@ function renderCentroCostos(){
   const todos=(CX_DATA&&CX_DATA.productos)||[];
   const conCosto=todos.filter(p=>p.costo>0||p.insumos.length);
   const provs=new Set(); todos.forEach(p=>p.insumos.forEach(i=>{if(i.proveedor)provs.add(i.proveedor.toLowerCase())}));
+  (CX_LISTAS||[]).forEach(l=>{if(l.proveedor)provs.add(l.proveedor.toLowerCase())});
   const margenes=todos.filter(p=>p.margen_pct!=null).map(p=>p.margen_pct);
   const mgProm=margenes.length?Math.round(margenes.reduce((a,b)=>a+b,0)/margenes.length):null;
   document.getElementById('cx-resumen').innerHTML=`
@@ -2797,7 +2811,8 @@ function renderCentroCostos(){
   const fil=todos.filter(p=>!q||p.nombre.toLowerCase().includes(q)||p.insumos.some(i=>i.nombre.toLowerCase().includes(q)||i.proveedor.toLowerCase().includes(q)));
   if(cxTab==='producto')renderCxProducto(cont,fil);
   else if(cxTab==='proveedor')renderCxProveedor(cont,fil);
-  else renderCxCategoria(cont,fil);
+  else if(cxTab==='categoria')renderCxCategoria(cont,fil);
+  else renderCxListas(cont,q);
 }
 function renderCxProducto(cont,lista){
   if(!lista.length){ cont.innerHTML='<div class="prod-col-empty" style="padding:18px">Sin resultados</div>'; return; }
@@ -2847,6 +2862,118 @@ function renderCxProveedor(cont,lista){
       <div class="cx-des">${items.map(i=>`<div class="cx-fila"><span class="n">${pesc(i.nombre)}</span><span class="prov">en <a class="cx-link" onclick="event.stopPropagation();cxAbiertos.add('${i.producto_id}');cxSetTab('producto')">${pesc(i.producto)}</a></span><span class="calc">${pesc(i.unidad)}</span><span class="sub">${fCOP(i.costo_unit)}</span></div>`).join('')}</div>
     </div>`;
   }).join('')+'</div>';
+}
+
+/* ── Listas de costos de proveedores ── */
+function cxParsearLista(texto){
+  // Detecta "descripcion ... $precio" línea por línea (listas de WhatsApp, Excel, etc.)
+  const items=[];
+  String(texto||'').split(/\r?\n/).forEach(linea=>{
+    let t=linea.trim();
+    if(!t)return;
+    const m=t.match(/^(.*?)[\s.…→\-–—:=>]*\$?\s*([\d]{1,3}(?:[.,][\d]{3})+|[\d]{4,})\s*$/);
+    if(!m)return;
+    let desc=m[1].replace(/^[^0-9A-Za-zÁÉÍÓÚÑáéíóúñü½¼()"']+/,'').replace(/[\s→\-–—:=>.…]+$/,'').trim();
+    const precio=cxNum(m[2]);
+    if(!desc||!(precio>0))return;
+    items.push({descripcion:desc,precio:String(precio)});
+  });
+  return items;
+}
+function cxNum(s){return parseInt(String(s||0).replace(/\D/g,''))||0}
+function cxNuevaLista(){ cxListaEdit='__nueva'; cxListaTmp={proveedor:'',titulo:'',notas:'',items:[]}; renderCentroCostos(); }
+function cxEditarLista(id){ const l=CX_LISTAS.find(x=>x.id===id); if(!l)return; cxListaEdit=id; cxListaTmp={proveedor:l.proveedor,titulo:l.titulo||'',notas:l.notas||'',items:(l.items||[]).map(it=>({descripcion:it.descripcion,precio:String(it.precio_calc||it.precio||'')}))}; renderCentroCostos(); }
+function cxCancelarLista(){ cxListaEdit=null; cxListaTmp=null; renderCentroCostos(); }
+function cxTmpSet(k,v){ if(cxListaTmp)cxListaTmp[k]=v; }
+function cxTmpItemSet(i,k,v){ if(cxListaTmp&&cxListaTmp.items[i])cxListaTmp.items[i][k]=v; }
+function cxTmpItemDel(i){ cxListaTmp.items.splice(i,1); renderCentroCostos(); }
+function cxTmpItemAdd(){ cxListaTmp.items.push({descripcion:'',precio:''}); renderCentroCostos(); requestAnimationFrame(()=>{ const rows=document.querySelectorAll('.cxl-item-desc'); rows[rows.length-1]?.focus(); }); }
+function cxTmpPegar(){
+  const txt=document.getElementById('cxl-pega')?.value||'';
+  const items=cxParsearLista(txt);
+  if(!items.length){ toast('No detecté líneas con precio. Formato esperado: "descripción … $precio" por línea.',false); return; }
+  cxListaTmp.items=cxListaTmp.items.filter(it=>(it.descripcion||'').trim()||(String(it.precio)||'').trim()).concat(items);
+  renderCentroCostos();
+  toast(items.length+' precios detectados ✓');
+}
+async function cxGuardarLista(){
+  const t=cxListaTmp;
+  if(!t||!t.proveedor.trim()){ toast('Escribe el nombre del proveedor',false); return; }
+  const items=t.items.filter(it=>(it.descripcion||'').trim());
+  try{
+    if(cxListaEdit==='__nueva')await api('POST','/costo-listas',{proveedor:t.proveedor,titulo:t.titulo,notas:t.notas,items});
+    else await api('PUT','/costo-listas/'+cxListaEdit,{proveedor:t.proveedor,titulo:t.titulo,notas:t.notas,items});
+    cxListaEdit=null; cxListaTmp=null;
+    CX_LISTAS=await api('GET','/costo-listas');
+    renderCentroCostos(); toast('Lista guardada ✓');
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+async function cxEliminarLista(id){
+  if(!confirm('¿Eliminar esta lista de precios? (queda archivada, no se pierde)'))return;
+  try{ await api('DELETE','/costo-listas/'+id); CX_LISTAS=await api('GET','/costo-listas'); renderCentroCostos(); }
+  catch(e){ toast('Error: '+e.message,false); }
+}
+function cxListaFormHTML(){
+  const t=cxListaTmp;
+  const filas=t.items.map((it,i)=>`<div class="cxl-row">
+    <input class="item-inp cxl-item-desc" type="text" value="${pesc(it.descripcion)}" placeholder="Descripción (ej: 10 x 29 cm)" oninput="cxTmpItemSet(${i},'descripcion',this.value)">
+    <input class="item-inp cxl-item-precio" type="text" value="${pesc(String(it.precio))}" placeholder="$" oninput="cxTmpItemSet(${i},'precio',this.value)">
+    <button class="item-del" onclick="cxTmpItemDel(${i})" title="Quitar"><i class="ti ti-x"></i></button>
+  </div>`).join('');
+  return `<div class="cx-card open" onclick="event.stopPropagation()">
+    <div class="cx-des" style="border-top:none;padding-top:12px">
+      <div class="cxl-form-top">
+        <div style="flex:1;min-width:160px"><label class="cxl-lbl">Proveedor *</label><input class="item-inp" type="text" value="${pesc(t.proveedor)}" placeholder="Ej: YANCA" oninput="cxTmpSet('proveedor',this.value)"></div>
+        <div style="flex:1.4;min-width:180px"><label class="cxl-lbl">Título de la lista</label><input class="item-inp" type="text" value="${pesc(t.titulo)}" placeholder="Ej: Precios Impresión DTF UV" oninput="cxTmpSet('titulo',this.value)"></div>
+      </div>
+      <label class="cxl-lbl" style="margin-top:10px">Pegar lista (WhatsApp, Excel, correo…)</label>
+      <textarea id="cxl-pega" class="cxl-pega" placeholder="Pega aquí la lista tal cual te la mandaron, una línea por precio:
+◼️ 5 x 19 cm → $10.000
+◼️ 10 x 29 cm → $20.000
+…y presiona «Detectar precios»"></textarea>
+      <div style="display:flex;gap:8px;margin:8px 0 4px;flex-wrap:wrap">
+        <button class="btn-add-row" onclick="cxTmpPegar()"><i class="ti ti-wand"></i> Detectar precios</button>
+        <button class="btn-add-row" onclick="cxTmpItemAdd()"><i class="ti ti-plus"></i> Fila manual</button>
+      </div>
+      ${filas?`<div class="cx-sec">Precios (${t.items.length})</div>${filas}`:''}
+      <label class="cxl-lbl" style="margin-top:8px">Notas (descuentos, condiciones…)</label>
+      <input class="item-inp" type="text" value="${pesc(t.notas)}" placeholder="Ej: FULL DESCUENTOS A PARTIR DE 2 METROS" oninput="cxTmpSet('notas',this.value)">
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button class="pill" onclick="cxCancelarLista()">Cancelar</button>
+        <button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="cxGuardarLista()"><i class="ti ti-check"></i> Guardar lista</button>
+      </div>
+    </div>
+  </div>`;
+}
+function renderCxListas(cont,q){
+  const puedeEditar=puede('gestionar_productos');
+  let listas=CX_LISTAS||[];
+  if(q)listas=listas.filter(l=>l.proveedor.toLowerCase().includes(q)||(l.titulo||'').toLowerCase().includes(q)||(l.items||[]).some(it=>it.descripcion.toLowerCase().includes(q)));
+  let html='';
+  if(puedeEditar&&cxListaEdit!=='__nueva')html+=`<div style="margin-bottom:10px"><button class="btn-add-row" onclick="cxNuevaLista()"><i class="ti ti-plus"></i> Nueva lista de precios</button></div>`;
+  if(cxListaEdit==='__nueva')html+=cxListaFormHTML();
+  if(!listas.length&&cxListaEdit!=='__nueva'){
+    html+=`<div class="prod-col-empty" style="padding:22px;font-size:11.5px">Aún no hay listas de precios de proveedores.<br>Guarda aquí los listados que te mandan por WhatsApp — pégalos tal cual y la app detecta los precios sola.</div>`;
+  }
+  html+='<div class="cx-lista">'+listas.map(l=>{
+    if(cxListaEdit===l.id)return cxListaFormHTML();
+    const abierta=cxAbiertos.has(l.id);
+    return `<div class="cx-card ${abierta?'open':''}" onclick="cxToggle('${l.id}')">
+      <div class="cx-head">
+        <i class="ti ti-chevron-${abierta?'down':'right'}"></i>
+        <span class="nom">${pesc(l.proveedor)}</span>
+        ${l.titulo?`<span class="cx-nsub">· ${pesc(l.titulo)}</span>`:''}
+        <span class="cx-cifras"><span class="cx-nsub">${(l.items||[]).length} precio${(l.items||[]).length===1?'':'s'} · ${fd((l.actualizado||l.creado||'').slice(0,10))}</span>
+        ${puedeEditar?`<button class="pcx-obsbtn" onclick="event.stopPropagation();cxEditarLista('${l.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
+        <button class="pcx-obsbtn" onclick="event.stopPropagation();cxEliminarLista('${l.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>`:''}</span>
+      </div>
+      ${abierta?`<div class="cx-des">
+        ${(l.items||[]).map(it=>`<div class="cx-fila cxl-view"><span class="n">${pesc(it.descripcion)}</span><span></span><span></span><span class="sub">${fCOP(it.precio_calc||0)}</span></div>`).join('')}
+        ${l.notas?`<div class="cxl-nota"><i class="ti ti-info-circle"></i> ${pesc(l.notas)}</div>`:''}
+      </div>`:''}
+    </div>`;
+  }).join('')+'</div>';
+  cont.innerHTML=html;
 }
 function renderCxCategoria(cont,lista){
   const grupos={};
