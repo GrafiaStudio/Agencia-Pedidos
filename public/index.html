@@ -305,12 +305,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 /* Cronograma */
 .pcrono-wrap{overflow-x:auto;padding-bottom:8px}
 .pcrono-in{min-width:600px}
-.pcrono-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.pcrono-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .pcrono-lbl{width:172px;flex-shrink:0;display:flex;align-items:center;gap:6px;overflow:hidden}
 .pcrono-lbl .cli{font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pcrono-pg{margin-left:auto;font-size:9px;font-weight:800;color:var(--slate);background:var(--line-lt);border-radius:10px;padding:1px 6px;flex-shrink:0}
-.pcrono-track{position:relative;flex:1;height:26px;background:#F2F6FB;border-radius:8px}
-.pcrono-bar{position:absolute;top:4px;height:18px;border-radius:6px;background:#D7E3F0;overflow:hidden;min-width:8px}
+.pcrono-track{position:relative;flex:1;height:20px;background:#F2F6FB;border-radius:7px}
+.pcrono-bar{position:absolute;top:3px;height:14px;border-radius:5px;background:#D7E3F0;overflow:hidden;min-width:8px}
 .pcrono-bar.late{background:var(--red-lt);outline:1.5px solid var(--red)}
 .pcrono-fill{height:100%;background:var(--teal);border-radius:6px 0 0 6px;transition:width .4s ease}
 .pcrono-bar.done .pcrono-fill{background:var(--green)}
@@ -3094,7 +3094,7 @@ async function cargarDashboard(){
     <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--green-lt);color:#1A6B45"><i class="ti ti-truck-delivery"></i></div><div class="num">${k.entregasHoy}</div><div class="lbl">Entregas para hoy</div></div>
     <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--purple-lt);color:var(--purple)"><i class="ti ti-file-invoice"></i></div><div class="num">${k.cotizaciones}</div><div class="lbl">Cotizaciones</div>${k.cotValor?`<div class="sub">Valor: ${fCOP(k.cotValor)}</div>`:''}</div>
     ${(()=>{const fin=ENC_ESTS[ENC_ESTS.length-1]||'Listo';const enProceso=Object.entries(d.produccion||{}).reduce((a,[s,n])=>s===fin?a:a+n,0);const listos=d.produccion?d.produccion[fin]||0:0;
-      return `<div class="dash-kpi" onclick="showView('produccion')" ${puede('ver_produccion')?'':'style="display:none"'}><div class="ico" style="background:#E0F5F4;color:#0BB5B0"><i class="ti ti-tools"></i></div><div class="num">${enProceso}</div><div class="lbl">Encargos en proceso</div><div class="sub">${listos} en ${pesc(fin.toLowerCase())}</div></div>`;})()}`;
+      return `<div class="dash-kpi" onclick="showView('produccion')" ${puede('ver_produccion')?'':'style="display:none"'}><div class="ico" style="background:#E0F5F4;color:#0BB5B0"><i class="ti ti-tools"></i></div><div class="num">${enProceso}</div><div class="lbl">Ítems en proceso</div><div class="sub">${listos} en ${pesc(fin.toLowerCase())}</div></div>`;})()}`;
   const f=d.finanzas;
   const perLbl={hoy:'Hoy',semana:'Últimos 7 días',mes:'Este mes'}[d.periodo]||'';
   const verFin=puede('ver_utilidad')||ES_ADMIN;
@@ -3299,15 +3299,16 @@ function renderProdKanban(board,cards,editable){
 function prodHoyStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function isoAddDays(iso,n){ const[y,m,d]=iso.split('-').map(Number); const dt=new Date(y,m-1,d+n); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
 function diasEntre(a,b){ const[y1,m1,d1]=a.split('-').map(Number),[y2,m2,d2]=b.split('-').map(Number); return Math.round((new Date(y2,m2-1,d2)-new Date(y1,m1-1,d1))/86400000); }
-function prodSelEstadoHTML(c,editable){ const dis=editable?'':'disabled'; return `<select ${dis} onchange="prodSetEstado('${c.encargo_id}',this.value)" title="Estado">${ENC_ESTS.map(e=>`<option value="${pesc(e)}" ${e===c.estado?'selected':''}>${pesc(e)}</option>`).join('')}</select>`; }
+function prodSelEstadoHTML(c,editable){ const dis=editable?'':'disabled'; return `<select ${dis} onchange="prodSetEstadoCard('${prodKey(c)}',this.value)" title="Estado">${ENC_ESTS.map(e=>`<option value="${pesc(e)}" ${e===c.estado?'selected':''}>${pesc(e)}</option>`).join('')}</select>`; }
 function prodSelRespHTML(c,editable){ const dis=editable?'':'disabled'; return `<select ${dis} onchange="prodSetResp('${c.encargo_id}',this.value)" title="Responsable"><option value="">Sin responsable</option>${PROD_EQUIPO.map(u=>`<option value="${u.id}" ${u.id===c.responsable_id?'selected':''}>${pesc(u.nombre)}</option>`).join('')}</select>`; }
-function prodItemsResumen(c,n){ n=n||2; const its=(c.items||[]).slice(0,n).map(it=>`${it.cantidad?pesc(it.cantidad)+'× ':''}${pesc(it.detalle||'—')}`).join(' · '); return its+((c.items||[]).length>n?' …':''); }
+function prodKey(c){ return c.item_id||c.encargo_id; }
+function prodDetalleCard(c){ return `${c.cantidad?pesc(c.cantidad)+'× ':''}${pesc(c.detalle||'—')}`; }
 function prodEstadoFinal(){ return ENC_ESTS[ENC_ESTS.length-1]; }
 function prodListaRowHTML(c,editable,extraCls){
   return `<div class="plist-row ${c.urgente?'urg':''} ${extraCls||''}">
     <span class="pl-ref" onclick="abrirEditar('${c.pedido_id}')">#${c.ref}·E${c.numero}${c.urgente?' <i class="ti ti-bolt" style="color:var(--red)"></i>':''}</span>
     <span class="pl-cli">${pesc(c.cliente)}</span>
-    <span class="pl-items">${prodItemsResumen(c)||'—'}</span>
+    <span class="pl-items">${prodDetalleCard(c)}</span>
     <span class="pl-est">${prodSelEstadoHTML(c,editable)}</span>
     <span class="pl-resp">${prodSelRespHTML(c,editable)}</span>
     <span class="pl-ent">${c.fecha_entrega?prodEntrega(c):'<span class="pl-sinf">Sin fecha</span>'}</span>
@@ -3360,7 +3361,7 @@ function renderProdCal(el,cards,editable){
     const lst=porDia[iso]||[];
     celdas+=`<div class="pcal-cell ${enMes?'':'fuera'} ${iso===hoy?'hoy':''} ${iso===prodCalSel?'sel':''}" onclick="prodCalDia('${iso}')">
       <div class="pcal-n">${f.getDate()}</div>
-      ${lst.slice(0,3).map(c=>`<div class="pcal-chip" title="#${c.ref} · ${pesc(c.cliente)} · ${pesc(c.estado)}"><span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>#${c.ref} ${pesc(c.cliente)}</div>`).join('')}
+      ${lst.slice(0,3).map(c=>`<div class="pcal-chip" title="#${c.ref} · ${pesc(c.cliente)} · ${prodDetalleCard(c)} · ${pesc(c.estado)}"><span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>#${c.ref} ${pesc((c.detalle||c.cliente))}</div>`).join('')}
       ${lst.length>3?`<div class="pcal-mas">+${lst.length-3} más</div>`:''}
       <div class="pcal-dots">${lst.slice(0,4).map(c=>`<span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>`).join('')}${lst.length>4?`<span class="pcal-mas">+${lst.length-4}</span>`:''}</div>
     </div>`;
@@ -3430,7 +3431,7 @@ function renderProdCrono(el,cards){
   }
   if(sinF.length){
     html+=`<div class="pcal-panel"><div class="msec"><span class="tri"></span>Sin fecha de entrega · ${sinF.length} pedido${sinF.length===1?'':'s'}</div>
-      <div class="plist">${sinF.map(r=>`<div class="plist-row"><span class="pl-ref" onclick="abrirEditar('${r.pedido_id}')">#${r.ref}</span><span class="pl-cli">${pesc(r.cliente)}</span><span class="pl-items">${r.encs.length} encargo${r.encs.length===1?'':'s'}</span><span></span><span></span><span class="pl-sinf">Sin fecha</span></div>`).join('')}</div></div>`;
+      <div class="plist">${sinF.map(r=>`<div class="plist-row"><span class="pl-ref" onclick="abrirEditar('${r.pedido_id}')">#${r.ref}</span><span class="pl-cli">${pesc(r.cliente)}</span><span class="pl-items">${r.encs.length} ítem${r.encs.length===1?'':'es'}</span><span></span><span></span><span class="pl-sinf">Sin fecha</span></div>`).join('')}</div></div>`;
   }
   el.innerHTML=html;
   // En pantallas angostas, enfocar la línea de "hoy" al abrir
@@ -3471,8 +3472,8 @@ function renderProdAgenda(el,cards,editable){
   el.innerHTML=html;
 }
 function prodCardHTMLp(c,editable){
+  const k=prodKey(c);
   const cats=(c.categorias||[]).map(cid=>{const cat=CATS.find(x=>x.id===cid);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
-  const its=(c.items||[]).slice(0,3).map(it=>`${it.cantidad?pesc(it.cantidad)+'× ':''}${pesc(it.detalle||'—')}`).join(' · ')+((c.items||[]).length>3?' …':'');
   const respOpts=`<option value="">Sin responsable</option>`+PROD_EQUIPO.map(u=>`<option value="${u.id}" ${u.id===c.responsable_id?'selected':''}>${pesc(u.nombre)}</option>`).join('');
   const estOpts=ENC_ESTS.map(e=>`<option value="${pesc(e)}" ${e===c.estado?'selected':''}>${pesc(e)}</option>`).join('');
   const dis=editable?'':'disabled';
@@ -3480,30 +3481,30 @@ function prodCardHTMLp(c,editable){
   const av=c.responsable_nombre?`<span class="prod-avatar" title="${pesc(c.responsable_nombre)}">${ini(c.responsable_nombre)}</span>`:'';
   return `<div class="prodx-card ${c.urgente?'urg':''}">
     <div class="pcx-top"><span class="pcx-ref" onclick="abrirEditar('${c.pedido_id}')">#${c.ref} · E${c.numero}</span>${c.urgente?'<span class="pcx-urg" title="Urgente"><i class="ti ti-bolt"></i></span>':''}</div>
-    <div class="pcx-cli">${pesc(c.cliente)}</div>
+    <div class="pcx-cli">${prodDetalleCard(c)}</div>
+    <div class="pcx-items"><i class="ti ti-user" style="font-size:10px"></i> ${pesc(c.cliente)}</div>
     ${cats?`<div class="tags" style="margin:5px 0 0">${cats}</div>`:''}
-    ${its?`<div class="pcx-items">${its}</div>`:''}
     ${prodEntrega(c)}
     <div class="pcx-row">
       ${av}
-      <select class="pcx-resp" ${dis} onchange="prodSetResp('${c.encargo_id}',this.value)" title="Responsable">${respOpts}</select>
+      <select class="pcx-resp" ${dis} onchange="prodSetResp('${c.encargo_id}',this.value)" title="Responsable (del encargo completo)">${respOpts}</select>
     </div>
     <div class="pcx-row">
-      <select class="pcx-est" ${dis} onchange="prodSetEstado('${c.encargo_id}',this.value)" title="Estado de producción" style="flex:1">${estOpts}</select>
-      <button class="pcx-obsbtn ${c.notas_tec?'has':''}" onclick="prodToggleObs('${c.encargo_id}')" title="Observación técnica"><i class="ti ti-note"></i></button>
-      <button class="pcx-obsbtn ${(c.consumos&&c.consumos.length)?'has':''}" onclick="prodToggleStock('${c.encargo_id}')" title="Materiales / Stock"><i class="ti ti-package"></i></button>
+      <select class="pcx-est" ${dis} onchange="prodSetEstadoCard('${k}',this.value)" title="Estado de este ítem" style="flex:1">${estOpts}</select>
+      <button class="pcx-obsbtn ${c.notas_tec?'has':''}" onclick="prodToggleObs('${k}')" title="Observación técnica (del encargo)"><i class="ti ti-note"></i></button>
+      <button class="pcx-obsbtn ${(c.consumos&&c.consumos.length)?'has':''}" onclick="prodToggleStock('${k}')" title="Materiales / Stock (del encargo)"><i class="ti ti-package"></i></button>
     </div>
-    <div class="pcx-obs" id="obs-${c.encargo_id}">
-      <textarea ${dis} id="obstx-${c.encargo_id}" placeholder="Observaciones técnicas para producción…">${pesc(c.notas_tec||'')}</textarea>
-      ${editable?`<div style="display:flex;gap:6px;margin-top:6px"><button class="btn-add-row" style="padding:5px 10px" onclick="prodGuardarObs('${c.encargo_id}')"><i class="ti ti-check"></i> Guardar nota</button></div>`:'<div class="hint">Solo lectura</div>'}
+    <div class="pcx-obs" id="obs-${k}">
+      <textarea ${dis} id="obstx-${k}" placeholder="Observaciones técnicas para producción…">${pesc(c.notas_tec||'')}</textarea>
+      ${editable?`<div style="display:flex;gap:6px;margin-top:6px"><button class="btn-add-row" style="padding:5px 10px" onclick="prodGuardarObs('${c.encargo_id}','${k}')"><i class="ti ti-check"></i> Guardar nota</button></div>`:'<div class="hint">Solo lectura</div>'}
     </div>
-    <div class="pcx-stock" id="stk-${c.encargo_id}">
-      <div class="lbl2">Materiales usados</div>
+    <div class="pcx-stock" id="stk-${k}">
+      <div class="lbl2">Materiales usados (encargo #${c.numero})</div>
       <div class="pcx-stk-list">${prodConsumosHTML(c,puedeConsumir)}</div>
       ${puedeConsumir?`<div class="pcx-stk-add">
-        <select id="stksel-${c.encargo_id}">${prodInvOptions()}</select>
-        <input type="number" id="stkqty-${c.encargo_id}" min="0" step="any" placeholder="Cant">
-        <button onclick="prodConsumir('${c.encargo_id}')" title="Registrar consumo"><i class="ti ti-minus"></i></button>
+        <select id="stksel-${k}">${prodInvOptions()}</select>
+        <input type="number" id="stkqty-${k}" min="0" step="any" placeholder="Cant">
+        <button onclick="prodConsumir('${c.encargo_id}','${k}')" title="Registrar consumo"><i class="ti ti-minus"></i></button>
       </div>`:'<div class="pcx-stk-empty">Solo lectura</div>'}
     </div>
   </div>`;
@@ -3530,53 +3531,60 @@ function prodEntrega(c){
   else{lbl='Entrega '+fd(c.fecha_entrega);col='var(--slate)';}
   return `<div class="pcx-entrega" style="color:${col}"><i class="ti ti-calendar"></i>${lbl}</div>`;
 }
-async function prodSetEstado(encId,estado){
-  const c=PROD_CARDS.find(x=>x.encargo_id===encId);
+async function prodSetEstadoCard(key,estado){
+  const c=PROD_CARDS.find(x=>prodKey(x)===key); if(!c)return;
   const destino=ENC_ESTADOS_FULL.find(e=>e.nombre===estado);
-  if(destino&&c){
+  if(destino){
     if(destino.requiere_responsable&&!c.responsable_id){ toast(`El estado "${estado}" requiere un responsable asignado`,false); renderProduccion(); return; }
     if(destino.requiere_notas&&!(c.notas_tec||'').trim()){ toast(`El estado "${estado}" requiere una observación técnica`,false); renderProduccion(); return; }
   }
-  try{ await api('PUT',`/produccion/encargo/${encId}`,{estado});
-    if(c)c.estado=estado;
+  try{
+    if(c.item_id) await api('PUT',`/produccion/item/${c.item_id}`,{estado});
+    else await api('PUT',`/produccion/encargo/${c.encargo_id}`,{estado});
+    c.estado=estado;
     renderProduccion(); toast('Estado actualizado ✓');
   }catch(e){ toast('Error: '+e.message,false); cargarProduccion(); }
 }
+function prodCardsDeEncargo(encId){ return PROD_CARDS.filter(x=>x.encargo_id===encId); }
 async function prodSetResp(encId,rid){
   try{ await api('PUT',`/produccion/encargo/${encId}`,{responsable_id:rid});
-    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c){c.responsable_id=rid;const u=PROD_EQUIPO.find(x=>x.id===rid);c.responsable_nombre=u?u.nombre:'';}
+    const u=PROD_EQUIPO.find(x=>x.id===rid);
+    prodCardsDeEncargo(encId).forEach(c=>{c.responsable_id=rid;c.responsable_nombre=u?u.nombre:'';});
     renderProduccion(); toast('Responsable actualizado ✓');
   }catch(e){ toast('Error: '+e.message,false); cargarProduccion(); }
 }
-function prodToggleObs(encId){ document.getElementById('obs-'+encId)?.classList.toggle('open'); }
-async function prodGuardarObs(encId){
-  const txt=document.getElementById('obstx-'+encId)?.value||'';
+function prodToggleObs(key){ document.getElementById('obs-'+key)?.classList.toggle('open'); }
+async function prodGuardarObs(encId,key){
+  const txt=document.getElementById('obstx-'+key)?.value||'';
   try{ await api('PUT',`/produccion/encargo/${encId}`,{notas_tec:txt});
-    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c)c.notas_tec=txt;
+    prodCardsDeEncargo(encId).forEach(c=>c.notas_tec=txt);
     renderProduccion(); toast('Observación guardada ✓');
   }catch(e){ toast('Error: '+e.message,false); }
 }
-function prodToggleStock(encId){ document.getElementById('stk-'+encId)?.classList.toggle('open'); }
-function prodReabrirStock(encId){ renderProduccion(); document.getElementById('stk-'+encId)?.classList.add('open'); }
-async function prodConsumir(encId){
-  const sel=document.getElementById('stksel-'+encId), qty=document.getElementById('stkqty-'+encId);
+function prodToggleStock(key){ document.getElementById('stk-'+key)?.classList.toggle('open'); }
+function prodReabrirStock(key){ renderProduccion(); document.getElementById('stk-'+key)?.classList.add('open'); }
+async function prodConsumir(encId,key){
+  const sel=document.getElementById('stksel-'+key), qty=document.getElementById('stkqty-'+key);
   const item_inv_id=sel?.value||''; const cantidad=Number(qty?.value||0);
   if(!item_inv_id){toast('Elige un ítem de inventario',false);return}
   if(!(cantidad>0)){toast('Cantidad inválida',false);return}
   try{
     const r=await api('POST',`/produccion/encargo/${encId}/consumo`,{item_inv_id,cantidad});
-    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c){c.consumos=c.consumos||[];c.consumos.push(r.consumo);}
+    prodCardsDeEncargo(encId).forEach(c=>{c.consumos=c.consumos||[];});
+    const first=prodCardsDeEncargo(encId)[0];
+    if(first){ first.consumos.push(r.consumo); prodCardsDeEncargo(encId).forEach(c=>{if(c!==first)c.consumos=first.consumos;}); }
     const inv=PROD_INV.find(x=>x.id===item_inv_id); if(inv&&r.stock_actual!=null)inv.stock_actual=r.stock_actual;
-    prodReabrirStock(encId); toast('Material descontado ✓');
+    prodReabrirStock(key); toast('Material descontado ✓');
   }catch(e){ toast('Error: '+e.message,false); }
 }
 async function prodQuitarConsumo(consumoId,encId){
   if(!confirm('¿Quitar este consumo y devolver la cantidad al stock?'))return;
   try{
     const r=await api('DELETE',`/produccion/consumo/${consumoId}`);
-    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c)c.consumos=(c.consumos||[]).filter(k=>k.id!==consumoId);
+    const nuevos=(prodCardsDeEncargo(encId)[0]?.consumos||[]).filter(k=>k.id!==consumoId);
+    prodCardsDeEncargo(encId).forEach(c=>c.consumos=nuevos);
     const inv=PROD_INV.find(x=>x.id===r.item_inv_id); if(inv&&inv.stock_actual!=null)inv.stock_actual+=Number(r.stock_restaurado)||0;
-    prodReabrirStock(encId); toast('Consumo revertido ✓');
+    renderProduccion(); toast('Consumo revertido ✓');
   }catch(e){ toast('Error: '+e.message,false); }
 }
 

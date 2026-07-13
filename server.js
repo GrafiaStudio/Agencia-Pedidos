@@ -1240,19 +1240,50 @@ app.get('/api/produccion',requiere('ver_produccion'),(req,res)=>{
     const encs=db.prepare('SELECT * FROM encargos WHERE pedido_id=? ORDER BY orden').all(p.id);
     encs.forEach(enc=>{
       resolverCategoriasEncargo(enc);
-      const items=db.prepare('SELECT cantidad,detalle FROM enc_items WHERE encargo_id=? ORDER BY orden').all(enc.id);
+      const items=db.prepare('SELECT id,cantidad,detalle,estado FROM enc_items WHERE encargo_id=? ORDER BY orden').all(enc.id);
       const consumos=db.prepare('SELECT id,item_inv_id,item_nombre,unidad,cantidad FROM consumo_inventario WHERE encargo_id=? AND workspace_id=? ORDER BY creado').all(enc.id,req.wsId);
-      tarjetas.push({
+      const base={
         pedido_id:p.id, ref:p.ref, cliente:p.nombre, tel:p.tel||'', urgente:!!p.urgente,
         fecha_entrega:p.fecha_entrega||'', creado:p.creado,
-        encargo_id:enc.id, numero:enc.numero||1, estado:nombresEstados.includes(enc.estado)?enc.estado:primerEstado,
+        encargo_id:enc.id, numero:enc.numero||1,
         categorias:enc.categorias||[], anotacion:enc.anotacion||'',
         responsable_id:enc.responsable_id||'', responsable_nombre:uById[enc.responsable_id]||'',
-        notas_tec:enc.notas_tec||'', items, consumos
-      });
+        notas_tec:enc.notas_tec||'', consumos
+      };
+      // Una tarjeta por ÍTEM: cada ítem tiene su propio proceso y tiempos.
+      // Si el encargo no tiene ítems, una tarjeta del encargo (compatibilidad).
+      if(items.length){
+        items.forEach(it=>tarjetas.push({...base,
+          item_id:it.id, cantidad:it.cantidad||'', detalle:it.detalle||'',
+          estado:nombresEstados.includes(it.estado)?it.estado:primerEstado
+        }));
+      }else{
+        tarjetas.push({...base, item_id:'', cantidad:'', detalle:enc.anotacion||'',
+          estado:nombresEstados.includes(enc.estado)?enc.estado:primerEstado});
+      }
     });
   });
   res.json(tarjetas);
+});
+// Cambiar el estado de UN ÍTEM desde Producción (cada ítem fluye por separado).
+app.put('/api/produccion/item/:id',requiere('gestionar_produccion'),(req,res)=>{
+  const it=db.prepare(`SELECT i.id,i.estado,i.detalle,i.cantidad,e.numero,e.responsable_id,e.notas_tec,p.cerrado AS p_cerrado,p.id AS p_id
+    FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+    WHERE i.id=? AND e.workspace_id=?`).get(req.params.id,req.wsId);
+  if(!it)return res.status(404).json({error:'Ítem no encontrado'});
+  if(it.p_cerrado)return res.status(409).json({error:'El pedido está cerrado'});
+  const b=req.body||{};
+  if(b.estado===undefined||b.estado===it.estado)return res.json({ok:true,sinCambios:true});
+  const estados=getEstados(req.wsId); const nombresEstados=estados.map(e=>e.nombre);
+  if(!nombresEstados.includes(b.estado))return res.status(400).json({error:'Estado no válido'});
+  const destino=estados.find(e=>e.nombre===b.estado);
+  if(destino.requiere_notas && !(it.notas_tec||'').trim())return res.status(400).json({error:`El estado "${destino.nombre}" requiere una observación técnica en el encargo`});
+  if(destino.requiere_responsable && !it.responsable_id)return res.status(400).json({error:`El estado "${destino.nombre}" requiere un responsable asignado`});
+  db.prepare('UPDATE enc_items SET estado=? WHERE id=?').run(b.estado,it.id);
+  const act=actorDe(req);
+  const det=String(it.detalle||'ítem').slice(0,40);
+  addHist(it.p_id,`Producción · Encargo #${it.numero} · "${det}": ${it.estado||'—'} → ${b.estado}`,req.wsId,act);
+  res.json({ok:true});
 });
 // Equipo asignable (usuarios activos del workspace) — accesible con solo ver_produccion.
 app.get('/api/produccion/equipo',requiere('ver_produccion'),(req,res)=>{
@@ -1399,8 +1430,9 @@ app.get('/api/stats',(req,res)=>{
   const candidatos=db.prepare("SELECT id FROM pedidos WHERE workspace_id=? AND entregado=0 AND cancelado=0 AND es_cotizacion=0").all(wsId);
   let listos=0;
   candidatos.forEach(p=>{
-    const encs=db.prepare('SELECT estado FROM encargos WHERE pedido_id=?').all(p.id);
-    if(encs.length&&encs.every(e=>e.estado===estadoFinal||e.estado==='Entregado'))listos++;
+    const its=db.prepare('SELECT i.estado FROM enc_items i JOIN encargos e ON e.id=i.encargo_id WHERE e.pedido_id=?').all(p.id);
+    const src=its.length?its:db.prepare('SELECT estado FROM encargos WHERE pedido_id=?').all(p.id);
+    if(src.length&&src.every(x=>x.estado===estadoFinal||x.estado==='Entregado'))listos++;
   });
   const clientes=db.prepare('SELECT COUNT(*) as n FROM clientes WHERE workspace_id=?').get(wsId).n;
   const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
@@ -1436,9 +1468,9 @@ app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
   const hasta=db.prepare("SELECT date(?, '+7 days') d").get(hoyStr).d;
   const entregas=db.prepare(`SELECT id,ref,nombre,fecha_entrega,urgente FROM pedidos WHERE workspace_id=? AND archivado=0
     AND entregado=0 AND cancelado=0 AND es_cotizacion=0 AND fecha_entrega>=? AND fecha_entrega<=? ORDER BY fecha_entrega ASC LIMIT 8`).all(wsId,hoyStr,hasta);
-  // Producción: encargos por estado (pedidos activos)
-  const prodRows=db.prepare(`SELECT e.estado, COUNT(*) n FROM encargos e JOIN pedidos p ON p.id=e.pedido_id
-    WHERE e.workspace_id=? AND p.archivado=0 AND p.entregado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.cerrado=0 GROUP BY e.estado`).all(wsId);
+  // Producción: ÍTEMS por estado (pedidos activos) — cada ítem fluye por separado
+  const prodRows=db.prepare(`SELECT i.estado, COUNT(*) n FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+    WHERE e.workspace_id=? AND p.archivado=0 AND p.entregado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.cerrado=0 GROUP BY i.estado`).all(wsId);
   const estadosWs=getEstados(wsId); const nombresEstadosWs=estadosWs.map(e=>e.nombre); const primerEstadoWs=nombresEstadosWs[0]||'Nuevo';
   const produccion={}; nombresEstadosWs.forEach(s=>produccion[s]=0);
   prodRows.forEach(r=>{ const s=nombresEstadosWs.includes(r.estado)?r.estado:primerEstadoWs; produccion[s]=(produccion[s]||0)+r.n; });
