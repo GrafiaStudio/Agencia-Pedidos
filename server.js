@@ -173,7 +173,7 @@ try { db.exec("ALTER TABLE usuarios ADD COLUMN ultimo_login TEXT DEFAULT ''"); }
 const ROL_COLORES=['navy','teal','purple','green','amber','red','pink','slate'];
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','editar_clientes','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','editar_clientes','gestionar_productos','gestionar_inventario','gestionar_eventos','configurar_sistema','administrar_usuarios'];
 function permisosDeRol(rol){
   if(!rol) return {};
   if(rol.es_admin) return {__admin:true};
@@ -369,6 +369,23 @@ db.exec(`CREATE TABLE IF NOT EXISTS costo_lista_items(
   precio TEXT DEFAULT '',
   precio_calc INTEGER DEFAULT 0,
   orden INTEGER DEFAULT 0
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS eventos(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  fecha TEXT NOT NULL,
+  hora TEXT DEFAULT '',
+  tipo TEXT DEFAULT 'recordatorio',
+  notas TEXT DEFAULT '',
+  pedido_id TEXT DEFAULT '',
+  responsable_id TEXT DEFAULT '',
+  hecho INTEGER DEFAULT 0,
+  hecho_por TEXT DEFAULT '',
+  hecho_en TEXT DEFAULT '',
+  creado_por TEXT DEFAULT '',
+  archivado INTEGER DEFAULT 0,
+  creado TEXT DEFAULT(datetime('now','localtime'))
 )`);
 
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
@@ -1871,6 +1888,82 @@ app.put('/api/costo-listas/:id',requiere('gestionar_productos'),(req,res)=>{
 app.delete('/api/costo-listas/:id',requiere('gestionar_productos'),(req,res)=>{
   const r=db.prepare('UPDATE costo_listas SET activo=0 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'Lista no encontrada'});
+  res.json({ok:true});
+});
+
+// ── EVENTOS Y RECORDATORIOS (planificador del trabajo) ──
+const EVENTO_TIPOS=['recordatorio','insumos','entrega','gestion','otro'];
+function eventoPublico(e,uById,pedById){
+  return {id:e.id,titulo:e.titulo,fecha:e.fecha,hora:e.hora||'',tipo:e.tipo||'recordatorio',notas:e.notas||'',
+    pedido_id:e.pedido_id||'',pedido_ref:(pedById&&pedById[e.pedido_id])||'',
+    responsable_id:e.responsable_id||'',responsable_nombre:(uById&&uById[e.responsable_id])||'',
+    hecho:!!e.hecho,hecho_por:e.hecho_por||'',creado_por:e.creado_por||'',creado:e.creado};
+}
+function mapasEventos(wsId){
+  const uById={}; db.prepare('SELECT id,nombre,usuario FROM usuarios WHERE workspace_id=?').all(wsId).forEach(u=>uById[u.id]=u.nombre||u.usuario);
+  const pedById={}; db.prepare('SELECT id,ref FROM pedidos WHERE workspace_id=?').all(wsId).forEach(p=>pedById[p.id]=p.ref);
+  return {uById,pedById};
+}
+function validarEvento(b){
+  if(!String(b.titulo||'').trim())return 'El título es obligatorio';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha||'')))return 'La fecha no es válida';
+  if(b.hora&&!/^\d{2}:\d{2}$/.test(String(b.hora)))return 'La hora no es válida (HH:MM)';
+  if(b.tipo&&!EVENTO_TIPOS.includes(b.tipo))return 'Tipo de evento no válido';
+  return null;
+}
+// Todos los usuarios logueados VEN los eventos; crear/editar/completar requiere gestionar_eventos.
+app.get('/api/eventos',(req,res)=>{
+  const desde=String(req.query.desde||'').match(/^\d{4}-\d{2}-\d{2}$/)?req.query.desde:db.prepare("SELECT date('now','localtime','-60 days') d").get().d;
+  const hasta=String(req.query.hasta||'').match(/^\d{4}-\d{2}-\d{2}$/)?req.query.hasta:db.prepare("SELECT date('now','localtime','+400 days') d").get().d;
+  const filas=db.prepare('SELECT * FROM eventos WHERE workspace_id=? AND archivado=0 AND fecha>=? AND fecha<=? ORDER BY fecha,hora').all(req.wsId,desde,hasta);
+  const {uById,pedById}=mapasEventos(req.wsId);
+  res.json(filas.map(e=>eventoPublico(e,uById,pedById)));
+});
+// Pendientes para la campana: vencidos + hoy, no hechos.
+app.get('/api/eventos/pendientes',(req,res)=>{
+  const hoy=db.prepare("SELECT date('now','localtime') d").get().d;
+  const filas=db.prepare('SELECT * FROM eventos WHERE workspace_id=? AND archivado=0 AND hecho=0 AND fecha<=? ORDER BY fecha,hora').all(req.wsId,hoy);
+  const {uById,pedById}=mapasEventos(req.wsId);
+  res.json({hoy,eventos:filas.map(e=>eventoPublico(e,uById,pedById))});
+});
+app.post('/api/eventos',requiere('gestionar_eventos'),(req,res)=>{
+  try{
+    const b=req.body||{}; const err=validarEvento(b);
+    if(err)return res.status(400).json({error:err});
+    if(b.pedido_id){const p=db.prepare('SELECT id,ref FROM pedidos WHERE id=? AND workspace_id=?').get(b.pedido_id,req.wsId); if(!p)return res.status(400).json({error:'Pedido no válido'});}
+    if(b.responsable_id){const u=db.prepare('SELECT id FROM usuarios WHERE id=? AND workspace_id=?').get(b.responsable_id,req.wsId); if(!u)return res.status(400).json({error:'Responsable no válido'});}
+    const act=actorDe(req); const id=uid();
+    db.prepare(`INSERT INTO eventos(id,workspace_id,titulo,fecha,hora,tipo,notas,pedido_id,responsable_id,creado_por)VALUES(?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,req.wsId,String(b.titulo).trim(),b.fecha,String(b.hora||''),b.tipo||'recordatorio',String(b.notas||''),b.pedido_id||'',b.responsable_id||'',act.nombre||'');
+    if(b.pedido_id)addHist(b.pedido_id,`Evento: "${String(b.titulo).trim()}" para el ${b.fecha}`,req.wsId,act);
+    const {uById,pedById}=mapasEventos(req.wsId);
+    res.json(eventoPublico(db.prepare('SELECT * FROM eventos WHERE id=?').get(id),uById,pedById));
+  }catch(e){logError('POST /api/eventos',e);res.status(500).json({error:e.message})}
+});
+app.put('/api/eventos/:id',requiere('gestionar_eventos'),(req,res)=>{
+  try{
+    const ev=db.prepare('SELECT * FROM eventos WHERE id=? AND workspace_id=? AND archivado=0').get(req.params.id,req.wsId);
+    if(!ev)return res.status(404).json({error:'Evento no encontrado'});
+    const b=req.body||{}; const act=actorDe(req);
+    if(b.hecho!==undefined&&Object.keys(b).length===1){
+      // marcar / desmarcar hecho
+      db.prepare("UPDATE eventos SET hecho=?,hecho_por=?,hecho_en=CASE WHEN ?=1 THEN datetime('now','localtime') ELSE '' END WHERE id=?")
+        .run(b.hecho?1:0,b.hecho?(act.nombre||''):'',b.hecho?1:0,ev.id);
+    }else{
+      const err=validarEvento({...ev,...b});
+      if(err)return res.status(400).json({error:err});
+      if(b.pedido_id){const p=db.prepare('SELECT id FROM pedidos WHERE id=? AND workspace_id=?').get(b.pedido_id,req.wsId); if(!p)return res.status(400).json({error:'Pedido no válido'});}
+      if(b.responsable_id){const u=db.prepare('SELECT id FROM usuarios WHERE id=? AND workspace_id=?').get(b.responsable_id,req.wsId); if(!u)return res.status(400).json({error:'Responsable no válido'});}
+      db.prepare('UPDATE eventos SET titulo=?,fecha=?,hora=?,tipo=?,notas=?,pedido_id=?,responsable_id=? WHERE id=?')
+        .run(String(b.titulo??ev.titulo).trim(),b.fecha??ev.fecha,String(b.hora??ev.hora??''),b.tipo??ev.tipo,String(b.notas??ev.notas??''),b.pedido_id??ev.pedido_id??'',b.responsable_id??ev.responsable_id??'',ev.id);
+    }
+    const {uById,pedById}=mapasEventos(req.wsId);
+    res.json(eventoPublico(db.prepare('SELECT * FROM eventos WHERE id=?').get(ev.id),uById,pedById));
+  }catch(e){logError('PUT /api/eventos/:id',e);res.status(500).json({error:e.message})}
+});
+app.delete('/api/eventos/:id',requiere('gestionar_eventos'),(req,res)=>{
+  const r=db.prepare('UPDATE eventos SET archivado=1 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'Evento no encontrado'});
   res.json({ok:true});
 });
 

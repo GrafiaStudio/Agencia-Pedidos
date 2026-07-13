@@ -323,6 +323,31 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pag-t .n{font-size:10px;background:var(--line-lt);border-radius:10px;padding:1px 8px}
 .pag-t.atra{color:var(--red)}
 .pag-t.hoy{color:var(--teal-dk)}
+/* EVENTOS Y RECORDATORIOS */
+.bell-badge{position:absolute;top:2px;right:2px;min-width:15px;height:15px;border-radius:10px;background:var(--red);color:#fff;font-size:8.5px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.bell-panel{display:none;position:absolute;top:44px;right:0;width:310px;max-height:400px;overflow-y:auto;background:var(--white);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);z-index:90;padding:10px}
+.bell-panel.open{display:block}
+.bell-h{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.bell-item{display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:9px;cursor:pointer;font-size:11px;color:var(--navy)}
+.bell-item:hover{background:#F3F7FC}
+.bell-item .f{margin-left:auto;font-size:9.5px;font-weight:700;flex-shrink:0}
+.bell-vacio{font-size:11px;color:var(--muted);text-align:center;padding:14px 6px}
+.ev-dot{width:22px;height:22px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.ev-row{display:flex;align-items:center;gap:8px;background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;box-shadow:var(--sh);font-size:11.5px;margin-bottom:6px}
+.ev-row.hecho{opacity:.5}
+.ev-row.hecho .ev-tit{text-decoration:line-through}
+.ev-row .ev-tit{font-weight:700;color:var(--navy)}
+.ev-row .ev-sub{font-size:10px;color:var(--muted)}
+.ev-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--teal);flex-shrink:0;cursor:pointer}
+.ev-row .ev-acc{margin-left:auto;display:flex;gap:4px;flex-shrink:0}
+.ev-form{background:#F8FAFD;border:1.5px dashed var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px}
+.ev-form .fila{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.ev-form .fila>*{min-width:0}
+.ev-form input,.ev-form select{font-size:11px}
+.ev-form label{display:block;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.pcal-chip.ev{background:#EFEBFF}
+.btn-ev{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 11px;font-size:10.5px;font-weight:700;color:var(--slate);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.btn-ev:hover{border-color:var(--teal);color:var(--teal-dk)}
 /* CENTRO DE COSTOS (v4.0) */
 .cx-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
 .cx-kpi{background:linear-gradient(180deg,#FDFEFF,#F3F7FC);border-radius:var(--r-lg);padding:12px 15px;box-shadow:var(--sh)}
@@ -979,6 +1004,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="tb-title" id="tb-title">Pedidos</div>
     <div class="tb-right">
       <div class="search-b"><i class="ti ti-search"></i><input type="text" id="s-inp" placeholder="Buscar…" oninput="buscar(this.value)"></div>
+      <div style="position:relative">
+        <button class="icon-btn" id="bell-btn" onclick="toggleCampana(event)" title="Recordatorios"><i class="ti ti-bell"></i><span class="bell-badge" id="bell-badge" style="display:none"></span></button>
+        <div class="bell-panel" id="bell-panel" onclick="event.stopPropagation()"></div>
+      </div>
       <button class="icon-btn" data-perm="gestionar_productos" onclick="showView('productos')"><i class="ti ti-box"></i></button>
       <button class="icon-btn" data-perm="configurar_sistema" onclick="showView('configuracion')"><i class="ti ti-settings"></i></button>
       <button class="icon-btn" data-perm="ver_registros" onclick="abrirExp()"><i class="ti ti-download"></i></button>
@@ -2016,7 +2045,7 @@ function showCfgTab(tab){
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
 let USUARIOS=[], ROLES=[], nuevoUsrTmp=null, nuevoRolTmp=null;
-const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_dashboard:'Ver Dashboard ejecutivo',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',editar_clientes:'Editar clientes (ficha y datos en pedidos)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
+const PERM_LABELS={crear_pedidos:'Crear pedidos',editar_pedidos:'Editar pedidos',reabrir_pedidos:'Reabrir pedidos cerrados',registrar_pagos:'Registrar pagos',ver_costos:'Ver costos (en el pedido)',ver_utilidad:'Ver utilidad',ver_registros:'Ver Registros (contabilidad)',ver_dashboard:'Ver Dashboard ejecutivo',ver_produccion:'Ver Producción',gestionar_produccion:'Gestionar Producción (estados, responsable)',consumir_inventario:'Consumir inventario (desde Producción)',editar_clientes:'Editar clientes (ficha y datos en pedidos)',gestionar_productos:'Gestionar Productos',gestionar_inventario:'Gestionar Inventario',gestionar_eventos:'Crear eventos y recordatorios',configurar_sistema:'Configurar el sistema',administrar_usuarios:'Administrar usuarios y roles'};
 // Mapa vista -> permiso requerido (para el gating de navegación)
 const VIEW_PERM={registros:'ver_registros',dashboard:'ver_dashboard',produccion:'ver_produccion',productos:'gestionar_productos',costos:'ver_costos',inventario:'gestionar_inventario',configuracion:'configurar_sistema'};
 function permCatalogo(){ return (ME&&ME.permisos_catalogo&&ME.permisos_catalogo.length)?ME.permisos_catalogo:Object.keys(PERM_LABELS); }
@@ -3346,10 +3375,110 @@ let PROD_CARDS=[], PROD_EQUIPO=[], PROD_INV=[], prodFUrg=false, prodFMio=false;
 let prodVista=(function(){try{return localStorage.getItem('prodVista')||'kanban'}catch(e){return 'kanban'}})();
 if(!['kanban','lista','calendario','cronograma','agenda'].includes(prodVista))prodVista='kanban';
 let prodCalMes=null, prodCalSel=null, prodListaSort={k:'entrega',d:1};
+/* Eventos y recordatorios */
+let EVENTOS=[], EV_PEND=[], evEdit=null, evTmp=null;
+const EV_META={recordatorio:{l:'Recordatorio',i:'ti-bell',c:'#0BB5B0'},insumos:{l:'Insumos',i:'ti-package',c:'#7B6EF6'},entrega:{l:'Entrega',i:'ti-truck-delivery',c:'#2BAD72'},gestion:{l:'Gestión',i:'ti-clipboard-check',c:'#F5A623'},otro:{l:'Otro',i:'ti-point',c:'#8A9EAD'}};
+async function cargarEventos(){ try{ EVENTOS=await api('GET','/eventos'); }catch(e){ EVENTOS=[]; } }
+async function cargarCampana(avisar){
+  try{
+    const r=await api('GET','/eventos/pendientes');
+    EV_PEND=r.eventos||[];
+    const badge=document.getElementById('bell-badge');
+    if(badge){ badge.textContent=EV_PEND.length; badge.style.display=EV_PEND.length?'flex':'none'; }
+    renderCampana(r.hoy);
+    if(avisar&&EV_PEND.length)toast(`🔔 Tienes ${EV_PEND.length} recordatorio${EV_PEND.length===1?'':'s'} pendiente${EV_PEND.length===1?'':'s'}`);
+  }catch(e){}
+}
+function renderCampana(hoy){
+  const el=document.getElementById('bell-panel'); if(!el)return;
+  if(!EV_PEND.length){ el.innerHTML='<div class="bell-h">Recordatorios</div><div class="bell-vacio">Nada pendiente 🎉</div>'; return; }
+  el.innerHTML='<div class="bell-h">Recordatorios pendientes</div>'+EV_PEND.slice(0,10).map(e=>{
+    const m=EV_META[e.tipo]||EV_META.otro;
+    const venc=e.fecha<hoy;
+    return `<div class="bell-item" onclick="irAEvento('${e.fecha}')">
+      <span class="ev-dot" style="background:${m.c}22;color:${m.c}"><i class="ti ${m.i}"></i></span>
+      <span style="flex:1;min-width:0"><div style="font-weight:700">${pesc(e.titulo)}</div><div class="ev-sub">${e.pedido_ref?'#'+e.pedido_ref+' · ':''}${e.hora||''}</div></span>
+      <span class="f" style="color:${venc?'var(--red)':'var(--teal-dk)'}">${venc?'Vencido':'Hoy'}</span>
+    </div>`;
+  }).join('')+(EV_PEND.length>10?`<div class="bell-vacio">y ${EV_PEND.length-10} más…</div>`:'');
+}
+function toggleCampana(ev){ ev&&ev.stopPropagation(); document.getElementById('bell-panel')?.classList.toggle('open'); }
+document.addEventListener('click',()=>document.getElementById('bell-panel')?.classList.remove('open'));
+function irAEvento(fecha){
+  document.getElementById('bell-panel')?.classList.remove('open');
+  const[y,m]=fecha.split('-').map(Number);
+  prodCalMes=new Date(y,m-1,1); prodCalSel=fecha; prodSetVista('calendario'); showView('produccion');
+}
+function evNuevo(fecha){ evEdit='__nuevo'; evTmp={titulo:'',fecha:fecha||prodHoyStr(),hora:'',tipo:'recordatorio',pedido_id:'',responsable_id:'',notas:''}; renderProduccion(); requestAnimationFrame(()=>document.getElementById('ev-tit')?.focus()); }
+function evEditar(id){ const e=EVENTOS.find(x=>x.id===id); if(!e)return; evEdit=id; evTmp={titulo:e.titulo,fecha:e.fecha,hora:e.hora,tipo:e.tipo,pedido_id:e.pedido_id,responsable_id:e.responsable_id,notas:e.notas}; renderProduccion(); }
+function evCancelar(){ evEdit=null; evTmp=null; renderProduccion(); }
+function evSet(k,v){ if(evTmp)evTmp[k]=v; }
+async function evGuardar(){
+  if(!evTmp||!evTmp.titulo.trim()){ toast('Escribe el título del evento',false); return; }
+  try{
+    if(evEdit==='__nuevo')await api('POST','/eventos',evTmp);
+    else await api('PUT','/eventos/'+evEdit,evTmp);
+    evEdit=null; evTmp=null;
+    await cargarEventos(); await cargarCampana();
+    renderProduccion(); toast('Evento guardado ✓');
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+async function evMarcarHecho(id,hecho){
+  try{
+    await api('PUT','/eventos/'+id,{hecho:!!hecho});
+    const e=EVENTOS.find(x=>x.id===id); if(e)e.hecho=!!hecho;
+    await cargarCampana();
+    renderProduccion();
+  }catch(e){ toast('Error: '+e.message,false); renderProduccion(); }
+}
+async function evEliminar(id){
+  if(!confirm('¿Eliminar este evento?'))return;
+  try{ await api('DELETE','/eventos/'+id); await cargarEventos(); await cargarCampana(); renderProduccion(); }
+  catch(e){ toast('Error: '+e.message,false); }
+}
+function evRowHTML(e,puedeEv){
+  const m=EV_META[e.tipo]||EV_META.otro;
+  return `<div class="ev-row ${e.hecho?'hecho':''}">
+    <input type="checkbox" ${e.hecho?'checked':''} ${puedeEv?'':'disabled'} onchange="evMarcarHecho('${e.id}',this.checked)" title="Marcar como hecho">
+    <span class="ev-dot" style="background:${m.c}22;color:${m.c}" title="${m.l}"><i class="ti ${m.i}"></i></span>
+    <span style="flex:1;min-width:0">
+      <div class="ev-tit">${pesc(e.titulo)}${e.hora?` <span class="ev-sub">· ${e.hora}</span>`:''}</div>
+      <div class="ev-sub">${m.l}${e.pedido_ref?` · <a class="cx-link" onclick="abrirEditar('${e.pedido_id}')">#${e.pedido_ref}</a>`:''}${e.responsable_nombre?` · ${pesc(e.responsable_nombre)}`:''}${e.notas?` · ${pesc(e.notas)}`:''}</div>
+    </span>
+    ${puedeEv?`<span class="ev-acc">
+      <button class="pcx-obsbtn" onclick="evEditar('${e.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
+      <button class="pcx-obsbtn" onclick="evEliminar('${e.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>
+    </span>`:''}
+  </div>`;
+}
+function evFormHTML(){
+  const t=evTmp;
+  const peds={}; PROD_CARDS.forEach(c=>peds[c.pedido_id]={ref:c.ref,cliente:c.cliente});
+  const pedOpts='<option value="">Sin pedido</option>'+Object.entries(peds).map(([id,p])=>`<option value="${id}" ${id===t.pedido_id?'selected':''}>#${p.ref} · ${pesc(p.cliente)}</option>`).join('');
+  const respOpts='<option value="">Sin responsable</option>'+PROD_EQUIPO.map(u=>`<option value="${u.id}" ${u.id===t.responsable_id?'selected':''}>${pesc(u.nombre)}</option>`).join('');
+  const tipoOpts=Object.entries(EV_META).map(([k,m])=>`<option value="${k}" ${k===t.tipo?'selected':''}>${m.l}</option>`).join('');
+  return `<div class="ev-form" onclick="event.stopPropagation()">
+    <div class="fila">
+      <div style="flex:2;min-width:160px"><label>Título *</label><input class="item-inp" id="ev-tit" type="text" value="${pesc(t.titulo)}" placeholder="Ej: Me entregan las camisetas" oninput="evSet('titulo',this.value)"></div>
+      <div style="width:120px"><label>Fecha</label><input class="item-inp" type="date" value="${t.fecha}" onchange="evSet('fecha',this.value)"></div>
+      <div style="width:88px"><label>Hora</label><input class="item-inp" type="time" value="${t.hora}" onchange="evSet('hora',this.value)"></div>
+    </div>
+    <div class="fila">
+      <div style="flex:1;min-width:110px"><label>Tipo</label><select onchange="evSet('tipo',this.value)">${tipoOpts}</select></div>
+      <div style="flex:1.4;min-width:150px"><label>Pedido (opcional)</label><select onchange="evSet('pedido_id',this.value)">${pedOpts}</select></div>
+      <div style="flex:1;min-width:130px"><label>Responsable</label><select onchange="evSet('responsable_id',this.value)">${respOpts}</select></div>
+    </div>
+    <div class="fila"><div style="flex:1"><label>Notas</label><input class="item-inp" type="text" value="${pesc(t.notas)}" placeholder="Detalle opcional…" oninput="evSet('notas',this.value)"></div></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="pill" onclick="evCancelar()">Cancelar</button>
+      <button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="evGuardar()"><i class="ti ti-check"></i> Guardar evento</button>
+    </div>
+  </div>`;
+}
 function pesc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 async function cargarProduccion(){
   try{
-    const [cards,equipo,inv]=await Promise.all([api('GET','/produccion'),api('GET','/produccion/equipo'),api('GET','/inventario-items').catch(()=>[])]);
+    const [cards,equipo,inv]=await Promise.all([api('GET','/produccion'),api('GET','/produccion/equipo'),api('GET','/inventario-items').catch(()=>[]),cargarEventos()]);
     PROD_CARDS=cards||[]; PROD_EQUIPO=equipo||[]; PROD_INV=inv||[];
   }catch(e){ PROD_CARDS=[];PROD_EQUIPO=[];PROD_INV=[]; toast('Error cargando producción: '+e.message,false); }
   const rs=document.getElementById('prod-f-resp');
@@ -3477,6 +3606,7 @@ function renderProdCal(el,cards,editable){
   const hoy=prodHoyStr();
   const porDia={}, sinFecha=[];
   cards.forEach(c=>{ if(c.fecha_entrega)(porDia[c.fecha_entrega]=porDia[c.fecha_entrega]||[]).push(c); else sinFecha.push(c); });
+  const evPorDia={}; EVENTOS.forEach(e=>{(evPorDia[e.fecha]=evPorDia[e.fecha]||[]).push(e);});
   const inicio=(new Date(y,m,1).getDay()+6)%7; // lunes=0
   const diasMes=new Date(y,m+1,0).getDate();
   const totalCeldas=Math.ceil((inicio+diasMes)/7)*7;
@@ -3486,27 +3616,42 @@ function renderProdCal(el,cards,editable){
     const iso=f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0');
     const enMes=f.getMonth()===m;
     const lst=porDia[iso]||[];
+    const evs=evPorDia[iso]||[];
+    const chipsEv=evs.map(e=>{const m=EV_META[e.tipo]||EV_META.otro;return `<div class="pcal-chip ev ${e.hecho?'hecho':''}" title="${pesc(e.titulo)}"><i class="ti ${m.i}" style="color:${m.c};font-size:9px"></i>${e.hecho?'<s>':''}${pesc(e.titulo)}${e.hecho?'</s>':''}</div>`;});
+    const chipsPed=lst.map(c=>`<div class="pcal-chip" title="#${c.ref} · ${pesc(c.cliente)} · ${prodDetalleCard(c)} · ${pesc(c.estado)}"><span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>#${c.ref} ${pesc((c.detalle||c.cliente))}</div>`);
+    const chips=[...chipsEv,...chipsPed];
+    const totalDia=evs.length+lst.length;
+    const dotsEv=evs.slice(0,2).map(e=>{const m=EV_META[e.tipo]||EV_META.otro;return `<span class="dot" style="background:${m.c};border-radius:2px"></span>`;});
+    const dotsPed=lst.slice(0,3).map(c=>`<span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>`);
     celdas+=`<div class="pcal-cell ${enMes?'':'fuera'} ${iso===hoy?'hoy':''} ${iso===prodCalSel?'sel':''}" onclick="prodCalDia('${iso}')">
       <div class="pcal-n">${f.getDate()}</div>
-      ${lst.slice(0,3).map(c=>`<div class="pcal-chip" title="#${c.ref} · ${pesc(c.cliente)} · ${prodDetalleCard(c)} · ${pesc(c.estado)}"><span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>#${c.ref} ${pesc((c.detalle||c.cliente))}</div>`).join('')}
-      ${lst.length>3?`<div class="pcal-mas">+${lst.length-3} más</div>`:''}
-      <div class="pcal-dots">${lst.slice(0,4).map(c=>`<span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>`).join('')}${lst.length>4?`<span class="pcal-mas">+${lst.length-4}</span>`:''}</div>
+      ${chips.slice(0,3).join('')}
+      ${totalDia>3?`<div class="pcal-mas">+${totalDia-3} más</div>`:''}
+      <div class="pcal-dots">${[...dotsEv,...dotsPed].join('')}${totalDia>5?`<span class="pcal-mas">+${totalDia-5}</span>`:''}</div>
     </div>`;
   }
   const selLst=prodCalSel?(porDia[prodCalSel]||[]):[];
+  const selEvs=prodCalSel?(evPorDia[prodCalSel]||[]):[];
+  const puedeEv=puede('gestionar_eventos');
   el.innerHTML=`
     <div class="pcal-head">
       <button class="pcx-obsbtn" onclick="prodCalNav(-1)" title="Mes anterior"><i class="ti ti-chevron-left"></i></button>
       <div class="pcal-title">${PROD_MESES[m]} ${y}</div>
       <button class="pcx-obsbtn" onclick="prodCalNav(1)" title="Mes siguiente"><i class="ti ti-chevron-right"></i></button>
       <button class="pill" onclick="prodCalHoy()">Hoy</button>
+      ${puedeEv?`<button class="btn-ev" style="margin-left:auto" onclick="evNuevo(prodCalSel||prodHoyStr())"><i class="ti ti-bell-plus"></i> Nuevo evento</button>`:''}
     </div>
+    ${evEdit?evFormHTML():''}
     <div class="pcal-grid">
       ${['lun','mar','mié','jue','vie','sáb','dom'].map(d=>`<div class="pcal-dow">${d}</div>`).join('')}
       ${celdas}
     </div>
-    ${prodCalSel?`<div class="pcal-panel"><div class="msec"><span class="tri"></span>Entregas del ${fd(prodCalSel)} · ${selLst.length||'ninguna'}</div>
-      ${selLst.length?`<div class="plist">${selLst.map(c=>prodListaRowHTML(c,editable)).join('')}</div>`:'<div class="prod-col-empty">Sin entregas ese día</div>'}</div>`:''}
+    ${prodCalSel?`<div class="pcal-panel">
+      <div class="msec" style="display:flex;align-items:center;gap:8px"><span class="tri"></span>${fd(prodCalSel)}${puedeEv?`<button class="btn-ev" style="margin-left:auto" onclick="evNuevo('${prodCalSel}')"><i class="ti ti-bell-plus"></i> Evento este día</button>`:''}</div>
+      ${selEvs.length?`<div style="margin-bottom:10px">${selEvs.map(e=>evRowHTML(e,puedeEv)).join('')}</div>`:''}
+      ${selLst.length?`<div class="cx-sec" style="margin-top:2px">Entregas de pedidos · ${selLst.length}</div><div class="plist">${selLst.map(c=>prodListaRowHTML(c,editable)).join('')}</div>`:''}
+      ${(!selEvs.length&&!selLst.length)?'<div class="prod-col-empty">Nada programado ese día</div>':''}
+    </div>`:''}
     ${sinFecha.length?`<div class="pcal-panel"><div class="msec"><span class="tri"></span>Sin fecha de entrega · ${sinFecha.length}</div>
       <div class="plist">${sinFecha.map(c=>prodListaRowHTML(c,editable)).join('')}</div></div>`:''}
   `;
@@ -3574,20 +3719,24 @@ function renderProdCrono(el,cards){
 function renderProdAgenda(el,cards,editable){
   const hoy=prodHoyStr(), man=isoAddDays(hoy,1), sem=isoAddDays(hoy,7);
   const fin=prodEstadoFinal();
+  const puedeEv=puede('gestionar_eventos');
   const pend=cards.filter(c=>c.estado!==fin);
   const listos=cards.filter(c=>c.estado===fin);
+  const evPend=EVENTOS.filter(e=>!e.hecho);
   const secs=[
-    {t:'Atrasados',cl:'atra',ic:'ti-alert-triangle',lst:pend.filter(c=>c.fecha_entrega&&c.fecha_entrega<hoy)},
-    {t:'Hoy',cl:'hoy',ic:'ti-sun',lst:pend.filter(c=>c.fecha_entrega===hoy)},
-    {t:'Mañana',cl:'',ic:'ti-arrow-big-right-line',lst:pend.filter(c=>c.fecha_entrega===man)},
-    {t:'Esta semana',cl:'',ic:'ti-calendar',lst:pend.filter(c=>c.fecha_entrega>man&&c.fecha_entrega<=sem)},
-    {t:'Más adelante',cl:'',ic:'ti-calendar-plus',lst:pend.filter(c=>c.fecha_entrega>sem)},
-    {t:'Sin fecha',cl:'',ic:'ti-calendar-off',lst:pend.filter(c=>!c.fecha_entrega)}
+    {t:'Atrasados',cl:'atra',ic:'ti-alert-triangle',lst:pend.filter(c=>c.fecha_entrega&&c.fecha_entrega<hoy),evs:evPend.filter(e=>e.fecha<hoy)},
+    {t:'Hoy',cl:'hoy',ic:'ti-sun',lst:pend.filter(c=>c.fecha_entrega===hoy),evs:evPend.filter(e=>e.fecha===hoy)},
+    {t:'Mañana',cl:'',ic:'ti-arrow-big-right-line',lst:pend.filter(c=>c.fecha_entrega===man),evs:evPend.filter(e=>e.fecha===man)},
+    {t:'Esta semana',cl:'',ic:'ti-calendar',lst:pend.filter(c=>c.fecha_entrega>man&&c.fecha_entrega<=sem),evs:evPend.filter(e=>e.fecha>man&&e.fecha<=sem)},
+    {t:'Más adelante',cl:'',ic:'ti-calendar-plus',lst:pend.filter(c=>c.fecha_entrega>sem),evs:evPend.filter(e=>e.fecha>sem)},
+    {t:'Sin fecha',cl:'',ic:'ti-calendar-off',lst:pend.filter(c=>!c.fecha_entrega),evs:[]}
   ];
-  let html=secs.filter(s=>s.lst.length).map(s=>`
+  let html=(evEdit?evFormHTML():'')+(puedeEv?`<div style="margin-bottom:12px${evEdit?';display:none':''}"><button class="btn-ev" onclick="evNuevo()"><i class="ti ti-bell-plus"></i> Nuevo recordatorio</button></div>`:'');
+  html+=secs.filter(s=>s.lst.length||s.evs.length).map(s=>`
     <div class="pag-sec">
-      <div class="pag-t ${s.cl}"><i class="ti ${s.ic}"></i>${s.t}<span class="n">${s.lst.length}</span></div>
-      <div class="plist">${s.lst.map(c=>prodListaRowHTML(c,editable)).join('')}</div>
+      <div class="pag-t ${s.cl}"><i class="ti ${s.ic}"></i>${s.t}<span class="n">${s.lst.length+s.evs.length}</span></div>
+      ${s.evs.map(e=>evRowHTML(e,puedeEv)).join('')}
+      ${s.lst.length?`<div class="plist">${s.lst.map(c=>prodListaRowHTML(c,editable)).join('')}</div>`:''}
     </div>`).join('');
   if(!html)html='<div class="prod-col-empty" style="padding:24px;font-size:12px">🎉 Nada pendiente por hacer</div>';
   if(listos.length){
@@ -6090,6 +6239,7 @@ async function init(){
   try{await cargarEtiquetas()}catch(e){console.warn('Etiquetas:',e.message)}
   try{await cargarEstadosProduccion()}catch(e){console.warn('Estados de producción:',e.message)}
   try{await cargarStats()}catch(e){console.warn('Stats:',e.message)}
+  cargarCampana(true).catch(()=>{});
   try{await cargarPedidos()}catch(e){
     console.warn('Pedidos:',e.message);
     document.getElementById('lista').innerHTML='<div class="empty"><i class="ti ti-plug-x"></i><p>'+e.message+'</p></div>';
