@@ -1394,12 +1394,13 @@ app.get('/api/stats',(req,res)=>{
   const wsId=req.wsId;
   const activos=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
   const urgentes=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
-  // Listo: todos sus encargos en Listo/Entregado y pedido no entregado/cancelado/cotización
+  // Listo: todos sus encargos en la etapa FINAL configurada (legacy 'Entregado' cuenta) y pedido activo
+  const estadosWs=getEstados(wsId); const estadoFinal=estadosWs.length?estadosWs[estadosWs.length-1].nombre:'Listo';
   const candidatos=db.prepare("SELECT id FROM pedidos WHERE workspace_id=? AND entregado=0 AND cancelado=0 AND es_cotizacion=0").all(wsId);
   let listos=0;
   candidatos.forEach(p=>{
     const encs=db.prepare('SELECT estado FROM encargos WHERE pedido_id=?').all(p.id);
-    if(encs.length&&encs.every(e=>e.estado==='Listo'||e.estado==='Entregado'))listos++;
+    if(encs.length&&encs.every(e=>e.estado===estadoFinal||e.estado==='Entregado'))listos++;
   });
   const clientes=db.prepare('SELECT COUNT(*) as n FROM clientes WHERE workspace_id=?').get(wsId).n;
   const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
@@ -1695,6 +1696,7 @@ app.put('/api/encargo-estados/:id',requiere('configurar_sistema'),(req,res)=>{
       .run(b.nombre.trim(),b.color||'#8A9EAD',b.requiere_notas?1:0,b.requiere_responsable?1:0,eid,req.wsId);
     if(nombreAnterior!==b.nombre.trim()){
       db.prepare('UPDATE encargos SET estado=? WHERE workspace_id=? AND estado=?').run(b.nombre.trim(),req.wsId,nombreAnterior);
+      db.prepare('UPDATE enc_items SET estado=? WHERE estado=? AND encargo_id IN (SELECT id FROM encargos WHERE workspace_id=?)').run(b.nombre.trim(),nombreAnterior,req.wsId);
     }
     res.json(getEstados(req.wsId).find(e=>e.id===eid));
   }catch(e){logError('PUT /api/encargo-estados/:id',e);res.status(500).json({error:e.message})}

@@ -1726,7 +1726,6 @@ async function cargarEtiquetas(){
   }
 }
 let ENC_ESTS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
-const EST_CLS={Nuevo:'es-nuevo',Diseño:'es-diseno','En diseño':'es-diseno',Aprobación:'es-aprobacion',Producción:'es-produccion','En producción':'es-produccion',Listo:'es-listo',Entregado:'es-entregado',Cancelado:'es-cancelado'};
 let ECOL_MAP={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb'};
 let ENC_ESTADOS_FULL=[];
 async function cargarEstadosProduccion(){
@@ -2348,13 +2347,15 @@ function enviarWhatsAppSoporte(){
   window.open(`https://wa.me/${numero}?text=${texto}`,'_blank');
 }
 
-/* Calcular progreso encargos: cada etapa del proceso pesa un % del avance */
-const PROG_PESOS={Nuevo:0,Diseño:25,'En diseño':25,Aprobación:50,Producción:75,'En producción':75,Listo:100,Entregado:100,Cancelado:100};
+/* Calcular progreso encargos: cada etapa configurable pesa proporcional a su posición */
 function calcProg(encs){
   if(!encs)return 0;
   const items=encs.flatMap(e=>e.items||[]);
   if(!items.length)return 0;
-  const total=items.reduce((a,it)=>a+(PROG_PESOS[it.estado||'Nuevo']??0),0);
+  const fin=ENC_ESTS.length-1;
+  if(fin<1)return 0;
+  const peso=s=>{ if(s==='Cancelado')return 100; return estIdx(s)*100/fin; };
+  const total=items.reduce((a,it)=>a+peso(it.estado||''),0);
   return Math.round(total/items.length);
 }
 // Evaluador seguro de expresiones matemáticas para campos de valor monetario
@@ -2743,27 +2744,35 @@ async function cargarStats(){
 
 /* ══ FILTROS ══ */
 function renderFiltros(){
-  const ops=[{id:'todos',l:'Todos'},{id:'Nuevo',l:'Nuevo'},{id:'Diseño',l:'Diseño'},{id:'Aprobación',l:'Aprobación'},{id:'Producción',l:'Producción'},{id:'Listo',l:'Listo'}];
-  document.getElementById('filtros').innerHTML=ops.map(o=>`<button class="pill${filtroAct===o.id?' active':''}" onclick="setFiltro('${o.id}')">${o.l}</button>`).join('');
+  // Pills de proceso dinámicas (estados configurables) — onclick por índice para no interpolar texto libre
+  const pills=[`<button class="pill${filtroAct==='todos'?' active':''}" onclick="setFiltro('todos')">Todos</button>`]
+    .concat(ENC_ESTS.map((e,i)=>`<button class="pill${filtroAct===e?' active':''}" onclick="setFiltro(ENC_ESTS[${i}])">${pesc(e)}</button>`));
+  document.getElementById('filtros').innerHTML=pills.join('');
 }
 async function setFiltro(id){filtroAct=id;busq='';document.getElementById('s-inp').value='';renderFiltros();await cargarPedidos();showView('pedidos')}
 async function filtroRapido(id){filtroAct=id;busq='';renderFiltros();await cargarPedidos();showView('pedidos')}
 function buscar(q){busq=q;filtroAct='todos';renderFiltros();cargarPedidos()}
 
-/* Estado general derivado de los encargos */
+/* Estado general derivado de los encargos — usa los estados configurables (Fase 4.1) */
+const EST_ALIAS={'En diseño':'Diseño','En producción':'Producción'};
+function estIdx(s){
+  let i=ENC_ESTS.indexOf(s);
+  if(i<0)i=ENC_ESTS.indexOf(EST_ALIAS[s]||'');
+  if(i<0&&s==='Entregado')i=ENC_ESTS.length-1; // dato legacy: cuenta como etapa final
+  return i<0?0:i;
+}
 function estadoGeneral(p){
   if(p.cancelado)return'Cancelado';
   if(p.cerrado)return'Cerrado';
   if(p.entregado)return'Entregado';
   if(p.es_cotizacion)return'Cotización';
+  const fin=ENC_ESTS.length-1;
+  if(fin<0)return'Nuevo';
   const items=(p.encargos||[]).flatMap(e=>e.items||[]);
-  if(!items.length)return'Nuevo';
-  const ests=items.map(it=>it.estado||'Nuevo');
-  if(ests.every(e=>e==='Listo'||e==='Entregado'))return'Listo';
-  if(ests.some(e=>e==='Producción'||e==='En producción'))return'Producción';
-  if(ests.some(e=>e==='Aprobación'))return'Aprobación';
-  if(ests.some(e=>e==='Diseño'||e==='En diseño'))return'Diseño';
-  return'Nuevo';
+  if(!items.length)return ENC_ESTS[0];
+  const ids=items.map(it=>estIdx(it.estado||''));
+  if(ids.every(i=>i===fin))return ENC_ESTS[fin];
+  return ENC_ESTS[Math.max(...ids.filter(i=>i<fin))];
 }
 
 /* ══ PEDIDOS ══ */
@@ -2777,8 +2786,8 @@ async function cargarPedidos(){
   else p.set('estado','todos');
   if(busq)p.set('q',busq);
   let lista=await api('GET',`/pedidos?${p}`);
-  // Filtros de proceso (cliente)
-  const procesos=['Nuevo','Diseño','Aprobación','Producción','Listo'];
+  // Filtros de proceso (cliente) — estados configurables
+  const procesos=ENC_ESTS;
   if(procesos.includes(filtroAct)){
     lista=lista.filter(x=>!x.entregado&&!x.cancelado&&!x.es_cotizacion&&estadoGeneral(x)===filtroAct);
   } else if(filtroAct==='pendiente'){
@@ -2797,7 +2806,7 @@ async function cargarPedidos(){
 function renderLista(){
   const el=document.getElementById('lista');
   if(!pedidos.length){el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i><p>Sin pedidos aquí</p></div>';return}
-  const EG_COL={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cerrado:'#4A6FA5',Cancelado:'#bbb',Cotización:'#7B6EF6'};
+  const EG_COL=Object.assign({},ECOL_MAP,{Entregado:'#6B7A8D',Cerrado:'#4A6FA5',Cancelado:'#bbb',Cotización:'#7B6EF6'});
   const rows=pedidos.map(p=>{
     const val=p.valor_total||0;
     const eg=estadoGeneral(p);
@@ -2810,7 +2819,7 @@ function renderLista(){
       <td><div class="pt-ref">${isUrg?'<span style="color:var(--red)">⚡</span> ':''}${p.cerrado?'<i class="ti ti-lock" style="color:#4A6FA5;font-size:12px;vertical-align:-1px"></i> ':''}#${p.ref}</div><div class="pt-date">${fd(p.fecha_pedido)}</div></td>
       <td><div class="pt-name">${p.nombre}</div>${p.tel?`<div class="pt-tel">${p.tel}</div>`:''}</td>
       <td><div class="tags" style="margin:0">${tags||'<span style="color:var(--muted);font-size:10px">—</span>'}</div>${nEnc?`<div class="pt-date">${nEnc} ${nEnc===1?'encargo':'encargos'}</div>`:''}</td>
-      <td>${pagoHTML(p)||''}<div style="display:flex;align-items:center;margin-top:4px"><span class="pt-dot" style="background:${egCol}"></span><span style="font-size:11px;font-weight:600;color:var(--slate)">${eg}</span></div></td>
+      <td>${pagoHTML(p)||''}<div style="display:flex;align-items:center;margin-top:4px"><span class="pt-dot" style="background:${egCol}"></span><span style="font-size:11px;font-weight:600;color:var(--slate)">${pesc(eg)}</span></div></td>
       <td>${entregaCell(p)}</td>
       <td class="pt-total">${val?fCOP(val):'—'}</td>
       <td style="text-align:center;color:var(--muted);width:30px"><i class="ti ti-dots-vertical"></i></td>
@@ -2828,7 +2837,7 @@ function renderLista(){
       <div class="pm-nom">${p.nombre}</div>
       ${tags?`<div class="tags" style="margin:4px 0 0">${tags}</div>`:''}
       <div class="pm-foot">
-        <span style="display:inline-flex;align-items:center"><span class="pt-dot" style="background:${egCol}"></span><span style="font-size:10.5px;font-weight:700;color:var(--slate)">${eg}</span></span>
+        <span style="display:inline-flex;align-items:center"><span class="pt-dot" style="background:${egCol}"></span><span style="font-size:10.5px;font-weight:700;color:var(--slate)">${pesc(eg)}</span></span>
         ${pagoHTML(p)||''}
         <span class="pm-ent">${entregaCell(p)}</span>
       </div>
@@ -2857,10 +2866,10 @@ function entregaCell(p){
 function buildEncSummary(encs){
   if(!encs||encs.length<=1)return'';
   const map={};
-  encs.forEach(e=>{const s=e.estado||'Nuevo';map[s]=(map[s]||0)+1});
+  encs.forEach(e=>{const s=e.estado||ENC_ESTS[0]||'Nuevo';map[s]=(map[s]||0)+1});
   return Object.entries(map).map(([s,n])=>{
-    const cls=EST_CLS[s]||'es-nuevo';
-    return`<span class="esc ${cls}">${n} ${pesc(s)}</span>`;
+    const col=ECOL_MAP[s]||ECOL_MAP[EST_ALIAS[s]]||'#8A9EAD';
+    return`<span class="esc" style="color:${col};border:1px solid ${col};background:${col}14">${n} ${pesc(s)}</span>`;
   }).join('');
 }
 
@@ -2878,10 +2887,11 @@ function dashEstadoPed(p){
   if(p.cerrado)return['Cerrado','#4A6FA5'];
   if(p.entregado)return['Entregado','#6B7A8D'];
   if(p.es_cotizacion)return['Cotización','#7B6EF6'];
-  const ests=(p.encargos||[]).map(e=>e.estado||'Nuevo');
-  if(ests.length&&ests.every(e=>e==='Listo'||e==='Entregado'))return['Listo','#2BAD72'];
-  for(const s of['Producción','Aprobación','Diseño']){ if(ests.includes(s))return[s,ECOL_MAP[s]]; }
-  return['Nuevo','#8A9EAD'];
+  const fin=ENC_ESTS.length-1;
+  const ids=(p.encargos||[]).map(e=>estIdx(e.estado||''));
+  if(fin<0||!ids.length)return[ENC_ESTS[0]||'Nuevo',ECOL_MAP[ENC_ESTS[0]]||'#8A9EAD'];
+  const eg=ids.every(i=>i===fin)?ENC_ESTS[fin]:ENC_ESTS[Math.max(...ids.filter(i=>i<fin))];
+  return[eg,ECOL_MAP[eg]||'#8A9EAD'];
 }
 function dashEntregaLbl(f,hoyStr){
   if(!f)return['—','var(--muted)'];
@@ -2915,7 +2925,8 @@ async function cargarDashboard(){
     <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--red-lt);color:var(--red)"><i class="ti ti-bolt"></i></div><div class="num">${k.urgentes}</div><div class="lbl">Urgentes</div>${k.urgentes?'<div class="sub" style="color:var(--red)">requieren atención</div>':''}</div>
     <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--green-lt);color:#1A6B45"><i class="ti ti-truck-delivery"></i></div><div class="num">${k.entregasHoy}</div><div class="lbl">Entregas para hoy</div></div>
     <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--purple-lt);color:var(--purple)"><i class="ti ti-file-invoice"></i></div><div class="num">${k.cotizaciones}</div><div class="lbl">Cotizaciones</div>${k.cotValor?`<div class="sub">Valor: ${fCOP(k.cotValor)}</div>`:''}</div>
-    <div class="dash-kpi" onclick="showView('produccion')" ${puede('ver_produccion')?'':'style="display:none"'}><div class="ico" style="background:#E0F5F4;color:#0BB5B0"><i class="ti ti-tools"></i></div><div class="num">${d.produccion['Producción']||0}</div><div class="lbl">En producción</div><div class="sub">${(d.produccion['Diseño']||0)} diseño · ${(d.produccion['Listo']||0)} listos</div></div>`;
+    ${(()=>{const fin=ENC_ESTS[ENC_ESTS.length-1]||'Listo';const enProceso=Object.entries(d.produccion||{}).reduce((a,[s,n])=>s===fin?a:a+n,0);const listos=d.produccion?d.produccion[fin]||0:0;
+      return `<div class="dash-kpi" onclick="showView('produccion')" ${puede('ver_produccion')?'':'style="display:none"'}><div class="ico" style="background:#E0F5F4;color:#0BB5B0"><i class="ti ti-tools"></i></div><div class="num">${enProceso}</div><div class="lbl">Encargos en proceso</div><div class="sub">${listos} en ${pesc(fin.toLowerCase())}</div></div>`;})()}`;
   const f=d.finanzas;
   const perLbl={hoy:'Hoy',semana:'Últimos 7 días',mes:'Este mes'}[d.periodo]||'';
   const verFin=puede('ver_utilidad')||ES_ADMIN;
@@ -2932,7 +2943,7 @@ async function cargarDashboard(){
   document.getElementById('dash-recientes').innerHTML=(d.recientes||[]).map(p=>{
     const[eg,col]=dashEstadoPed(p);
     const pagP=p.valor_total>0&&p.pagado>=p.valor_total?'<span class="badge b-ok">Pagado</span>':(p.pagado>0?'<span class="badge b-par">Abono</span>':'<span class="badge b-no">Sin pago</span>');
-    return`<div class="dash-row" onclick="abrirEditar('${p.id}')"><span class="rref">#${p.ref}</span><span class="rnom">${pesc(p.nombre)}</span>${pagP}<span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:var(--slate)"><span class="pt-dot" style="background:${col};margin:0"></span>${eg}</span><span class="rval">${p.valor_total?fCOP(p.valor_total):'—'}</span></div>`;
+    return`<div class="dash-row" onclick="abrirEditar('${p.id}')"><span class="rref">#${p.ref}</span><span class="rnom">${pesc(p.nombre)}</span>${pagP}<span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:var(--slate)"><span class="pt-dot" style="background:${col};margin:0"></span>${pesc(eg)}</span><span class="rval">${p.valor_total?fCOP(p.valor_total):'—'}</span></div>`;
   }).join('')||'<div class="dash-empty">Aún no hay pedidos</div>';
   document.getElementById('dash-entregas').innerHTML=(d.entregas||[]).map(p=>{
     const[lbl,col]=dashEntregaLbl(p.fecha_entrega,d.hoy);
@@ -4127,7 +4138,7 @@ function renderItemsHTML(enc){
     <tr>
       <td style="width:62px"><input class="item-inp" type="text" value="${it.cantidad||''}" placeholder="Ej: 3" oninput="setItem('${enc.id}','${it.id}','cantidad',this.value)"><div id="itstock-${it.id}" style="font-size:8px;font-weight:700;color:var(--red);margin-top:2px;display:${stockWarn?'block':'none'}">${stockWarn}</div></td>
       <td><div class="item-line"><div class="ac-wrap" style="flex:1;min-width:120px"><textarea class="item-ta" id="itdet-${it.id}" rows="1" placeholder="Camiseta negra M, full color…" oninput="setItem('${enc.id}','${it.id}','detalle',this.value);autoTA(this);acItem('${enc.id}','${it.id}',this.value)">${it.detalle||''}</textarea><div class="ac-drop" id="it-ac-drop-${it.id}"></div></div>${chips?`<span class="item-chips">${chips}</span>`:''}<div class="item-icons">
-          <button type="button" class="item-icon estado-ic${itemEstAbierto.has(it.id)?' on':''}" style="background:${ECOL_MAP[it.estado||'Nuevo']}22;color:${ECOL_MAP[it.estado||'Nuevo']}" onclick="toggleItemEstado('${enc.id}','${it.id}')" title="Estado: ${it.estado||'Nuevo'}"><i class="ti ti-progress"></i></button>
+          <button type="button" class="item-icon estado-ic${itemEstAbierto.has(it.id)?' on':''}" style="background:${(ECOL_MAP[it.estado]||ECOL_MAP[ENC_ESTS[0]]||'#8A9EAD')}22;color:${ECOL_MAP[it.estado]||ECOL_MAP[ENC_ESTS[0]]||'#8A9EAD'}" onclick="toggleItemEstado('${enc.id}','${it.id}')" title="Estado: ${pesc(it.estado||ENC_ESTS[0]||'Nuevo')}"><i class="ti ti-progress"></i></button>
           ${tieneDetalle?`<button type="button" class="item-icon${abierto?' on':''}" onclick="toggleVarItem('${enc.id}','${it.id}')" title="${it._fichaSel.tipo_precio==='pliego'?'Hoja y extras':'Ver detalle / opciones'}"><i class="ti ti-adjustments-horizontal"></i></button>`:''}
           <button type="button" class="item-icon${itemTagAbierto.has(it.id)?' on':''}" onclick="toggleItemTag('${enc.id}','${it.id}')" title="Etiquetas"><i class="ti ti-tag"></i></button>
           <button type="button" class="item-icon${it.nota?' on':''}${itemNotaAbierto.has(it.id)?' open':''}" onclick="toggleItemNota('${enc.id}','${it.id}')" title="Nota adicional del ítem"><i class="ti ti-note"></i></button>
@@ -4192,7 +4203,7 @@ function setItemEstado(encId,itemId,est){
   renderEncItems(encId);actualizarProgreso();
 }
 function itemEstadoPickerHTML(enc,it){
-  const cur=it.estado||'Nuevo';
+  const cur=it.estado||ENC_ESTS[0]||'Nuevo';
   return `<div class="item-tagpick"><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Estado de este ítem</div><div class="cat-row">${ENC_ESTS.map((s,i)=>`<button type="button" class="cat-btn${cur===s?' sel':''}" style="${cur===s?`border-color:${ECOL_MAP[s]};background:${ECOL_MAP[s]}1e;color:${ECOL_MAP[s]}`:''}" onclick="setItemEstado('${enc.id}','${it.id}',ENC_ESTS[${i}])">${pesc(s)}</button>`).join('')}</div></div>`;
 }
 function autoTA(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'}
@@ -5019,7 +5030,7 @@ function renderProgresoCard(prog){
   if(!el)return;
   const items=fEnc.flatMap(e=>e.items||[]);
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--muted)">Agrega ítems para ver el progreso.</div>';return}
-  const cnt={};items.forEach(it=>{const s=it.estado||'Nuevo';cnt[s]=(cnt[s]||0)+1});
+  const cnt={};items.forEach(it=>{const s=it.estado||ENC_ESTS[0]||'Nuevo';cnt[s]=(cnt[s]||0)+1});
   const filas=ENC_ESTS.map(s=>cnt[s]?`<div class="prog-stage"><span class="prog-dot" style="background:${ECOL_MAP[s]}"></span><span>${pesc(s)}</span><span class="prog-stage-n">${cnt[s]}</span></div>`:'').join('');
   el.innerHTML=`
     <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px"><span style="font-size:26px;font-weight:600;color:var(--teal-dk);line-height:1">${prog}%</span><span style="font-size:10px;color:var(--muted)">${items.length} ítem${items.length!==1?'s':''}</span></div>
