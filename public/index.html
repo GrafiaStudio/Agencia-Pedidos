@@ -1007,6 +1007,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <button class="cfgtab" onclick="showCfgTab('notificaciones')">Notificaciones</button>
         <button class="cfgtab" onclick="showCfgTab('impuestos')">Impuestos</button>
         <button class="cfgtab" onclick="showCfgTab('etiquetas')">Etiquetas</button>
+        <button class="cfgtab" onclick="showCfgTab('estados')">Producción</button>
         <button class="cfgtab" data-perm="administrar_usuarios" onclick="showCfgTab('usuarios')">Usuarios y Roles</button>
       </div>
 
@@ -1092,6 +1093,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px">Cada fila es una <b>Etiqueta</b> (el grupo grande, ej. "Estampados") con su color. El segundo campo son sus <b>Subetiquetas</b> (las que salen dentro de ese grupo, ej. "Camisetas, Vasos, Gorras") — se escriben separadas por coma.</div>
         <div id="etiquetas-lista"></div>
         <button class="btn-add-row" onclick="abrirNuevaEtiqueta()"><i class="ti ti-plus"></i>Agregar etiqueta</button>
+      </div>
+
+      <div id="cfg-estados" class="cfg-panel">
+        <div class="msec"><span class="tri"></span>Estados de producción</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px">Define las columnas del tablero de <b>Producción</b> según el flujo real de tu taller (ej. Nuevo, Diseño, Compra de insumos, Impresión, Empaque, Listo). Usa las flechas para ordenar. <b>Requiere responsable</b> / <b>Requiere notas</b> obligan a completar ese dato antes de mover un encargo a ese estado.</div>
+        <div id="estados-lista"></div>
+        <button class="btn-add-row" onclick="abrirNuevoEstado()"><i class="ti ti-plus"></i>Agregar estado</button>
       </div>
 
       <div id="cfg-usuarios" class="cfg-panel">
@@ -1629,9 +1637,21 @@ async function cargarEtiquetas(){
     console.warn('Etiquetas:',e.message);
   }
 }
-const ENC_ESTS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
+let ENC_ESTS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 const EST_CLS={Nuevo:'es-nuevo',Diseño:'es-diseno','En diseño':'es-diseno',Aprobación:'es-aprobacion',Producción:'es-produccion','En producción':'es-produccion',Listo:'es-listo',Entregado:'es-entregado',Cancelado:'es-cancelado'};
-const ECOL_MAP={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb'};
+let ECOL_MAP={Nuevo:'#8A9EAD',Diseño:'#7B6EF6',Aprobación:'#F5A623',Producción:'#0BB5B0',Listo:'#2BAD72',Entregado:'#6B7A8D',Cancelado:'#bbb'};
+let ENC_ESTADOS_FULL=[];
+async function cargarEstadosProduccion(){
+  try{
+    ENC_ESTADOS_FULL=await api('GET','/encargo-estados');
+    if(ENC_ESTADOS_FULL.length){
+      ENC_ESTS=ENC_ESTADOS_FULL.map(e=>e.nombre);
+      const mapa={Entregado:'#6B7A8D',Cancelado:'#bbb'};
+      ENC_ESTADOS_FULL.forEach(e=>mapa[e.nombre]=e.color);
+      ECOL_MAP=mapa;
+    }
+  }catch(e){ console.warn('Estados de producción:',e.message); }
+}
 
 /* ══ ESTADO ══ */
 let pedidos=[],clientes=[],productos=[];
@@ -1827,9 +1847,10 @@ function showCfgTab(tab){
   document.querySelectorAll('.cfg-panel').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.cfgtab').forEach(x=>x.classList.remove('active'));
   document.getElementById('cfg-'+tab).classList.add('active');
-  ['perfil','preferencias','pedidos','notificaciones','impuestos','etiquetas','usuarios'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.cfgtab')[i].classList.add('active')});
-  document.getElementById('btn-guardar-config').style.display=(tab==='etiquetas'||tab==='usuarios')?'none':'inline-flex';
+  ['perfil','preferencias','pedidos','notificaciones','impuestos','etiquetas','estados','usuarios'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.cfgtab')[i].classList.add('active')});
+  document.getElementById('btn-guardar-config').style.display=(tab==='etiquetas'||tab==='estados'||tab==='usuarios')?'none':'inline-flex';
   if(tab==='etiquetas')renderEtiquetas();
+  if(tab==='estados')renderEstadosProduccion();
   if(tab==='usuarios')renderUsuariosRoles();
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
@@ -2045,6 +2066,72 @@ function renderEtiquetas(){
       <input class="item-inp" style="flex:2;min-width:160px" type="text" value="${c._subsRaw!=null?c._subsRaw:(c.subs||[]).join(', ')}" placeholder="Subetiquetas separadas por coma" oninput="setEtiquetaSubs('${c.id}',this.value)">
       <button class="btn-add-row" style="padding:6px 10px" onclick="guardarEtiqueta('${c.id}')"><i class="ti ti-check"></i></button>
       ${c.id==='_nueva'?'':`<button class="item-del" onclick="eliminarEtiqueta('${c.id}')"><i class="ti ti-trash"></i></button>`}
+    </div>`).join('');
+}
+
+/* ══ ESTADOS DE PRODUCCIÓN (tablero configurable) ══ */
+let estNuevoTmp=null;
+function abrirNuevoEstado(){
+  if(estNuevoTmp)return;
+  estNuevoTmp={id:'_nuevo',nombre:'',color:'#8A9EAD',requiere_notas:false,requiere_responsable:false};
+  renderEstadosProduccion();
+}
+function buscarEst(id){return id==='_nuevo'?estNuevoTmp:ENC_ESTADOS_FULL.find(x=>x.id===id)}
+function setEstadoNombre(id,v){const e=buscarEst(id);if(e)e.nombre=v}
+function setEstadoColor(id,v){const e=buscarEst(id);if(e){e.color=v;renderEstadosProduccion()}}
+function setEstadoFlag(id,campo,v){const e=buscarEst(id);if(e)e[campo]=v}
+async function guardarEstado(id){
+  const e=buscarEst(id); if(!e)return;
+  if(!e.nombre||!e.nombre.trim()){toast('Ingresa un nombre',false);return}
+  try{
+    if(id==='_nuevo'){
+      await api('POST','/encargo-estados',{nombre:e.nombre.trim(),color:e.color,requiere_notas:!!e.requiere_notas,requiere_responsable:!!e.requiere_responsable});
+      estNuevoTmp=null;
+    }else{
+      await api('PUT',`/encargo-estados/${id}`,{nombre:e.nombre.trim(),color:e.color,requiere_notas:!!e.requiere_notas,requiere_responsable:!!e.requiere_responsable});
+    }
+    await cargarEstadosProduccion();
+    renderEstadosProduccion();
+    toast('Estado guardado ✓');
+  }catch(err){toast('Error: '+err.message,false)}
+}
+async function eliminarEstado(id){
+  if(!confirm('¿Eliminar este estado? Solo se puede si no hay encargos activos en él.'))return;
+  try{
+    await api('DELETE',`/encargo-estados/${id}`);
+    await cargarEstadosProduccion();
+    renderEstadosProduccion();
+    toast('Estado eliminado ✓');
+  }catch(err){toast('Error: '+err.message,false)}
+}
+async function moverEstado(id,dir){
+  const idx=ENC_ESTADOS_FULL.findIndex(x=>x.id===id);
+  const j=idx+dir;
+  if(idx<0||j<0||j>=ENC_ESTADOS_FULL.length)return;
+  const arr=[...ENC_ESTADOS_FULL];
+  [arr[idx],arr[j]]=[arr[j],arr[idx]];
+  ENC_ESTADOS_FULL=arr;
+  renderEstadosProduccion();
+  try{
+    await api('POST','/encargo-estados/reordenar',{orden:arr.map(x=>x.id)});
+    await cargarEstadosProduccion();
+  }catch(err){toast('Error: '+err.message,false); await cargarEstadosProduccion();}
+  renderEstadosProduccion();
+}
+function renderEstadosProduccion(){
+  const filas=estNuevoTmp?[...ENC_ESTADOS_FULL,estNuevoTmp]:ENC_ESTADOS_FULL;
+  document.getElementById('estados-lista').innerHTML=filas.map((e,i)=>`
+    <div class="etq-row" style="display:flex;align-items:center;gap:8px;padding:10px;border:1.5px solid var(--line);border-radius:var(--r);margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:0">
+        <button type="button" ${(e.id==='_nuevo'||i===0)?'disabled':''} onclick="moverEstado('${e.id}',-1)" title="Subir" style="border:none;background:none;cursor:pointer;color:var(--muted);padding:0;line-height:1"><i class="ti ti-chevron-up"></i></button>
+        <button type="button" ${(e.id==='_nuevo'||i===filas.length-1)?'disabled':''} onclick="moverEstado('${e.id}',1)" title="Bajar" style="border:none;background:none;cursor:pointer;color:var(--muted);padding:0;line-height:1"><i class="ti ti-chevron-down"></i></button>
+      </div>
+      <input type="color" value="${e.color}" oninput="setEstadoColor('${e.id}',this.value)" title="Color" style="width:32px;height:32px;border:none;border-radius:50%;cursor:pointer;flex-shrink:0;padding:0">
+      <input class="item-inp" style="flex:1;min-width:120px" type="text" value="${e.nombre}" placeholder="Nombre del estado (ej: Compra de insumos)" oninput="setEstadoNombre('${e.id}',this.value)">
+      <div class="ck-box"><input type="checkbox" id="est-resp-${e.id}" ${e.requiere_responsable?'checked':''} onchange="setEstadoFlag('${e.id}','requiere_responsable',this.checked)"><label for="est-resp-${e.id}">Requiere responsable</label></div>
+      <div class="ck-box"><input type="checkbox" id="est-notas-${e.id}" ${e.requiere_notas?'checked':''} onchange="setEstadoFlag('${e.id}','requiere_notas',this.checked)"><label for="est-notas-${e.id}">Requiere notas</label></div>
+      <button class="btn-add-row" style="padding:6px 10px" onclick="guardarEstado('${e.id}')"><i class="ti ti-check"></i></button>
+      ${e.id==='_nuevo'?'':`<button class="item-del" onclick="eliminarEstado('${e.id}')"><i class="ti ti-trash"></i></button>`}
     </div>`).join('');
 }
 
@@ -2972,8 +3059,14 @@ function prodEntrega(c){
   return `<div class="pcx-entrega" style="color:${col}"><i class="ti ti-calendar"></i>${lbl}</div>`;
 }
 async function prodSetEstado(encId,estado){
+  const c=PROD_CARDS.find(x=>x.encargo_id===encId);
+  const destino=ENC_ESTADOS_FULL.find(e=>e.nombre===estado);
+  if(destino&&c){
+    if(destino.requiere_responsable&&!c.responsable_id){ toast(`El estado "${estado}" requiere un responsable asignado`,false); renderProduccion(); return; }
+    if(destino.requiere_notas&&!(c.notas_tec||'').trim()){ toast(`El estado "${estado}" requiere una observación técnica`,false); renderProduccion(); return; }
+  }
   try{ await api('PUT',`/produccion/encargo/${encId}`,{estado});
-    const c=PROD_CARDS.find(x=>x.encargo_id===encId); if(c)c.estado=estado;
+    if(c)c.estado=estado;
     renderProduccion(); toast('Estado actualizado ✓');
   }catch(e){ toast('Error: '+e.message,false); cargarProduccion(); }
 }
@@ -5388,6 +5481,7 @@ async function init(){
     <div class="sc-mini light"><div class="ico"><i class="ti ti-package"></i></div><div><div class="num">—</div><div class="lbl">Listos para entregar</div></div></div>`;
   try{await cargarConfiguracion()}catch(e){console.warn('Configuración:',e.message)}
   try{await cargarEtiquetas()}catch(e){console.warn('Etiquetas:',e.message)}
+  try{await cargarEstadosProduccion()}catch(e){console.warn('Estados de producción:',e.message)}
   try{await cargarStats()}catch(e){console.warn('Stats:',e.message)}
   try{await cargarPedidos()}catch(e){
     console.warn('Pedidos:',e.message);

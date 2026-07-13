@@ -174,7 +174,6 @@ const ROL_COLORES=['navy','teal','purple','green','amber','red','pink','slate'];
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
 const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','editar_clientes','gestionar_productos','gestionar_inventario','configurar_sistema','administrar_usuarios'];
-const ENC_ESTADOS=['Nuevo','Diseño','Aprobación','Producción','Listo'];
 function permisosDeRol(rol){
   if(!rol) return {};
   if(rol.es_admin) return {__admin:true};
@@ -341,6 +340,16 @@ db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   subs TEXT DEFAULT '[]',
   activo INTEGER DEFAULT 1,
   orden INTEGER DEFAULT 0
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS encargo_estados(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  color TEXT DEFAULT '#8A9EAD',
+  orden INTEGER DEFAULT 0,
+  requiere_notas INTEGER DEFAULT 0,
+  requiere_responsable INTEGER DEFAULT 0,
+  activo INTEGER DEFAULT 1
 )`);
 
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
@@ -1225,6 +1234,7 @@ app.post('/api/pedidos/:id/reabrir',requiere('reabrir_pedidos'),(req,res)=>{
 app.get('/api/produccion',requiere('ver_produccion'),(req,res)=>{
   const peds=db.prepare("SELECT id,ref,nombre,tel,urgente,fecha_entrega,creado FROM pedidos WHERE workspace_id=? AND archivado=0 AND entregado=0 AND cancelado=0 AND es_cotizacion=0 AND cerrado=0 ORDER BY urgente DESC, (fecha_entrega='' OR fecha_entrega IS NULL) ASC, fecha_entrega ASC, creado DESC").all(req.wsId);
   const uById={}; db.prepare('SELECT id,nombre,usuario FROM usuarios WHERE workspace_id=?').all(req.wsId).forEach(u=>uById[u.id]=u.nombre||u.usuario);
+  const estados=getEstados(req.wsId); const nombresEstados=estados.map(e=>e.nombre); const primerEstado=nombresEstados[0]||'Nuevo';
   const tarjetas=[];
   peds.forEach(p=>{
     const encs=db.prepare('SELECT * FROM encargos WHERE pedido_id=? ORDER BY orden').all(p.id);
@@ -1235,7 +1245,7 @@ app.get('/api/produccion',requiere('ver_produccion'),(req,res)=>{
       tarjetas.push({
         pedido_id:p.id, ref:p.ref, cliente:p.nombre, tel:p.tel||'', urgente:!!p.urgente,
         fecha_entrega:p.fecha_entrega||'', creado:p.creado,
-        encargo_id:enc.id, numero:enc.numero||1, estado:ENC_ESTADOS.includes(enc.estado)?enc.estado:'Nuevo',
+        encargo_id:enc.id, numero:enc.numero||1, estado:nombresEstados.includes(enc.estado)?enc.estado:primerEstado,
         categorias:enc.categorias||[], anotacion:enc.anotacion||'',
         responsable_id:enc.responsable_id||'', responsable_nombre:uById[enc.responsable_id]||'',
         notas_tec:enc.notas_tec||'', items, consumos
@@ -1255,7 +1265,14 @@ app.put('/api/produccion/encargo/:id',requiere('gestionar_produccion'),(req,res)
   if(!enc)return res.status(404).json({error:'Encargo no encontrado'});
   if(enc.p_cerrado)return res.status(409).json({error:'El pedido está cerrado'});
   const b=req.body||{}; const act=actorDe(req); const sets=[]; const vals=[]; const logs=[];
-  if(b.estado!==undefined && ENC_ESTADOS.includes(b.estado) && b.estado!==enc.estado){
+  const estados=getEstados(req.wsId); const nombresEstados=estados.map(e=>e.nombre);
+  if(b.estado!==undefined && b.estado!==enc.estado){
+    if(!nombresEstados.includes(b.estado))return res.status(400).json({error:'Estado no válido'});
+    const destino=estados.find(e=>e.nombre===b.estado);
+    const notaFinal=b.notas_tec!==undefined?String(b.notas_tec):(enc.notas_tec||'');
+    const respFinal=b.responsable_id!==undefined?(b.responsable_id||''):(enc.responsable_id||'');
+    if(destino.requiere_notas && !notaFinal.trim())return res.status(400).json({error:`El estado "${destino.nombre}" requiere una observación técnica`});
+    if(destino.requiere_responsable && !respFinal)return res.status(400).json({error:`El estado "${destino.nombre}" requiere un responsable asignado`});
     logs.push(`Producción · Encargo #${enc.numero}: ${enc.estado||'Nuevo'} → ${b.estado}`);
     sets.push('estado=?'); vals.push(b.estado);
   }
@@ -1421,8 +1438,9 @@ app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
   // Producción: encargos por estado (pedidos activos)
   const prodRows=db.prepare(`SELECT e.estado, COUNT(*) n FROM encargos e JOIN pedidos p ON p.id=e.pedido_id
     WHERE e.workspace_id=? AND p.archivado=0 AND p.entregado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.cerrado=0 GROUP BY e.estado`).all(wsId);
-  const produccion={}; ENC_ESTADOS.forEach(s=>produccion[s]=0);
-  prodRows.forEach(r=>{ const s=ENC_ESTADOS.includes(r.estado)?r.estado:'Nuevo'; produccion[s]+=r.n; });
+  const estadosWs=getEstados(wsId); const nombresEstadosWs=estadosWs.map(e=>e.nombre); const primerEstadoWs=nombresEstadosWs[0]||'Nuevo';
+  const produccion={}; nombresEstadosWs.forEach(s=>produccion[s]=0);
+  prodRows.forEach(r=>{ const s=nombresEstadosWs.includes(r.estado)?r.estado:primerEstadoWs; produccion[s]=(produccion[s]||0)+r.n; });
   // Actividad reciente (historial cross-pedidos)
   const actividad=db.prepare(`SELECT h.texto,h.usuario_nombre,h.creado,p.ref FROM historial h JOIN pedidos p ON p.id=h.pedido_id
     WHERE h.workspace_id=? ORDER BY h.creado DESC LIMIT 8`).all(wsId);
@@ -1514,6 +1532,35 @@ function validarEtiqueta(b){
   if(!String(b.nombre||'').trim())errores.push('El nombre de la etiqueta no puede estar vacío');
   if(b.color!==undefined&&!PALETA_ETIQUETAS.includes(b.color))errores.push('Color no válido');
   if(b.subs!==undefined&&(!Array.isArray(b.subs)||b.subs.some(s=>!String(s||'').trim())))errores.push('Las subcategorías no pueden estar vacías');
+  return errores;
+}
+
+// ── ESTADOS DE PRODUCCIÓN (tablero configurable por workspace) ──
+const ESTADOS_DEFAULT=[
+  {nombre:'Nuevo',color:'#8A9EAD',requiere_notas:0,requiere_responsable:0},
+  {nombre:'Diseño',color:'#7B6EF6',requiere_notas:0,requiere_responsable:1},
+  {nombre:'Aprobación',color:'#F5A623',requiere_notas:0,requiere_responsable:1},
+  {nombre:'Producción',color:'#0BB5B0',requiere_notas:0,requiere_responsable:1},
+  {nombre:'Listo',color:'#2BAD72',requiere_notas:0,requiere_responsable:0},
+];
+function sembrarEstados(wsId){
+  ESTADOS_DEFAULT.forEach((e,i)=>{
+    db.prepare('INSERT INTO encargo_estados(id,workspace_id,nombre,color,orden,requiere_notas,requiere_responsable,activo)VALUES(?,?,?,?,?,?,?,1)')
+      .run(uid(),wsId,e.nombre,e.color,i,e.requiere_notas,e.requiere_responsable);
+  });
+}
+function getEstados(wsId){
+  let filas=db.prepare('SELECT * FROM encargo_estados WHERE workspace_id=? AND activo=1 ORDER BY orden').all(wsId);
+  if(!filas.length){
+    sembrarEstados(wsId);
+    filas=db.prepare('SELECT * FROM encargo_estados WHERE workspace_id=? AND activo=1 ORDER BY orden').all(wsId);
+  }
+  return filas.map(f=>({id:f.id,nombre:f.nombre,color:f.color,orden:f.orden,requiere_notas:!!f.requiere_notas,requiere_responsable:!!f.requiere_responsable}));
+}
+function validarEstado(b){
+  const errores=[];
+  if(!String(b.nombre||'').trim())errores.push('El nombre del estado no puede estar vacío');
+  if(b.color!==undefined&&!/^#[0-9a-fA-F]{6}$/.test(b.color||''))errores.push('Color no válido');
   return errores;
 }
 
@@ -1614,6 +1661,62 @@ app.delete('/api/etiquetas/:id',requiere('configurar_sistema'),(req,res)=>{
   const r=db.prepare('DELETE FROM etiquetas_negocio WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrada'});
   res.json({ok:true});
+});
+
+// ── ESTADOS DE PRODUCCIÓN (tablero configurable) ──
+app.get('/api/encargo-estados',(req,res)=>{
+  res.json(getEstados(req.wsId));
+});
+app.post('/api/encargo-estados',requiere('configurar_sistema'),(req,res)=>{
+  try{
+    const b=req.body;
+    const errores=validarEstado(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    const dup=db.prepare('SELECT id FROM encargo_estados WHERE workspace_id=? AND activo=1 AND lower(nombre)=lower(?)').get(req.wsId,b.nombre.trim());
+    if(dup)return res.status(400).json({error:'Ya existe un estado con ese nombre'});
+    const id=uid();
+    const max=db.prepare('SELECT MAX(orden) AS m FROM encargo_estados WHERE workspace_id=? AND activo=1').get(req.wsId).m;
+    db.prepare('INSERT INTO encargo_estados(id,workspace_id,nombre,color,orden,requiere_notas,requiere_responsable,activo)VALUES(?,?,?,?,?,?,?,1)')
+      .run(id,req.wsId,b.nombre.trim(),b.color||'#8A9EAD',(max??-1)+1,b.requiere_notas?1:0,b.requiere_responsable?1:0);
+    res.json(getEstados(req.wsId).find(e=>e.id===id));
+  }catch(e){logError('POST /api/encargo-estados',e);res.status(500).json({error:e.message})}
+});
+app.put('/api/encargo-estados/:id',requiere('configurar_sistema'),(req,res)=>{
+  try{
+    const b=req.body; const eid=req.params.id;
+    const f=db.prepare('SELECT * FROM encargo_estados WHERE id=? AND workspace_id=?').get(eid,req.wsId);
+    if(!f)return res.status(404).json({error:'No encontrado'});
+    const errores=validarEstado(b);
+    if(errores.length)return res.status(400).json({error:errores.join('. ')});
+    const dup=db.prepare('SELECT id FROM encargo_estados WHERE workspace_id=? AND activo=1 AND lower(nombre)=lower(?) AND id!=?').get(req.wsId,b.nombre.trim(),eid);
+    if(dup)return res.status(400).json({error:'Ya existe un estado con ese nombre'});
+    const nombreAnterior=f.nombre;
+    db.prepare('UPDATE encargo_estados SET nombre=?,color=?,requiere_notas=?,requiere_responsable=? WHERE id=? AND workspace_id=?')
+      .run(b.nombre.trim(),b.color||'#8A9EAD',b.requiere_notas?1:0,b.requiere_responsable?1:0,eid,req.wsId);
+    if(nombreAnterior!==b.nombre.trim()){
+      db.prepare('UPDATE encargos SET estado=? WHERE workspace_id=? AND estado=?').run(b.nombre.trim(),req.wsId,nombreAnterior);
+    }
+    res.json(getEstados(req.wsId).find(e=>e.id===eid));
+  }catch(e){logError('PUT /api/encargo-estados/:id',e);res.status(500).json({error:e.message})}
+});
+app.delete('/api/encargo-estados/:id',requiere('configurar_sistema'),(req,res)=>{
+  const f=db.prepare('SELECT * FROM encargo_estados WHERE id=? AND workspace_id=? AND activo=1').get(req.params.id,req.wsId);
+  if(!f)return res.status(404).json({error:'No encontrado'});
+  const total=db.prepare('SELECT COUNT(*) AS n FROM encargo_estados WHERE workspace_id=? AND activo=1').get(req.wsId).n;
+  if(total<=2)return res.status(400).json({error:'Debe haber al menos 2 estados en el tablero'});
+  const enUso=db.prepare(`SELECT COUNT(*) AS n FROM encargos e JOIN pedidos p ON p.id=e.pedido_id WHERE e.workspace_id=? AND e.estado=? AND p.archivado=0 AND p.entregado=0 AND p.cancelado=0`).get(req.wsId,f.nombre).n;
+  if(enUso>0)return res.status(400).json({error:`No se puede eliminar. Hay ${enUso} encargo(s) activo(s) en "${f.nombre}". Muévelos a otro estado primero.`});
+  db.prepare('UPDATE encargo_estados SET activo=0 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  res.json({ok:true});
+});
+app.post('/api/encargo-estados/reordenar',requiere('configurar_sistema'),(req,res)=>{
+  try{
+    const orden=req.body.orden;
+    if(!Array.isArray(orden))return res.status(400).json({error:'Formato inválido'});
+    const upd=db.prepare('UPDATE encargo_estados SET orden=? WHERE id=? AND workspace_id=?');
+    orden.forEach((id,i)=>upd.run(i,id,req.wsId));
+    res.json(getEstados(req.wsId));
+  }catch(e){logError('POST /api/encargo-estados/reordenar',e);res.status(500).json({error:e.message})}
 });
 
 // ── PRODUCTOS (fichas de producto) ──
