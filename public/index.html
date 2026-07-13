@@ -264,6 +264,66 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pcx-stk-add button:hover{background:var(--navy2)}
 .pcx-stk-add button:disabled{opacity:.4;cursor:default}
 
+/* PRODUCCIÓN — multi-vista (v4.0 Fase 4.2) */
+.prod-vistas{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.prod-vistas::-webkit-scrollbar{display:none}
+.pv-tab{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--white);color:var(--slate);font-size:10px;font-weight:700;cursor:pointer;transition:all .13s;white-space:nowrap;flex-shrink:0}
+.pv-tab i{font-size:12px}
+.pv-tab:hover{border-color:#C9D6E5}
+.pv-tab.active{border-color:var(--navy);background:var(--navy);color:#fff}
+/* Lista */
+.plist{display:flex;flex-direction:column;gap:8px}
+.plist-head{display:grid;grid-template-columns:88px 1.1fr 1.5fr 130px 150px 104px;gap:10px;padding:2px 14px;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.plist-head span{cursor:pointer;user-select:none;white-space:nowrap}
+.plist-head span:hover{color:var(--navy)}
+.plist-row{display:grid;grid-template-columns:88px 1.1fr 1.5fr 130px 150px 104px;gap:10px;align-items:center;background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;box-shadow:var(--sh)}
+.plist-row.urg{border-left:3px solid var(--red)}
+.plist-row.fin{opacity:.55}
+.plist-row select{font-size:10.5px;padding:6px 8px;border-radius:8px;font-weight:600;height:auto;width:100%;min-width:0}
+.pl-ref{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.pl-ref:hover{color:var(--teal-dk);text-decoration:underline}
+.pl-cli{font-size:12px;font-weight:700;color:var(--navy);line-height:1.25;overflow:hidden;text-overflow:ellipsis}
+.pl-items{font-size:10.5px;color:var(--slate);line-height:1.4;overflow:hidden;text-overflow:ellipsis}
+.pl-ent .pcx-entrega{font-size:10px;font-weight:600;display:inline-flex;align-items:center;gap:4px;margin:0}
+.pl-sinf{font-size:10px;color:var(--muted)}
+/* Calendario */
+.pcal-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.pcal-title{font-size:14px;font-weight:800;color:var(--navy);text-transform:capitalize;min-width:150px;text-align:center}
+.pcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.pcal-dow{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;text-align:center;padding:2px 0}
+.pcal-cell{background:var(--white);border:1px solid var(--line);border-radius:10px;min-height:76px;padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;transition:border-color .12s,box-shadow .12s;overflow:hidden}
+.pcal-cell:hover{border-color:var(--teal)}
+.pcal-cell.fuera{opacity:.38;background:transparent}
+.pcal-cell.sel{border-color:var(--navy);box-shadow:var(--sh)}
+.pcal-n{font-size:10px;font-weight:700;color:var(--slate);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pcal-cell.hoy .pcal-n{background:var(--navy);color:#fff}
+.pcal-chip{font-size:9px;font-weight:600;color:var(--navy);background:#F2F6FB;border-radius:6px;padding:2px 5px;display:flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pcal-chip .dot,.pcal-dots .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block}
+.pcal-mas{font-size:8.5px;color:var(--muted);font-weight:700}
+.pcal-dots{display:none;align-items:center;gap:3px;flex-wrap:wrap}
+.pcal-panel{margin-top:14px}
+/* Cronograma */
+.pcrono-wrap{overflow-x:auto;padding-bottom:8px}
+.pcrono-in{min-width:600px}
+.pcrono-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.pcrono-lbl{width:172px;flex-shrink:0;display:flex;align-items:center;gap:6px;overflow:hidden}
+.pcrono-lbl .cli{font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcrono-pg{margin-left:auto;font-size:9px;font-weight:800;color:var(--slate);background:var(--line-lt);border-radius:10px;padding:1px 6px;flex-shrink:0}
+.pcrono-track{position:relative;flex:1;height:26px;background:#F2F6FB;border-radius:8px}
+.pcrono-bar{position:absolute;top:4px;height:18px;border-radius:6px;background:#D7E3F0;overflow:hidden;min-width:8px}
+.pcrono-bar.late{background:var(--red-lt);outline:1.5px solid var(--red)}
+.pcrono-fill{height:100%;background:var(--teal);border-radius:6px 0 0 6px;transition:width .4s ease}
+.pcrono-bar.done .pcrono-fill{background:var(--green)}
+.pcrono-hoy{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--red);opacity:.55;border-radius:2px}
+.pcrono-axis{position:relative;height:16px;font-size:9px;color:var(--muted);font-weight:700}
+.pcrono-axis span{position:absolute;white-space:nowrap}
+/* Agenda */
+.pag-sec{margin-bottom:18px}
+.pag-t{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;display:flex;align-items:center;gap:6px;margin-bottom:8px;color:var(--slate)}
+.pag-t .n{font-size:10px;background:var(--line-lt);border-radius:10px;padding:1px 8px}
+.pag-t.atra{color:var(--red)}
+.pag-t.hoy{color:var(--teal-dk)}
+
 /* DASHBOARD (Fase 6) */
 .dash-hello{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .dash-hi{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
@@ -744,6 +804,22 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
   .prod-col{flex:0 0 86vw;width:86vw;scroll-snap-align:center;max-height:calc(100vh - 235px)}
   .prod-bar{gap:6px}
   .prod-bar select{min-width:0!important;flex:1}
+  /* Producción multi-vista en móvil */
+  .plist-head{display:none}
+  .plist-row{grid-template-columns:1fr 1fr;row-gap:7px;padding:11px 13px}
+  .plist-row .pl-ref{order:1}
+  .plist-row .pl-ent{order:2;justify-self:end}
+  .plist-row .pl-cli{order:3;grid-column:1/-1}
+  .plist-row .pl-items{order:4;grid-column:1/-1}
+  .plist-row .pl-est{order:5;min-width:0}
+  .plist-row .pl-resp{order:6;min-width:0}
+  .pcal-grid{gap:3px}
+  .pcal-cell{min-height:46px;padding:4px;border-radius:8px}
+  .pcal-chip,.pcal-mas{display:none}
+  .pcal-cell .pcal-dots{display:flex}
+  .pcal-cell .pcal-dots .pcal-mas{display:inline}
+  .pcrono-lbl{width:118px}
+  .pcrono-lbl .cli{font-size:10px}
   /* Dashboard */
   .dash-hello{flex-direction:column;align-items:flex-start;gap:8px}
   .dash-hi{font-size:18px}
@@ -977,8 +1053,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div class="empty" id="inv-empty" style="display:none"><i class="ti ti-box-off"></i><p>Aún no hay ítems de inventario — crea el primero</p></div>
     </div>
 
-    <!-- PRODUCCIÓN (Fase 4) -->
+    <!-- PRODUCCIÓN (Fase 4 · multi-vista Fase 4.2) -->
     <div id="view-produccion" class="view">
+      <div class="prod-vistas" id="prod-vistas">
+        <button class="pv-tab active" data-pv="kanban" onclick="prodSetVista('kanban')"><i class="ti ti-layout-kanban"></i>Tablero</button>
+        <button class="pv-tab" data-pv="lista" onclick="prodSetVista('lista')"><i class="ti ti-list"></i>Lista</button>
+        <button class="pv-tab" data-pv="calendario" onclick="prodSetVista('calendario')"><i class="ti ti-calendar-month"></i>Calendario</button>
+        <button class="pv-tab" data-pv="cronograma" onclick="prodSetVista('cronograma')"><i class="ti ti-timeline"></i>Cronograma</button>
+        <button class="pv-tab" data-pv="agenda" onclick="prodSetVista('agenda')"><i class="ti ti-checkup-list"></i>Agenda</button>
+      </div>
       <div class="prod-bar">
         <div class="search-b" style="flex:1;min-width:180px;max-width:280px"><i class="ti ti-search"></i>
           <input type="text" id="prod-q" placeholder="Buscar cliente o #pedido…" oninput="prodFiltrar()" style="max-width:100%">
@@ -986,9 +1069,14 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
         <select id="prod-f-resp" onchange="prodFiltrar()" style="width:auto;min-width:150px"><option value="">Todos los responsables</option></select>
         <select id="prod-f-cat" onchange="prodFiltrar()" style="width:auto;min-width:130px"><option value="">Todas las etiquetas</option></select>
         <button class="pill" id="prod-f-urg" onclick="prodToggleUrg()"><i class="ti ti-bolt"></i> Urgentes</button>
+        <button class="pill" id="prod-f-mio" onclick="prodToggleMio()"><i class="ti ti-user"></i> Míos</button>
         <div style="margin-left:auto;font-size:11px;color:var(--muted)" id="prod-count"></div>
       </div>
       <div id="prod-board" class="prod-board"></div>
+      <div id="prod-lista" style="display:none"></div>
+      <div id="prod-cal" style="display:none"></div>
+      <div id="prod-crono" style="display:none"></div>
+      <div id="prod-agenda" style="display:none"></div>
       <div class="empty" id="prod-empty" style="display:none"><i class="ti ti-tools-off"></i><p>No hay trabajos en producción ahora mismo</p></div>
     </div>
 
@@ -2127,7 +2215,7 @@ function renderEstadosProduccion(){
         <button type="button" ${(e.id==='_nuevo'||i===filas.length-1)?'disabled':''} onclick="moverEstado('${e.id}',1)" title="Bajar" style="border:none;background:none;cursor:pointer;color:var(--muted);padding:0;line-height:1"><i class="ti ti-chevron-down"></i></button>
       </div>
       <input type="color" value="${e.color}" oninput="setEstadoColor('${e.id}',this.value)" title="Color" style="width:32px;height:32px;border:none;border-radius:50%;cursor:pointer;flex-shrink:0;padding:0">
-      <input class="item-inp" style="flex:1;min-width:120px" type="text" value="${e.nombre}" placeholder="Nombre del estado (ej: Compra de insumos)" oninput="setEstadoNombre('${e.id}',this.value)">
+      <input class="item-inp" style="flex:1;min-width:120px" type="text" value="${pesc(e.nombre)}" placeholder="Nombre del estado (ej: Compra de insumos)" oninput="setEstadoNombre('${e.id}',this.value)">
       <div class="ck-box"><input type="checkbox" id="est-resp-${e.id}" ${e.requiere_responsable?'checked':''} onchange="setEstadoFlag('${e.id}','requiere_responsable',this.checked)"><label for="est-resp-${e.id}">Requiere responsable</label></div>
       <div class="ck-box"><input type="checkbox" id="est-notas-${e.id}" ${e.requiere_notas?'checked':''} onchange="setEstadoFlag('${e.id}','requiere_notas',this.checked)"><label for="est-notas-${e.id}">Requiere notas</label></div>
       <button class="btn-add-row" style="padding:6px 10px" onclick="guardarEstado('${e.id}')"><i class="ti ti-check"></i></button>
@@ -2772,7 +2860,7 @@ function buildEncSummary(encs){
   encs.forEach(e=>{const s=e.estado||'Nuevo';map[s]=(map[s]||0)+1});
   return Object.entries(map).map(([s,n])=>{
     const cls=EST_CLS[s]||'es-nuevo';
-    return`<span class="esc ${cls}">${n} ${s}</span>`;
+    return`<span class="esc ${cls}">${n} ${pesc(s)}</span>`;
   }).join('');
 }
 
@@ -2936,7 +3024,7 @@ function dashChartProduccion(prod){
   const total=ENC_ESTS.reduce((a,e)=>a+(prod[e]||0),0);
   el.innerHTML=ENC_ESTS.map(e=>{
     const n=prod[e]||0, pct=total?Math.round(n*100/total):0;
-    return `<div class="hbar-row"><div class="hbar-lbl"><span class="pt-dot" style="background:${ECOL_MAP[e]};margin:0"></span>${e}</div>
+    return `<div class="hbar-row"><div class="hbar-lbl"><span class="pt-dot" style="background:${ECOL_MAP[e]};margin:0"></span>${pesc(e)}</div>
       <div class="hbar-track"><div class="hbar-fill" data-w="${pct}%" style="background:${ECOL_MAP[e]}"></div></div>
       <div class="hbar-n">${n}</div></div>`;
   }).join('')+`<div style="font-size:9px;color:var(--muted);text-align:right;margin-top:2px">${total} encargo${total===1?'':'s'} activos</div>`;
@@ -2947,8 +3035,11 @@ function dashChartProduccion(prod){
   }));
 }
 
-/* ══ PRODUCCIÓN (Fase 4) ══ */
-let PROD_CARDS=[], PROD_EQUIPO=[], PROD_INV=[], prodFUrg=false;
+/* ══ PRODUCCIÓN (Fase 4 · multi-vista Fase 4.2) ══ */
+let PROD_CARDS=[], PROD_EQUIPO=[], PROD_INV=[], prodFUrg=false, prodFMio=false;
+let prodVista=(function(){try{return localStorage.getItem('prodVista')||'kanban'}catch(e){return 'kanban'}})();
+if(!['kanban','lista','calendario','cronograma','agenda'].includes(prodVista))prodVista='kanban';
+let prodCalMes=null, prodCalSel=null, prodListaSort={k:'entrega',d:1};
 function pesc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 async function cargarProduccion(){
   try{
@@ -2962,6 +3053,7 @@ async function cargarProduccion(){
   renderProduccion();
 }
 function prodToggleUrg(){ prodFUrg=!prodFUrg; document.getElementById('prod-f-urg').classList.toggle('active',prodFUrg); renderProduccion(); }
+function prodToggleMio(){ prodFMio=!prodFMio; document.getElementById('prod-f-mio').classList.toggle('active',prodFMio); renderProduccion(); }
 function prodFiltrar(){ renderProduccion(); }
 function prodCardsFiltradas(){
   const q=(document.getElementById('prod-q')?.value||'').trim().toLowerCase();
@@ -2969,6 +3061,7 @@ function prodCardsFiltradas(){
   const cat=document.getElementById('prod-f-cat')?.value||'';
   return PROD_CARDS.filter(c=>{
     if(prodFUrg&&!c.urgente)return false;
+    if(prodFMio&&c.responsable_id!==(ME&&ME.id))return false;
     if(resp==='__none'&&c.responsable_id)return false;
     if(resp&&resp!=='__none'&&c.responsable_id!==resp)return false;
     if(cat&&!(c.categorias||[]).includes(cat))return false;
@@ -2976,19 +3069,44 @@ function prodCardsFiltradas(){
     return true;
   });
 }
+const PROD_VISTAS={kanban:'prod-board',lista:'prod-lista',calendario:'prod-cal',cronograma:'prod-crono',agenda:'prod-agenda'};
+function prodSetVista(v){
+  if(!PROD_VISTAS[v])return;
+  prodVista=v;
+  try{localStorage.setItem('prodVista',v)}catch(e){}
+  renderProduccion();
+}
 function renderProduccion(){
-  const board=document.getElementById('prod-board');
+  document.querySelectorAll('#prod-vistas .pv-tab').forEach(b=>b.classList.toggle('active',b.dataset.pv===prodVista));
   const empty=document.getElementById('prod-empty');
-  if(!PROD_CARDS.length){ board.style.display='none'; empty.style.display=''; document.getElementById('prod-count').textContent=''; return; }
+  Object.entries(PROD_VISTAS).forEach(([v,id])=>{
+    const el=document.getElementById(id);
+    if(v!==prodVista){ el.style.display='none'; el.innerHTML=''; }
+  });
+  if(!PROD_CARDS.length){
+    const el=document.getElementById(PROD_VISTAS[prodVista]);
+    el.style.display='none'; el.innerHTML='';
+    empty.style.display=''; document.getElementById('prod-count').textContent='';
+    return;
+  }
+  empty.style.display='none';
   const cards=prodCardsFiltradas();
   document.getElementById('prod-count').textContent = cards.length? `${cards.length} ${cards.length===1?'trabajo':'trabajos'}` : 'Sin resultados';
-  board.style.display='flex'; empty.style.display='none';
   const editable=puede('gestionar_produccion');
+  const el=document.getElementById(PROD_VISTAS[prodVista]);
+  el.style.display='';
+  if(prodVista==='kanban')renderProdKanban(el,cards,editable);
+  else if(prodVista==='lista')renderProdLista(el,cards,editable);
+  else if(prodVista==='calendario')renderProdCal(el,cards,editable);
+  else if(prodVista==='cronograma')renderProdCrono(el,cards);
+  else renderProdAgenda(el,cards,editable);
+}
+function renderProdKanban(board,cards,editable){
   board.innerHTML=ENC_ESTS.map(est=>{
     const col=cards.filter(c=>c.estado===est);
     const cardsHtml=col.length? col.map(c=>prodCardHTMLp(c,editable)).join('') : '<div class="prod-col-empty">—</div>';
     return `<div class="prod-col" data-n="${col.length}">
-      <div class="prod-col-head"><span class="dot" style="background:${ECOL_MAP[est]||'#8A9EAD'}"></span>${est}<span class="cnt">${col.length}</span></div>
+      <div class="prod-col-head"><span class="dot" style="background:${ECOL_MAP[est]||'#8A9EAD'}"></span>${pesc(est)}<span class="cnt">${col.length}</span></div>
       <div class="prod-col-body">${cardsHtml}</div>
     </div>`;
   }).join('');
@@ -2998,11 +3116,186 @@ function renderProduccion(){
     if(first)requestAnimationFrame(()=>{board.scrollLeft=first.offsetLeft-board.offsetLeft;});
   }
 }
+/* ── Helpers multi-vista ── */
+function prodHoyStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function isoAddDays(iso,n){ const[y,m,d]=iso.split('-').map(Number); const dt=new Date(y,m-1,d+n); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function diasEntre(a,b){ const[y1,m1,d1]=a.split('-').map(Number),[y2,m2,d2]=b.split('-').map(Number); return Math.round((new Date(y2,m2-1,d2)-new Date(y1,m1-1,d1))/86400000); }
+function prodSelEstadoHTML(c,editable){ const dis=editable?'':'disabled'; return `<select ${dis} onchange="prodSetEstado('${c.encargo_id}',this.value)" title="Estado">${ENC_ESTS.map(e=>`<option value="${pesc(e)}" ${e===c.estado?'selected':''}>${pesc(e)}</option>`).join('')}</select>`; }
+function prodSelRespHTML(c,editable){ const dis=editable?'':'disabled'; return `<select ${dis} onchange="prodSetResp('${c.encargo_id}',this.value)" title="Responsable"><option value="">Sin responsable</option>${PROD_EQUIPO.map(u=>`<option value="${u.id}" ${u.id===c.responsable_id?'selected':''}>${pesc(u.nombre)}</option>`).join('')}</select>`; }
+function prodItemsResumen(c,n){ n=n||2; const its=(c.items||[]).slice(0,n).map(it=>`${it.cantidad?pesc(it.cantidad)+'× ':''}${pesc(it.detalle||'—')}`).join(' · '); return its+((c.items||[]).length>n?' …':''); }
+function prodEstadoFinal(){ return ENC_ESTS[ENC_ESTS.length-1]; }
+function prodListaRowHTML(c,editable,extraCls){
+  return `<div class="plist-row ${c.urgente?'urg':''} ${extraCls||''}">
+    <span class="pl-ref" onclick="abrirEditar('${c.pedido_id}')">#${c.ref}·E${c.numero}${c.urgente?' <i class="ti ti-bolt" style="color:var(--red)"></i>':''}</span>
+    <span class="pl-cli">${pesc(c.cliente)}</span>
+    <span class="pl-items">${prodItemsResumen(c)||'—'}</span>
+    <span class="pl-est">${prodSelEstadoHTML(c,editable)}</span>
+    <span class="pl-resp">${prodSelRespHTML(c,editable)}</span>
+    <span class="pl-ent">${c.fecha_entrega?prodEntrega(c):'<span class="pl-sinf">Sin fecha</span>'}</span>
+  </div>`;
+}
+/* ── Vista Lista ── */
+function prodListaOrdenar(k){ if(prodListaSort.k===k)prodListaSort.d*=-1; else prodListaSort={k,d:1}; renderProduccion(); }
+function renderProdLista(el,cards,editable){
+  const arr=[...cards];
+  const cmp={
+    ref:(a,b)=>String(a.ref).localeCompare(String(b.ref),undefined,{numeric:true}),
+    cliente:(a,b)=>(a.cliente||'').localeCompare(b.cliente||''),
+    estado:(a,b)=>ENC_ESTS.indexOf(a.estado)-ENC_ESTS.indexOf(b.estado),
+    resp:(a,b)=>(a.responsable_nombre||'￿').localeCompare(b.responsable_nombre||'￿'),
+    entrega:(a,b)=>(a.fecha_entrega||'9999-99-99').localeCompare(b.fecha_entrega||'9999-99-99')
+  };
+  arr.sort((a,b)=>prodListaSort.d*cmp[prodListaSort.k](a,b));
+  const fle=k=>prodListaSort.k===k?(prodListaSort.d>0?' ▲':' ▼'):'';
+  el.innerHTML=`<div class="plist">
+    <div class="plist-head">
+      <span onclick="prodListaOrdenar('ref')">Ref${fle('ref')}</span>
+      <span onclick="prodListaOrdenar('cliente')">Cliente${fle('cliente')}</span>
+      <span style="cursor:default">Ítems</span>
+      <span onclick="prodListaOrdenar('estado')">Estado${fle('estado')}</span>
+      <span onclick="prodListaOrdenar('resp')">Responsable${fle('resp')}</span>
+      <span onclick="prodListaOrdenar('entrega')">Entrega${fle('entrega')}</span>
+    </div>
+    ${arr.map(c=>prodListaRowHTML(c,editable)).join('')||'<div class="prod-col-empty">Sin resultados</div>'}
+  </div>`;
+}
+/* ── Vista Calendario ── */
+const PROD_MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function prodCalNav(d){ prodCalMes=new Date(prodCalMes.getFullYear(),prodCalMes.getMonth()+d,1); renderProduccion(); }
+function prodCalHoy(){ const d=new Date(); prodCalMes=new Date(d.getFullYear(),d.getMonth(),1); prodCalSel=prodHoyStr(); renderProduccion(); }
+function prodCalDia(iso){ prodCalSel=prodCalSel===iso?null:iso; renderProduccion(); }
+function renderProdCal(el,cards,editable){
+  if(!prodCalMes){ const d=new Date(); prodCalMes=new Date(d.getFullYear(),d.getMonth(),1); }
+  const y=prodCalMes.getFullYear(), m=prodCalMes.getMonth();
+  const hoy=prodHoyStr();
+  const porDia={}, sinFecha=[];
+  cards.forEach(c=>{ if(c.fecha_entrega)(porDia[c.fecha_entrega]=porDia[c.fecha_entrega]||[]).push(c); else sinFecha.push(c); });
+  const inicio=(new Date(y,m,1).getDay()+6)%7; // lunes=0
+  const diasMes=new Date(y,m+1,0).getDate();
+  const totalCeldas=Math.ceil((inicio+diasMes)/7)*7;
+  let celdas='';
+  for(let i=0;i<totalCeldas;i++){
+    const f=new Date(y,m,i-inicio+1);
+    const iso=f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0');
+    const enMes=f.getMonth()===m;
+    const lst=porDia[iso]||[];
+    celdas+=`<div class="pcal-cell ${enMes?'':'fuera'} ${iso===hoy?'hoy':''} ${iso===prodCalSel?'sel':''}" onclick="prodCalDia('${iso}')">
+      <div class="pcal-n">${f.getDate()}</div>
+      ${lst.slice(0,3).map(c=>`<div class="pcal-chip" title="#${c.ref} · ${pesc(c.cliente)} · ${pesc(c.estado)}"><span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>#${c.ref} ${pesc(c.cliente)}</div>`).join('')}
+      ${lst.length>3?`<div class="pcal-mas">+${lst.length-3} más</div>`:''}
+      <div class="pcal-dots">${lst.slice(0,4).map(c=>`<span class="dot" style="background:${ECOL_MAP[c.estado]||'#8A9EAD'}"></span>`).join('')}${lst.length>4?`<span class="pcal-mas">+${lst.length-4}</span>`:''}</div>
+    </div>`;
+  }
+  const selLst=prodCalSel?(porDia[prodCalSel]||[]):[];
+  el.innerHTML=`
+    <div class="pcal-head">
+      <button class="pcx-obsbtn" onclick="prodCalNav(-1)" title="Mes anterior"><i class="ti ti-chevron-left"></i></button>
+      <div class="pcal-title">${PROD_MESES[m]} ${y}</div>
+      <button class="pcx-obsbtn" onclick="prodCalNav(1)" title="Mes siguiente"><i class="ti ti-chevron-right"></i></button>
+      <button class="pill" onclick="prodCalHoy()">Hoy</button>
+    </div>
+    <div class="pcal-grid">
+      ${['lun','mar','mié','jue','vie','sáb','dom'].map(d=>`<div class="pcal-dow">${d}</div>`).join('')}
+      ${celdas}
+    </div>
+    ${prodCalSel?`<div class="pcal-panel"><div class="msec"><span class="tri"></span>Entregas del ${fd(prodCalSel)} · ${selLst.length||'ninguna'}</div>
+      ${selLst.length?`<div class="plist">${selLst.map(c=>prodListaRowHTML(c,editable)).join('')}</div>`:'<div class="prod-col-empty">Sin entregas ese día</div>'}</div>`:''}
+    ${sinFecha.length?`<div class="pcal-panel"><div class="msec"><span class="tri"></span>Sin fecha de entrega · ${sinFecha.length}</div>
+      <div class="plist">${sinFecha.map(c=>prodListaRowHTML(c,editable)).join('')}</div></div>`:''}
+  `;
+}
+/* ── Vista Cronograma ── */
+function renderProdCrono(el,cards){
+  const peds={};
+  cards.forEach(c=>{
+    (peds[c.pedido_id]=peds[c.pedido_id]||{pedido_id:c.pedido_id,ref:c.ref,cliente:c.cliente,urgente:c.urgente,creado:c.creado,entrega:c.fecha_entrega,encs:[]}).encs.push(c);
+  });
+  const rows=Object.values(peds);
+  const conF=rows.filter(r=>r.entrega).sort((a,b)=>a.entrega.localeCompare(b.entrega));
+  const sinF=rows.filter(r=>!r.entrega);
+  const fin=prodEstadoFinal();
+  const hoy=prodHoyStr();
+  let html='';
+  if(conF.length){
+    const fechas=[hoy];
+    conF.forEach(r=>{ fechas.push(r.entrega); if(r.creado)fechas.push(String(r.creado).slice(0,10)); });
+    const dMin=isoAddDays(fechas.reduce((a,b)=>a<b?a:b),-2);
+    const dMax=isoAddDays(fechas.reduce((a,b)=>a>b?a:b),2);
+    const span=Math.max(diasEntre(dMin,dMax),1);
+    const pos=iso=>Math.min(100,Math.max(0,diasEntre(dMin,iso)*100/span));
+    const posHoy=pos(hoy);
+    html+=`<div class="pcrono-wrap"><div class="pcrono-in">
+      <div class="pcrono-row"><div class="pcrono-lbl"></div><div class="pcrono-axis" style="flex:1">
+        <span style="left:0">${fd(dMin)}</span>
+        <span style="left:${posHoy}%;transform:translateX(-50%);color:var(--red)">hoy</span>
+        <span style="left:100%;transform:translateX(-100%)">${fd(dMax)}</span>
+      </div></div>
+      ${conF.map(r=>{
+        const ini=r.creado?String(r.creado).slice(0,10):dMin;
+        const left=pos(ini), right=pos(r.entrega);
+        const w=Math.max(right-left,2);
+        const listos=r.encs.filter(c=>c.estado===fin).length, tot=r.encs.length;
+        const pg=tot?Math.round(listos*100/tot):0;
+        const late=r.entrega<hoy&&pg<100;
+        return `<div class="pcrono-row">
+          <div class="pcrono-lbl"><span class="pl-ref" onclick="abrirEditar('${r.pedido_id}')">#${r.ref}</span><span class="cli">${pesc(r.cliente)}</span><span class="pcrono-pg">${listos}/${tot}</span></div>
+          <div class="pcrono-track">
+            <div class="pcrono-bar ${late?'late':''} ${pg===100?'done':''}" style="left:${left}%;width:${w}%" title="#${r.ref} · ${pesc(r.cliente)} · entrega ${fd(r.entrega)} · ${pg}% listo"><div class="pcrono-fill" style="width:${pg}%"></div></div>
+            <div class="pcrono-hoy" style="left:${posHoy}%"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div></div>`;
+  }else{
+    html+='<div class="prod-col-empty" style="padding:20px">Ningún pedido en producción tiene fecha de entrega — el cronograma se dibuja con esas fechas.</div>';
+  }
+  if(sinF.length){
+    html+=`<div class="pcal-panel"><div class="msec"><span class="tri"></span>Sin fecha de entrega · ${sinF.length} pedido${sinF.length===1?'':'s'}</div>
+      <div class="plist">${sinF.map(r=>`<div class="plist-row"><span class="pl-ref" onclick="abrirEditar('${r.pedido_id}')">#${r.ref}</span><span class="pl-cli">${pesc(r.cliente)}</span><span class="pl-items">${r.encs.length} encargo${r.encs.length===1?'':'s'}</span><span></span><span></span><span class="pl-sinf">Sin fecha</span></div>`).join('')}</div></div>`;
+  }
+  el.innerHTML=html;
+  // En pantallas angostas, enfocar la línea de "hoy" al abrir
+  requestAnimationFrame(()=>{
+    const wrap=el.querySelector('.pcrono-wrap');
+    if(wrap&&wrap.scrollWidth>wrap.clientWidth){
+      const hoyEl=wrap.querySelector('.pcrono-hoy');
+      if(hoyEl){ const r=hoyEl.getBoundingClientRect(), wr=wrap.getBoundingClientRect(); wrap.scrollLeft+=r.left-wr.left-wrap.clientWidth*0.55; }
+    }
+  });
+}
+/* ── Vista Agenda ── */
+function renderProdAgenda(el,cards,editable){
+  const hoy=prodHoyStr(), man=isoAddDays(hoy,1), sem=isoAddDays(hoy,7);
+  const fin=prodEstadoFinal();
+  const pend=cards.filter(c=>c.estado!==fin);
+  const listos=cards.filter(c=>c.estado===fin);
+  const secs=[
+    {t:'Atrasados',cl:'atra',ic:'ti-alert-triangle',lst:pend.filter(c=>c.fecha_entrega&&c.fecha_entrega<hoy)},
+    {t:'Hoy',cl:'hoy',ic:'ti-sun',lst:pend.filter(c=>c.fecha_entrega===hoy)},
+    {t:'Mañana',cl:'',ic:'ti-arrow-big-right-line',lst:pend.filter(c=>c.fecha_entrega===man)},
+    {t:'Esta semana',cl:'',ic:'ti-calendar',lst:pend.filter(c=>c.fecha_entrega>man&&c.fecha_entrega<=sem)},
+    {t:'Más adelante',cl:'',ic:'ti-calendar-plus',lst:pend.filter(c=>c.fecha_entrega>sem)},
+    {t:'Sin fecha',cl:'',ic:'ti-calendar-off',lst:pend.filter(c=>!c.fecha_entrega)}
+  ];
+  let html=secs.filter(s=>s.lst.length).map(s=>`
+    <div class="pag-sec">
+      <div class="pag-t ${s.cl}"><i class="ti ${s.ic}"></i>${s.t}<span class="n">${s.lst.length}</span></div>
+      <div class="plist">${s.lst.map(c=>prodListaRowHTML(c,editable)).join('')}</div>
+    </div>`).join('');
+  if(!html)html='<div class="prod-col-empty" style="padding:24px;font-size:12px">🎉 Nada pendiente por hacer</div>';
+  if(listos.length){
+    html+=`<div class="pag-sec">
+      <div class="pag-t"><i class="ti ti-circle-check"></i>En «${pesc(fin)}»<span class="n">${listos.length}</span></div>
+      <div class="plist">${listos.map(c=>prodListaRowHTML(c,editable,'fin')).join('')}</div>
+    </div>`;
+  }
+  el.innerHTML=html;
+}
 function prodCardHTMLp(c,editable){
   const cats=(c.categorias||[]).map(cid=>{const cat=CATS.find(x=>x.id===cid);return cat?`<span class="ttag ${cat.tc}">${cat.label}</span>`:''}).join('');
   const its=(c.items||[]).slice(0,3).map(it=>`${it.cantidad?pesc(it.cantidad)+'× ':''}${pesc(it.detalle||'—')}`).join(' · ')+((c.items||[]).length>3?' …':'');
   const respOpts=`<option value="">Sin responsable</option>`+PROD_EQUIPO.map(u=>`<option value="${u.id}" ${u.id===c.responsable_id?'selected':''}>${pesc(u.nombre)}</option>`).join('');
-  const estOpts=ENC_ESTS.map(e=>`<option value="${e}" ${e===c.estado?'selected':''}>${e}</option>`).join('');
+  const estOpts=ENC_ESTS.map(e=>`<option value="${pesc(e)}" ${e===c.estado?'selected':''}>${pesc(e)}</option>`).join('');
   const dis=editable?'':'disabled';
   const puedeConsumir=puede('consumir_inventario');
   const av=c.responsable_nombre?`<span class="prod-avatar" title="${pesc(c.responsable_nombre)}">${ini(c.responsable_nombre)}</span>`:'';
@@ -3900,7 +4193,7 @@ function setItemEstado(encId,itemId,est){
 }
 function itemEstadoPickerHTML(enc,it){
   const cur=it.estado||'Nuevo';
-  return `<div class="item-tagpick"><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Estado de este ítem</div><div class="cat-row">${ENC_ESTS.map(s=>`<button type="button" class="cat-btn${cur===s?' sel':''}" style="${cur===s?`border-color:${ECOL_MAP[s]};background:${ECOL_MAP[s]}1e;color:${ECOL_MAP[s]}`:''}" onclick="setItemEstado('${enc.id}','${it.id}','${s}')">${s}</button>`).join('')}</div></div>`;
+  return `<div class="item-tagpick"><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Estado de este ítem</div><div class="cat-row">${ENC_ESTS.map((s,i)=>`<button type="button" class="cat-btn${cur===s?' sel':''}" style="${cur===s?`border-color:${ECOL_MAP[s]};background:${ECOL_MAP[s]}1e;color:${ECOL_MAP[s]}`:''}" onclick="setItemEstado('${enc.id}','${it.id}',ENC_ESTS[${i}])">${pesc(s)}</button>`).join('')}</div></div>`;
 }
 function autoTA(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'}
 function renderEncSubcats(id){
@@ -4727,7 +5020,7 @@ function renderProgresoCard(prog){
   const items=fEnc.flatMap(e=>e.items||[]);
   if(!items.length){el.innerHTML='<div style="font-size:11px;color:var(--muted)">Agrega ítems para ver el progreso.</div>';return}
   const cnt={};items.forEach(it=>{const s=it.estado||'Nuevo';cnt[s]=(cnt[s]||0)+1});
-  const filas=ENC_ESTS.map(s=>cnt[s]?`<div class="prog-stage"><span class="prog-dot" style="background:${ECOL_MAP[s]}"></span><span>${s}</span><span class="prog-stage-n">${cnt[s]}</span></div>`:'').join('');
+  const filas=ENC_ESTS.map(s=>cnt[s]?`<div class="prog-stage"><span class="prog-dot" style="background:${ECOL_MAP[s]}"></span><span>${pesc(s)}</span><span class="prog-stage-n">${cnt[s]}</span></div>`:'').join('');
   el.innerHTML=`
     <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px"><span style="font-size:26px;font-weight:600;color:var(--teal-dk);line-height:1">${prog}%</span><span style="font-size:10px;color:var(--muted)">${items.length} ítem${items.length!==1?'s':''}</span></div>
     <div class="prog-bar" style="height:6px"><div class="prog-fill" style="width:${prog}%"></div></div>
