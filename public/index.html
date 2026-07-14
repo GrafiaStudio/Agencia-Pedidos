@@ -395,6 +395,26 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cxl-row{display:flex;gap:6px;align-items:center;margin-bottom:5px}
 .cxl-row .cxl-item-desc{flex:1;min-width:0}
 .cxl-row .cxl-item-precio{width:110px;flex-shrink:0;text-align:right}
+/* B2 · listas multi-columna */
+.cxl-cols{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.cxl-col-chip{display:flex;align-items:center;background:var(--white);border:1px solid var(--line);border-radius:8px;padding:1px 3px}
+.cxl-col-chip .chip-inp{width:88px;border:none;background:transparent;font-size:11px;padding:4px 5px;color:var(--navy)}
+.cxl-col-chip .chip-inp:focus{outline:none}
+.cxl-grid{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin-top:2px}
+.cxl-grid-hd,.cxl-grow{display:flex;gap:6px;align-items:center;padding:4px 7px;min-width:max-content}
+.cxl-grid-hd{background:var(--line-lt);font-size:8.5px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.cxl-grow{border-top:1px solid var(--line-lt)}
+.cxl-g-desc{flex:1 0 150px;min-width:150px}
+.cxl-g-cod{flex:0 0 76px;width:76px}
+.cxl-g-val{flex:0 0 92px;width:92px;text-align:right}
+.cxl-g-x{flex:0 0 24px;width:24px;text-align:center}
+.cxl-grid-hd span{display:inline-block}
+.cxl-vwrap{overflow-x:auto}
+.cxl-vhd,.cxl-vrow{display:flex;gap:6px;align-items:center;min-width:max-content;padding:3px 2px}
+.cxl-vhd{font-size:8.5px;font-weight:800;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--line)}
+.cxl-vrow{border-bottom:1px solid var(--line-lt);font-size:11.5px;color:var(--navy)}
+.cxl-vrow .cxl-g-val{font-weight:700;color:var(--teal-dk)}
+.cxl-cod{font-size:9px;font-weight:800;background:var(--line-lt);color:var(--slate);border-radius:6px;padding:1px 5px}
 .cxl-nota{margin-top:8px;font-size:10.5px;color:var(--slate);background:var(--amber-lt);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:6px}
 .cxl-nota i{color:#9B6500;flex-shrink:0}
 .cx-head .pcx-obsbtn{width:26px;height:26px;font-size:12px}
@@ -1228,7 +1248,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
           <button class="pv-tab active" data-cx="producto" onclick="cxSetTab('producto')"><i class="ti ti-box"></i>Por producto</button>
           <button class="pv-tab" data-cx="proveedor" onclick="cxSetTab('proveedor')"><i class="ti ti-truck"></i>Por proveedor</button>
           <button class="pv-tab" data-cx="categoria" onclick="cxSetTab('categoria')"><i class="ti ti-tags"></i>Por categoría</button>
-          <button class="pv-tab" data-cx="listas" onclick="cxSetTab('listas')"><i class="ti ti-truck-delivery"></i>Listas de proveedores</button>
+          <button class="pv-tab" data-cx="listas" onclick="cxSetTab('listas')"><i class="ti ti-truck-delivery"></i>Listados de costos</button>
         </div>
         <div class="search-b" style="min-width:170px"><i class="ti ti-search"></i><input type="text" id="cx-q" placeholder="Producto, insumo o proveedor…" oninput="renderCentroCostos()"></div>
       </div>
@@ -2977,28 +2997,71 @@ function cxParsearLista(texto){
   return items;
 }
 function cxNum(s){return parseInt(String(s||0).replace(/\D/g,''))||0}
-function cxNuevaLista(){ cxListaEdit='__nueva'; cxListaTmp={proveedor:'',titulo:'',notas:'',items:[]}; renderCentroCostos(); }
-function cxEditarLista(id){ const l=CX_LISTAS.find(x=>x.id===id); if(!l)return; cxListaEdit=id; cxListaTmp={proveedor:l.proveedor,titulo:l.titulo||'',notas:l.notas||'',items:(l.items||[]).map(it=>({descripcion:it.descripcion,precio:String(it.precio_calc||it.precio||'')}))}; renderCentroCostos(); }
+function cxColsDe(l){ return (l.columnas&&l.columnas.length)?l.columnas.slice():['Precio']; }
+function cxNuevaLista(){ cxListaEdit='__nueva'; cxListaTmp={proveedor:'',titulo:'',notas:'',columnas:['Precio'],items:[]}; renderCentroCostos(); }
+function cxEditarLista(id){ const l=CX_LISTAS.find(x=>x.id===id); if(!l)return; cxListaEdit=id;
+  const cols=cxColsDe(l);
+  cxListaTmp={proveedor:l.proveedor,titulo:l.titulo||'',notas:l.notas||'',columnas:cols,
+    items:(l.items||[]).map(it=>{
+      let vals;
+      if(it.valores&&it.valores.length) vals=cols.map((c,ci)=>String((it.valores[ci]&&it.valores[ci].valor!=null?it.valores[ci].valor:it.valores[ci])||''));
+      else vals=cols.map((c,ci)=>ci===0?String(it.precio_calc||it.precio||''):'');
+      return {descripcion:it.descripcion,codigo:it.codigo||'',valores:vals};
+    })};
+  renderCentroCostos();
+}
 function cxCancelarLista(){ cxListaEdit=null; cxListaTmp=null; renderCentroCostos(); }
 function cxTmpSet(k,v){ if(cxListaTmp)cxListaTmp[k]=v; }
 function cxTmpItemSet(i,k,v){ if(cxListaTmp&&cxListaTmp.items[i])cxListaTmp.items[i][k]=v; }
+function cxTmpItemSetVal(i,ci,v){ if(cxListaTmp&&cxListaTmp.items[i]){cxListaTmp.items[i].valores=cxListaTmp.items[i].valores||[];cxListaTmp.items[i].valores[ci]=v;} }
 function cxTmpItemDel(i){ cxListaTmp.items.splice(i,1); renderCentroCostos(); }
-function cxTmpItemAdd(){ cxListaTmp.items.push({descripcion:'',precio:''}); renderCentroCostos(); requestAnimationFrame(()=>{ const rows=document.querySelectorAll('.cxl-item-desc'); rows[rows.length-1]?.focus(); }); }
+function cxTmpItemAdd(){ cxListaTmp.items.push({descripcion:'',codigo:'',valores:(cxListaTmp.columnas||['Precio']).map(()=>'')}); renderCentroCostos(); requestAnimationFrame(()=>{ const rows=document.querySelectorAll('.cxl-item-desc'); rows[rows.length-1]?.focus(); }); }
+function cxTmpColAdd(){ cxListaTmp.columnas=cxListaTmp.columnas||['Precio']; cxListaTmp.columnas.push('Costo '+cxListaTmp.columnas.length); cxListaTmp.items.forEach(it=>{it.valores=it.valores||[];it.valores.push('')}); renderCentroCostos(); }
+function cxTmpColSet(ci,name){ if(cxListaTmp&&cxListaTmp.columnas)cxListaTmp.columnas[ci]=name; }
+function cxTmpColDel(ci){ if(!cxListaTmp||!cxListaTmp.columnas||cxListaTmp.columnas.length<=1)return; cxListaTmp.columnas.splice(ci,1); cxListaTmp.items.forEach(it=>{if(it.valores)it.valores.splice(ci,1)}); renderCentroCostos(); }
 function cxTmpPegar(){
   const txt=document.getElementById('cxl-pega')?.value||'';
-  const items=cxParsearLista(txt);
-  if(!items.length){ toast('No detecté líneas con precio. Formato esperado: "descripción … $precio" por línea.',false); return; }
-  cxListaTmp.items=cxListaTmp.items.filter(it=>(it.descripcion||'').trim()||(String(it.precio)||'').trim()).concat(items);
+  const parse=prodParseTabla(txt);
+  if(!parse||!parse.rows.length){ toast('No detecté filas. Pega desde Excel (columnas) o "descripción → $precio".',false); return; }
+  const esNum=s=>/^\$?\s*[\d][\d.,]*\s*$/.test(String(s||'').trim());
+  const primera=parse.rows[0]||[];
+  const hayHeader=parse.ncols>1&&!esNum(primera[0])&&primera.slice(1).some(c=>c&&!esNum(c));
+  const headers=hayHeader?primera:null;
+  const dataRows=hayHeader?parse.rows.slice(1):parse.rows;
+  const roles=[], colNames=[];
+  for(let i=0;i<parse.ncols;i++){
+    const h=(headers&&headers[i]?String(headers[i]):'').toLowerCase();
+    if(i===0){ roles.push('desc'); }
+    else if(/total|utilidad|margen/.test(h)){ roles.push('ignorar'); }
+    else if(/codigo|código|\bref\b|\bc[oó]d\b/.test(h)&&roles.indexOf('codigo')<0){ roles.push('codigo'); }
+    else if(esNum(dataRows[0]&&dataRows[0][i])||/precio|vr\.?|valor|costo|caucho|m[aá]quina|completo|unitario/.test(h)){ roles.push('precio'); colNames.push(headers?String(headers[i]).trim():('Precio '+(colNames.length+1))); }
+    else if(roles.indexOf('codigo')<0){ roles.push('codigo'); }
+    else { roles.push('precio'); colNames.push(headers?String(headers[i]).trim():('Precio '+(colNames.length+1))); }
+  }
+  if(!colNames.length)colNames.push('Precio');
+  cxListaTmp.columnas=colNames;
+  const descCol=roles.indexOf('desc'), codCol=roles.indexOf('codigo');
+  const nuevos=[];
+  dataRows.forEach(row=>{
+    const desc=descCol>=0?String(row[descCol]||'').trim():'';
+    if(!desc)return;
+    const valores=[]; roles.forEach((r,i)=>{ if(r==='precio')valores.push(prodLimpiaMonto(row[i])); });
+    nuevos.push({descripcion:desc, codigo:codCol>=0?String(row[codCol]||'').trim():'', valores});
+  });
+  if(!nuevos.length){ toast('No detecté filas con descripción.',false); return; }
+  cxListaTmp.items=cxListaTmp.items.filter(it=>(it.descripcion||'').trim()).concat(nuevos);
   renderCentroCostos();
-  toast(items.length+' precios detectados ✓');
+  toast(nuevos.length+' fila'+(nuevos.length===1?'':'s')+' · '+colNames.length+' columna'+(colNames.length===1?'':'s')+' ✓');
 }
 async function cxGuardarLista(){
   const t=cxListaTmp;
   if(!t||!t.proveedor.trim()){ toast('Escribe el nombre del proveedor',false); return; }
-  const items=t.items.filter(it=>(it.descripcion||'').trim());
+  const cols=(t.columnas||['Precio']).map(c=>String(c||'').trim()).filter(Boolean);
+  const items=t.items.filter(it=>(it.descripcion||'').trim()).map(it=>({descripcion:it.descripcion,codigo:it.codigo||'',valores:(it.valores||[]).map(v=>({valor:v}))}));
+  const payload={proveedor:t.proveedor,titulo:t.titulo,notas:t.notas,columnas:cols.length?cols:['Precio'],items};
   try{
-    if(cxListaEdit==='__nueva')await api('POST','/costo-listas',{proveedor:t.proveedor,titulo:t.titulo,notas:t.notas,items});
-    else await api('PUT','/costo-listas/'+cxListaEdit,{proveedor:t.proveedor,titulo:t.titulo,notas:t.notas,items});
+    if(cxListaEdit==='__nueva')await api('POST','/costo-listas',payload);
+    else await api('PUT','/costo-listas/'+cxListaEdit,payload);
     cxListaEdit=null; cxListaTmp=null;
     CX_LISTAS=await api('GET','/costo-listas');
     renderCentroCostos(); toast('Lista guardada ✓');
@@ -3011,32 +3074,35 @@ async function cxEliminarLista(id){
 }
 function cxListaFormHTML(){
   const t=cxListaTmp;
-  const filas=t.items.map((it,i)=>`<div class="cxl-row">
-    <input class="item-inp cxl-item-desc" type="text" value="${pesc(it.descripcion)}" placeholder="Descripción (ej: 10 x 29 cm)" oninput="cxTmpItemSet(${i},'descripcion',this.value)">
-    <input class="item-inp cxl-item-precio" type="text" value="${pesc(String(it.precio))}" placeholder="$" oninput="cxTmpItemSet(${i},'precio',this.value)">
-    <button class="item-del" onclick="cxTmpItemDel(${i})" title="Quitar"><i class="ti ti-x"></i></button>
+  const cols=t.columnas||['Precio'];
+  const colMgr=`<div class="cxl-cols">${cols.map((c,ci)=>`<div class="cxl-col-chip"><input class="chip-inp" type="text" value="${pesc(c)}" placeholder="Columna" oninput="cxTmpColSet(${ci},this.value)">${cols.length>1?`<button class="chip-x" title="Quitar columna" onclick="cxTmpColDel(${ci})"><i class="ti ti-x"></i></button>`:''}</div>`).join('')}<button class="chip-add" onclick="cxTmpColAdd()"><i class="ti ti-plus"></i>Columna de precio</button></div>`;
+  const head=`<div class="cxl-grid-hd"><span class="cxl-g-desc">Descripción</span><span class="cxl-g-cod">Código</span>${cols.map(c=>`<span class="cxl-g-val">${pesc(c||'—')}</span>`).join('')}<span class="cxl-g-x"></span></div>`;
+  const filas=t.items.map((it,i)=>`<div class="cxl-grow">
+    <input class="item-inp cxl-item-desc cxl-g-desc" type="text" value="${pesc(it.descripcion)}" placeholder="Ej: Sello Ecológico 4910" oninput="cxTmpItemSet(${i},'descripcion',this.value)">
+    <input class="item-inp cxl-g-cod" type="text" value="${pesc(it.codigo||'')}" placeholder="—" oninput="cxTmpItemSet(${i},'codigo',this.value)">
+    ${cols.map((c,ci)=>`<input class="item-inp cxl-g-val" type="text" value="${pesc(String((it.valores&&it.valores[ci])||''))}" placeholder="$" oninput="cxTmpItemSetVal(${i},${ci},this.value)">`).join('')}
+    <button class="item-del cxl-g-x" onclick="cxTmpItemDel(${i})" title="Quitar"><i class="ti ti-x"></i></button>
   </div>`).join('');
   return `<div class="cx-card open" onclick="event.stopPropagation()">
     <div class="cx-des" style="border-top:none;padding-top:12px">
       <div class="cxl-form-top">
-        <div style="flex:1;min-width:160px"><label class="cxl-lbl">Proveedor *</label><input class="item-inp" type="text" value="${pesc(t.proveedor)}" placeholder="Ej: YANCA" oninput="cxTmpSet('proveedor',this.value)"></div>
-        <div style="flex:1.4;min-width:180px"><label class="cxl-lbl">Título de la lista</label><input class="item-inp" type="text" value="${pesc(t.titulo)}" placeholder="Ej: Precios Impresión DTF UV" oninput="cxTmpSet('titulo',this.value)"></div>
+        <div style="flex:1.4;min-width:180px"><label class="cxl-lbl">Producto / título de la lista *</label><input class="item-inp" type="text" value="${pesc(t.titulo)}" placeholder="Ej: Sellos Trodat" oninput="cxTmpSet('titulo',this.value)"></div>
+        <div style="flex:1;min-width:150px"><label class="cxl-lbl">Proveedor *</label><input class="item-inp" type="text" value="${pesc(t.proveedor)}" placeholder="Ej: YANCA" oninput="cxTmpSet('proveedor',this.value)"></div>
       </div>
-      <label class="cxl-lbl" style="margin-top:10px">Pegar lista (WhatsApp, Excel, correo…)</label>
-      <textarea id="cxl-pega" class="cxl-pega" placeholder="Pega aquí la lista tal cual te la mandaron, una línea por precio:
-◼️ 5 x 19 cm → $10.000
-◼️ 10 x 29 cm → $20.000
-…y presiona «Detectar precios»"></textarea>
+      <label class="cxl-lbl" style="margin-top:10px">Columnas de precio (Caucho, Máquina, Completo…)</label>
+      ${colMgr}
+      <label class="cxl-lbl" style="margin-top:10px">Pegar desde Excel / WhatsApp</label>
+      <textarea id="cxl-pega" class="cxl-pega" placeholder="Pega la tabla tal cual (copiada de Excel, columnas con tab) o una línea por precio &quot;descripción → \$precio&quot;. La app detecta las columnas de precio y presiona «Detectar tabla»."></textarea>
       <div style="display:flex;gap:8px;margin:8px 0 4px;flex-wrap:wrap">
-        <button class="btn-add-row" onclick="cxTmpPegar()"><i class="ti ti-wand"></i> Detectar precios</button>
+        <button class="btn-add-row" onclick="cxTmpPegar()"><i class="ti ti-wand"></i> Detectar tabla</button>
         <button class="btn-add-row" onclick="cxTmpItemAdd()"><i class="ti ti-plus"></i> Fila manual</button>
       </div>
-      ${filas?`<div class="cx-sec">Precios (${t.items.length})</div>${filas}`:''}
+      ${t.items.length?`<div class="cx-sec">Ítems (${t.items.length})</div><div class="cxl-grid">${head}${filas}</div>`:''}
       <label class="cxl-lbl" style="margin-top:8px">Notas (descuentos, condiciones…)</label>
-      <input class="item-inp" type="text" value="${pesc(t.notas)}" placeholder="Ej: FULL DESCUENTOS A PARTIR DE 2 METROS" oninput="cxTmpSet('notas',this.value)">
+      <input class="item-inp" type="text" value="${pesc(t.notas)}" placeholder="Ej: descuentos a partir de 2 metros" oninput="cxTmpSet('notas',this.value)">
       <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
         <button class="pill" onclick="cxCancelarLista()">Cancelar</button>
-        <button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="cxGuardarLista()"><i class="ti ti-check"></i> Guardar lista</button>
+        <button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="cxGuardarLista()"><i class="ti ti-check"></i> Guardar</button>
       </div>
     </div>
   </div>`;
@@ -3057,14 +3123,15 @@ function renderCxListas(cont,q){
     return `<div class="cx-card ${abierta?'open':''}" onclick="cxToggle('${l.id}')">
       <div class="cx-head">
         <i class="ti ti-chevron-${abierta?'down':'right'}"></i>
-        <span class="nom">${pesc(l.proveedor)}</span>
-        ${l.titulo?`<span class="cx-nsub">· ${pesc(l.titulo)}</span>`:''}
-        <span class="cx-cifras"><span class="cx-nsub">${(l.items||[]).length} precio${(l.items||[]).length===1?'':'s'} · ${fd((l.actualizado||l.creado||'').slice(0,10))}</span>
+        <span class="nom">${pesc(l.titulo||l.proveedor)}</span>
+        ${l.titulo?`<span class="cx-nsub">· ${pesc(l.proveedor)}</span>`:''}
+        <span class="cx-cifras"><span class="cx-nsub">${(l.items||[]).length} ítem${(l.items||[]).length===1?'':'s'}${(l.columnas&&l.columnas.length>1)?' · '+l.columnas.length+' col':''} · ${fd((l.actualizado||l.creado||'').slice(0,10))}</span>
         ${puedeEditar?`<button class="pcx-obsbtn" onclick="event.stopPropagation();cxEditarLista('${l.id}')" title="Editar"><i class="ti ti-pencil"></i></button>
         <button class="pcx-obsbtn" onclick="event.stopPropagation();cxEliminarLista('${l.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>`:''}</span>
       </div>
       ${abierta?`<div class="cx-des">
-        ${(l.items||[]).map(it=>`<div class="cx-fila cxl-view"><span class="n">${pesc(it.descripcion)}</span><span></span><span></span><span class="sub">${fCOP(it.precio_calc||0)}</span></div>`).join('')}
+        ${(l.columnas&&l.columnas.length>1)?`<div class="cxl-vwrap"><div class="cxl-vhd"><span class="cxl-g-desc">Descripción</span>${l.columnas.map(c=>`<span class="cxl-g-val">${pesc(c)}</span>`).join('')}</div>${(l.items||[]).map(it=>`<div class="cxl-vrow"><span class="cxl-g-desc">${pesc(it.descripcion)}${it.codigo?` <span class="cxl-cod">#${pesc(it.codigo)}</span>`:''}</span>${l.columnas.map((c,ci)=>`<span class="cxl-g-val">${fCOP((it.valores&&it.valores[ci]&&it.valores[ci].valor_calc)||0)}</span>`).join('')}</div>`).join('')}</div>`
+        :`${(l.items||[]).map(it=>`<div class="cx-fila cxl-view"><span class="n">${pesc(it.descripcion)}${it.codigo?` <span class="cxl-cod">#${pesc(it.codigo)}</span>`:''}</span><span></span><span></span><span class="sub">${fCOP(it.precio_calc||0)}</span></div>`).join('')}`}
         ${l.notas?`<div class="cxl-nota"><i class="ti ti-info-circle"></i> ${pesc(l.notas)}</div>`:''}
       </div>`:''}
     </div>`;

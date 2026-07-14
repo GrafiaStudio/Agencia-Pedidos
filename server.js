@@ -375,6 +375,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS costo_lista_items(
   precio_calc INTEGER DEFAULT 0,
   orden INTEGER DEFAULT 0
 )`);
+// B2 · Listados de costos MULTI-COLUMNA (un ítem puede tener varias columnas de precio: Caucho/Máquina/Completo…)
+try { db.exec("ALTER TABLE costo_listas ADD COLUMN columnas TEXT DEFAULT '[]'"); } catch(e){}
+try { db.exec("ALTER TABLE costo_lista_items ADD COLUMN codigo TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE costo_lista_items ADD COLUMN valores TEXT DEFAULT '[]'"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS eventos(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -1860,18 +1864,22 @@ app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
 
 // ── LISTAS DE COSTOS DE PROVEEDORES (base de datos de precios, informativa) ──
 function listaConItems(l){
-  l.items=db.prepare('SELECT id,descripcion,precio,precio_calc,orden FROM costo_lista_items WHERE lista_id=? ORDER BY orden').all(l.id);
+  l.items=db.prepare('SELECT id,descripcion,codigo,precio,precio_calc,valores,orden FROM costo_lista_items WHERE lista_id=? ORDER BY orden').all(l.id);
+  l.items.forEach(it=>{ try{it.valores=JSON.parse(it.valores||'[]')}catch(e){it.valores=[]} });
+  try{l.columnas=JSON.parse(l.columnas||'[]')}catch(e){l.columnas=[]}
   l.activo=!!l.activo;
   return l;
 }
 function guardarItemsLista(listaId,wsId,items){
   db.prepare('DELETE FROM costo_lista_items WHERE lista_id=?').run(listaId);
-  const ins=db.prepare('INSERT INTO costo_lista_items(id,lista_id,workspace_id,descripcion,precio,precio_calc,orden)VALUES(?,?,?,?,?,?,?)');
+  const ins=db.prepare('INSERT INTO costo_lista_items(id,lista_id,workspace_id,descripcion,codigo,precio,precio_calc,valores,orden)VALUES(?,?,?,?,?,?,?,?,?)');
   (items||[]).forEach((it,i)=>{
     const desc=String(it.descripcion||'').trim();
     if(!desc)return;
-    const precioRaw=String(it.precio||'').trim();
-    ins.run(uid(),listaId,wsId,desc,precioRaw,toNum(precioRaw),i);
+    // Precios de lista = enteros en pesos; toNum quita separadores ("23.500"→23500). NO toFloatCO (daría 23.5).
+    const vals=Array.isArray(it.valores)?it.valores.map(v=>{const raw=String((v&&v.valor!=null?v.valor:v)||'').trim();return {valor:raw,valor_calc:toNum(raw)};}):[];
+    const precioRaw=String(it.precio||(vals[0]?vals[0].valor:'')||'').trim();
+    ins.run(uid(),listaId,wsId,desc,String(it.codigo||'').trim(),precioRaw,toNum(precioRaw),JSON.stringify(vals),i);
   });
 }
 app.get('/api/costo-listas',requiere('ver_costos'),(req,res)=>{
@@ -1883,8 +1891,9 @@ app.post('/api/costo-listas',requiere('gestionar_productos'),(req,res)=>{
     const b=req.body||{};
     if(!String(b.proveedor||'').trim())return res.status(400).json({error:'El proveedor es obligatorio'});
     const id=uid();
-    db.prepare('INSERT INTO costo_listas(id,workspace_id,proveedor,titulo,notas)VALUES(?,?,?,?,?)')
-      .run(id,req.wsId,String(b.proveedor).trim(),String(b.titulo||'').trim(),String(b.notas||'').trim());
+    const cols=Array.isArray(b.columnas)?b.columnas.map(c=>String(c||'').trim()).filter(Boolean):[];
+    db.prepare('INSERT INTO costo_listas(id,workspace_id,proveedor,titulo,notas,columnas)VALUES(?,?,?,?,?,?)')
+      .run(id,req.wsId,String(b.proveedor).trim(),String(b.titulo||'').trim(),String(b.notas||'').trim(),JSON.stringify(cols));
     guardarItemsLista(id,req.wsId,b.items);
     res.json(listaConItems(db.prepare('SELECT * FROM costo_listas WHERE id=?').get(id)));
   }catch(e){logError('POST /api/costo-listas',e);res.status(500).json({error:e.message})}
@@ -1895,8 +1904,9 @@ app.put('/api/costo-listas/:id',requiere('gestionar_productos'),(req,res)=>{
     if(!f)return res.status(404).json({error:'Lista no encontrada'});
     const b=req.body||{};
     if(!String(b.proveedor||'').trim())return res.status(400).json({error:'El proveedor es obligatorio'});
-    db.prepare("UPDATE costo_listas SET proveedor=?,titulo=?,notas=?,actualizado=datetime('now','localtime') WHERE id=? AND workspace_id=?")
-      .run(String(b.proveedor).trim(),String(b.titulo||'').trim(),String(b.notas||'').trim(),f.id,req.wsId);
+    const cols=Array.isArray(b.columnas)?b.columnas.map(c=>String(c||'').trim()).filter(Boolean):(function(){try{return JSON.parse(f.columnas||'[]')}catch(e){return[]}})();
+    db.prepare("UPDATE costo_listas SET proveedor=?,titulo=?,notas=?,columnas=?,actualizado=datetime('now','localtime') WHERE id=? AND workspace_id=?")
+      .run(String(b.proveedor).trim(),String(b.titulo||'').trim(),String(b.notas||'').trim(),JSON.stringify(cols),f.id,req.wsId);
     if(b.items!==undefined)guardarItemsLista(f.id,req.wsId,b.items);
     res.json(listaConItems(db.prepare('SELECT * FROM costo_listas WHERE id=?').get(f.id)));
   }catch(e){logError('PUT /api/costo-listas/:id',e);res.status(500).json({error:e.message})}
