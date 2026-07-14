@@ -1876,10 +1876,12 @@ function guardarItemsLista(listaId,wsId,items){
   (items||[]).forEach((it,i)=>{
     const desc=String(it.descripcion||'').trim();
     if(!desc)return;
+    // Preservar el id del ítem si viene (para no romper vínculos 📎 de costos al editar la lista).
+    const iid=(it.id&&String(it.id).trim())||uid();
     // Precios de lista = enteros en pesos; toNum quita separadores ("23.500"→23500). NO toFloatCO (daría 23.5).
     const vals=Array.isArray(it.valores)?it.valores.map(v=>{const raw=String((v&&v.valor!=null?v.valor:v)||'').trim();return {valor:raw,valor_calc:toNum(raw)};}):[];
     const precioRaw=String(it.precio||(vals[0]?vals[0].valor:'')||'').trim();
-    ins.run(uid(),listaId,wsId,desc,String(it.codigo||'').trim(),precioRaw,toNum(precioRaw),JSON.stringify(vals),i);
+    ins.run(iid,listaId,wsId,desc,String(it.codigo||'').trim(),precioRaw,toNum(precioRaw),JSON.stringify(vals),i);
   });
 }
 app.get('/api/costo-listas',requiere('ver_costos'),(req,res)=>{
@@ -2047,7 +2049,7 @@ function guardarVariantes(fichaId,variantes,wsId){
   db.prepare('DELETE FROM ficha_variantes WHERE ficha_id=?').run(fichaId);
   const insertarNodo=(v,parentId,i)=>{
     const id=v.id||uid();
-    const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)}));
+    const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor),lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''}));
     const modoV=(v.modo==='hoja'||v.modo==='medidas')?v.modo:'precio';
     db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo));

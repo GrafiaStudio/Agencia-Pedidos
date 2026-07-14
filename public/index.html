@@ -636,6 +636,24 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .var-chip .chip-inp:focus{outline:none}
 .var-chip .chip-inp.chip-sm{width:44px;text-align:center}
 .var-chip .chip-inp.chip-val{width:78px;font-weight:700;border-left:1px solid var(--line);padding-left:8px}
+/* B3 · costos vinculados 📎 */
+.chip-link{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:0 3px;font-size:13px;line-height:1}
+.chip-link:hover{color:var(--teal)}
+.chip-link.on{color:#1E7A4D}
+.chip-link.stale{color:#B8860B}
+.chip-link.roto{color:var(--muted);opacity:.5}
+.var-chip.vinc{border-color:#BFE0CE;background:#F3FBF6}
+.cv-picker{flex-basis:100%;border:1px solid #C9BEF3;background:#F7F5FE;border-radius:9px;padding:9px 10px;margin-top:6px}
+.cv-picker .item-inp{font-size:11px;width:100%}
+.cv-picker-hd{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:800;color:var(--navy);text-transform:uppercase;margin-bottom:6px}
+.cv-close{border:none;background:transparent;color:var(--muted);cursor:pointer}
+.cv-cols{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.cv-colbtn{border:1px solid var(--line);background:var(--white);border-radius:8px;padding:5px 9px;font-size:11px;color:var(--slate);cursor:pointer}
+.cv-colbtn:hover{border-color:#7B6EF6;color:var(--navy)}
+.cv-colbtn b{color:var(--teal-dk)}
+.cv-stale-banner{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#FBF3DD;border:1px solid #E9D08C;border-radius:9px;padding:8px 11px;margin-bottom:10px;font-size:11.5px;color:#8A6D1B;font-weight:600}
+.cv-stale-banner i{color:#B8860B}
+.cv-stale-banner .btn-add-row{background:#8A6D1B;color:#fff;border-color:#8A6D1B}
 .chip-lbl{font-size:10px;color:var(--muted);padding:0 1px}
 .chip-x{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:2px;display:flex;align-items:center}
 .chip-x:hover{color:var(--red)}
@@ -3006,7 +3024,7 @@ function cxEditarLista(id){ const l=CX_LISTAS.find(x=>x.id===id); if(!l)return; 
       let vals;
       if(it.valores&&it.valores.length) vals=cols.map((c,ci)=>String((it.valores[ci]&&it.valores[ci].valor!=null?it.valores[ci].valor:it.valores[ci])||''));
       else vals=cols.map((c,ci)=>ci===0?String(it.precio_calc||it.precio||''):'');
-      return {descripcion:it.descripcion,codigo:it.codigo||'',valores:vals};
+      return {id:it.id,descripcion:it.descripcion,codigo:it.codigo||'',valores:vals};
     })};
   renderCentroCostos();
 }
@@ -3057,7 +3075,7 @@ async function cxGuardarLista(){
   const t=cxListaTmp;
   if(!t||!t.proveedor.trim()){ toast('Escribe el nombre del proveedor',false); return; }
   const cols=(t.columnas||['Precio']).map(c=>String(c||'').trim()).filter(Boolean);
-  const items=t.items.filter(it=>(it.descripcion||'').trim()).map(it=>({descripcion:it.descripcion,codigo:it.codigo||'',valores:(it.valores||[]).map(v=>({valor:v}))}));
+  const items=t.items.filter(it=>(it.descripcion||'').trim()).map(it=>({id:it.id||'',descripcion:it.descripcion,codigo:it.codigo||'',valores:(it.valores||[]).map(v=>({valor:v}))}));
   const payload={proveedor:t.proveedor,titulo:t.titulo,notas:t.notas,columnas:cols.length?cols:['Precio'],items};
   try{
     if(cxListaEdit==='__nueva')await api('POST','/costo-listas',payload);
@@ -4969,7 +4987,7 @@ let varItemPlegados=new Set();
 function toggleVarItem(encId,itemId){if(varItemPlegados.has(itemId))varItemPlegados.delete(itemId);else varItemPlegados.add(itemId);renderEncItems(encId)}
 function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'precio',piezas:'',informativa:false,medida_tarifa:'',medida_minimo:''}}
 function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,medida_tarifa:v.medida_tarifa||'',medida_minimo:v.medida_minimo||'',
-  costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
+  costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||'',lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
   tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
   hijos:(v.hijos||[]).map(clonarNodoVar)}}
 function setVarModo(id,modo){const v=buscarNodoVar(id);if(v){v.modo=modo;renderVariantes()}}
@@ -5004,15 +5022,75 @@ function actualizarUtilidadVariante(vid){
   el.textContent='Costo de este nivel: '+fCOP(costo)+((!esGrupo&&precio>0)?(' · Utilidad: '+fCOP(precio-costo)):'');
 }
 function htmlCostosVar(v){
+  const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  const picker=(cvVinculando&&cvVinculando.vid===v.id)?cvPickerHTML(v):'';
   return `<div class="var-chips">
-    ${(v.costos||[]).map(c=>`<div class="var-chip">
-      <input class="chip-inp" type="text" value="${String(c.nombre||'').replace(/"/g,'&quot;')}" placeholder="Concepto" oninput="setCostoVariante('${v.id}','${c.id}','nombre',this.value)">
-      <input class="chip-inp chip-val" type="text" value="${String(c.valor||'').replace(/"/g,'&quot;')}" placeholder="$ 0" oninput="setCostoVariante('${v.id}','${c.id}','valor',this.value)">
-      <button class="chip-x" title="Quitar" onclick="remCostoVariante('${v.id}','${c.id}')"><i class="ti ti-x"></i></button>
-    </div>`).join('')}
+    ${(v.costos||[]).map(c=>{
+      const vinc=cvEstadoVinculo(c);
+      const cls=c.lista_id?(vinc.estado==='roto'?' roto':(vinc.estado==='stale'?' stale':' on')):'';
+      return `<div class="var-chip${c.lista_id?' vinc':''}">
+        <input class="chip-inp" type="text" value="${esc(c.nombre)}" placeholder="Concepto" oninput="setCostoVariante('${v.id}','${c.id}','nombre',this.value)">
+        <input class="chip-inp chip-val" type="text" value="${esc(c.valor)}" placeholder="$ 0" oninput="setCostoVariante('${v.id}','${c.id}','valor',this.value)">
+        <button class="chip-link${cls}" title="${esc(vinc.tip||'Vincular a un Listado de costos')}" onclick="cvAbrirVinculo('${v.id}','${c.id}')"><i class="ti ti-link"></i></button>
+        <button class="chip-x" title="Quitar" onclick="remCostoVariante('${v.id}','${c.id}')"><i class="ti ti-x"></i></button>
+      </div>`;
+    }).join('')}
     <button class="chip-add" onclick="addCostoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar costo</button>
+    ${picker}
   </div>`;
 }
+/* B3 · Costos vinculados a Listados de costos (📎) */
+let CX_LISTAS_ED=null, cvVinculando=null;
+async function cvAsegurarListas(){ if(!CX_LISTAS_ED){ try{ CX_LISTAS_ED=await api('GET','/costo-listas'); }catch(e){ CX_LISTAS_ED=[]; } } return CX_LISTAS_ED; }
+function cvListaDe(id){ return (CX_LISTAS_ED||[]).find(l=>l.id===id); }
+function cvColsLista(l){ return (l&&l.columnas&&l.columnas.length)?l.columnas:['Precio']; }
+function cvValorItem(l,it,columna){
+  if(!l||!it)return null;
+  if(l.columnas&&l.columnas.length){ const ci=cvColsLista(l).indexOf(columna); const x=(it.valores&&it.valores[ci]); return x?(x.valor_calc!=null?x.valor_calc:cxNum(x.valor)):null; }
+  return it.precio_calc!=null?it.precio_calc:cxNum(it.precio);
+}
+function cvBuscarItem(c){ const l=cvListaDe(c.lista_id); if(!l)return null; const it=(l.items||[]).find(x=>x.id===c.item_id); return it?{l,it}:null; }
+function cvEstadoVinculo(c){
+  if(!c||!c.lista_id)return {estado:'',tip:''};
+  const f=cvBuscarItem(c);
+  if(!f)return {estado:'roto',tip:'Vínculo roto: el ítem ya no está en la lista'};
+  const tip=(f.l.proveedor||'')+' · '+(f.it.descripcion||'')+(c.columna?' · '+c.columna:'');
+  const actual=cvValorItem(f.l,f.it,c.columna), guardado=evalExpr(c.valor);
+  if(actual!=null&&guardado!=null&&Math.round(actual)!==Math.round(guardado))return {estado:'stale',tip:tip+' → cambió a '+fCOP(actual)};
+  return {estado:'ok',tip};
+}
+async function cvAbrirVinculo(vid,cid){ await cvAsegurarListas(); cvVinculando={vid,cid}; renderVariantes(); }
+function cvPickLista(val){ if(cvVinculando){cvVinculando.lista_id=val;cvVinculando.item_id=null;} renderVariantes(); }
+function cvPickItem(val){ if(cvVinculando)cvVinculando.item_id=val; renderVariantes(); }
+function cvCostoDe(vid,cid){ const n=buscarNodoVar(vid); return n?(n.costos||[]).find(x=>x.id===cid):null; }
+function cvAplicar(ci){
+  const st=cvVinculando; if(!st)return;
+  const c=cvCostoDe(st.vid,st.cid), l=cvListaDe(st.lista_id), it=l&&(l.items||[]).find(x=>x.id===st.item_id);
+  if(!c||!l||!it){ cvVinculando=null; renderVariantes(); return; }
+  const cols=cvColsLista(l), columna=cols[ci]!=null?cols[ci]:'';
+  const val=cvValorItem(l,it,columna);
+  c.lista_id=l.id; c.item_id=it.id; c.columna=columna;
+  if(val!=null)c.valor=String(val);
+  if(!String(c.nombre||'').trim())c.nombre=it.descripcion||l.titulo||l.proveedor;
+  cvVinculando=null; renderVariantes(); actualizarUtilidadVariante(st.vid);
+}
+function cvQuitar(){ const st=cvVinculando; if(!st)return; const c=cvCostoDe(st.vid,st.cid); if(c){c.lista_id='';c.item_id='';c.columna='';} cvVinculando=null; renderVariantes(); }
+function cvPickerHTML(v){
+  const st=cvVinculando, listas=CX_LISTAS_ED||[];
+  const l=cvListaDe(st.lista_id), it=l&&(l.items||[]).find(x=>x.id===st.item_id);
+  const esc=s=>String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  return `<div class="cv-picker" onclick="event.stopPropagation()">
+    <div class="cv-picker-hd"><span><i class="ti ti-link"></i> Vincular a un Listado de costos</span><button class="cv-close" onclick="cvVinculando=null;renderVariantes()"><i class="ti ti-x"></i></button></div>
+    ${listas.length?`
+    <select class="item-inp" onchange="cvPickLista(this.value)"><option value="">— Elige lista —</option>${listas.map(x=>`<option value="${x.id}"${x.id===st.lista_id?' selected':''}>${esc(x.titulo||x.proveedor)} · ${esc(x.proveedor)}</option>`).join('')}</select>
+    ${l?`<select class="item-inp" style="margin-top:5px" onchange="cvPickItem(this.value)"><option value="">— Elige ítem —</option>${(l.items||[]).map(x=>`<option value="${x.id}"${x.id===st.item_id?' selected':''}>${esc(x.descripcion)}${x.codigo?' ('+esc(x.codigo)+')':''}</option>`).join('')}</select>`:''}
+    ${it?`<div class="cv-cols">${cvColsLista(l).map((col,ci)=>`<button class="cv-colbtn" onclick="cvAplicar(${ci})">${esc(col)}: <b>${fCOP(cvValorItem(l,it,col)||0)}</b></button>`).join('')}</div>`:''}
+    `:`<div class="hint" style="padding:6px 0">Aún no hay Listados de costos. Créalos en Costos → Listados de costos.</div>`}
+    ${(cvCostoDe(st.vid,st.cid)||{}).lista_id?`<div style="text-align:right;margin-top:6px"><button class="chip-add" onclick="cvQuitar()"><i class="ti ti-unlink"></i>Quitar vínculo</button></div>`:''}
+  </div>`;
+}
+function cvStaleList(){ const out=[]; (function walk(ns){(ns||[]).forEach(n=>{(n.costos||[]).forEach(c=>{if(c.lista_id&&cvEstadoVinculo(c).estado==='stale'){const f=cvBuscarItem(c);out.push({vid:n.id,c,actual:cvValorItem(f.l,f.it,c.columna),prov:f.l.proveedor});}});walk(n.hijos)})})(fProdVariantes); return out; }
+function cvActualizarTodos(){ cvStaleList().forEach(s=>{ if(s.actual!=null)s.c.valor=String(s.actual); }); renderVariantes(); toast('Precios actualizados desde los listados ✓'); }
 function htmlTramosVar(v){
   return `<div class="var-chips">
     ${(v.tramos||[]).map(t=>`<div class="var-chip">
@@ -5114,7 +5192,9 @@ function renderVariantes(){
   if(!fProdVariantes.some(v=>v.id===varSel))varSel=fProdVariantes[0].id;
   varColapsadas.delete(varSel); // la variante seleccionada siempre se muestra desplegada en el detalle
   const sel=fProdVariantes.find(v=>v.id===varSel);
-  cont.innerHTML=`<div class="var-md">
+  const stale=cvStaleList();
+  const staleBanner=stale.length?`<div class="cv-stale-banner"><span><i class="ti ti-alert-triangle"></i> ${stale.length} costo${stale.length===1?'':'s'} usa${stale.length===1?'':'n'} precios desactualizados de un listado.</span><button class="btn-add-row" onclick="cvActualizarTodos()"><i class="ti ti-refresh"></i>Actualizar</button></div>`:'';
+  cont.innerHTML=staleBanner+`<div class="var-md">
     <div class="var-md-list">
       ${fProdVariantes.map(v=>`<button type="button" class="var-md-item${v.id===varSel?' active':''}" onclick="setVarSel('${v.id}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${String(v.nombre||'(sin nombre)').replace(/</g,'&lt;')}</span>${v.informativa?`<span class="var-md-badge" style="background:#EDE9FB;color:#6A5AE0">info</span>`:((v.hijos&&v.hijos.length)?`<span class="var-md-badge">${v.hijos.length}</span>`:'')}</button>`).join('')}
     </div>
@@ -5269,7 +5349,7 @@ function renderPegarPanelHTML(){
 function cargarNodoVar(v){
   return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,
     medida_tarifa:v.medida_tarifa||'',medida_tarifa_calc:v.medida_tarifa_calc||'',medida_minimo:v.medida_minimo||'',medida_minimo_calc:v.medida_minimo_calc||'',
-    costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
+    costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||'',lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
     tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
     hijos:(v.hijos||[]).map(cargarNodoVar)};
 }
@@ -5277,7 +5357,7 @@ function serializarNodoVar(v){
   const modo=(v.modo==='hoja'||v.modo==='medidas')?v.modo:'precio';
   return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo,piezas:parseInt(v.piezas,10)||null,informativa:v.informativa?1:0,
     medida_tarifa:(v.medida_tarifa||'').toString().trim(),medida_minimo:(v.medida_minimo||'').toString().trim(),
-    costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),
+    costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim(),lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
     tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
     hijos:(v.hijos||[]).map(serializarNodoVar)};
 }
@@ -5654,6 +5734,7 @@ async function abrirEditarProducto(id){
   renderRangos();
   renderCostosFijos();
   renderVariantes();
+  CX_LISTAS_ED=null; cvAsegurarListas().then(()=>renderVariantes()); // B3 · listas frescas para picker/aviso de desactualización
   renderHojaSup();
   renderHojaExtras();
   renderComponentes();
