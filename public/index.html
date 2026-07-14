@@ -579,6 +579,27 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .var-modo-pill .rd{width:12px;height:12px;border-radius:50%;border:2px solid var(--line);flex-shrink:0}
 .var-modo-pill.active .rd{border-color:#7B6EF6;background:#7B6EF6;box-shadow:inset 0 0 0 2px #fff}
 .var-modo-pill .soon{font-size:8px;font-weight:800;background:#EEEAFB;color:#6A5AE0;border-radius:10px;padding:1px 6px;letter-spacing:.4px}
+/* Editor 2.0 · Pegar tabla */
+.pega-panel{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--white)}
+.pega-hd{font-size:13px;color:var(--navy)}
+.pega-grp{font-weight:700;color:var(--teal-dk)}
+.pega-txt{width:100%;min-height:120px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:12px;font-family:'Consolas','Menlo',monospace;color:var(--navy);resize:vertical;white-space:pre;overflow:auto}
+.pega-txt:focus{outline:none;border-color:#7B6EF6}
+.pega-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;justify-content:flex-end}
+.pega-tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;max-height:340px;overflow-y:auto}
+.pega-tbl{border-collapse:collapse;font-size:11.5px;width:100%}
+.pega-tbl th{background:var(--line-lt);padding:6px 8px;text-align:left;vertical-align:top;position:sticky;top:0;border-bottom:1px solid var(--line)}
+.pega-tbl td{padding:5px 8px;border-bottom:1px solid var(--line-lt);color:var(--navy);white-space:nowrap}
+.pega-tbl td.pega-ig{color:var(--muted);text-decoration:line-through}
+.pega-tbl tr.pega-skip td{opacity:.5}
+.pega-h{font-weight:800;color:var(--navy);margin-bottom:3px}
+.pega-role{font-size:10px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:2px 4px;background:var(--white);color:var(--slate)}
+.pega-cn{display:block;margin-top:3px;width:96px;font-size:10px;border:1px solid var(--line);border-radius:6px;padding:2px 5px;color:var(--navy)}
+.pega-bcell{white-space:nowrap}
+.pega-badge{font-size:8.5px;font-weight:800;border-radius:10px;padding:2px 7px;letter-spacing:.3px}
+.pega-badge.nv{background:#E4F5EC;color:#1E7A4D}
+.pega-badge.up{background:#FBF0DD;color:#A5761B}
+.pega-badge.ig{background:var(--line);color:var(--muted)}
 /* B1.4 (CORR 001) — casillas compactas: costos y tramos como bloques que se acomodan a lo ancho */
 .var-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 2px}
 .var-chip{display:flex;align-items:center;gap:2px;background:var(--white);border:1px solid var(--line);border-radius:9px;padding:3px 5px}
@@ -4965,7 +4986,10 @@ function htmlNodoVariante(v,nivel){
       <div style="font-size:9px;font-weight:800;color:var(--navy);text-transform:uppercase;margin:12px 0 4px">Sub-variantes (versiones internas)</div>
       ${esGrupo?`<label class="ck-box" style="display:inline-flex;gap:6px;margin-bottom:6px"><input type="checkbox" ${v.multi?'checked':''} onchange="setVarMulti('${v.id}',this.checked)"><span style="font-size:10px">Permite elegir varias opciones (ej. varios estampados). Si está apagado, en el pedido se elige una sola (ej. un tamaño).</span></label>`:''}
       ${(v.hijos||[]).map(h=>htmlNodoVariante(h,nivel+1)).join('')}
-      <button class="btn-add-row" onclick="addSubVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar sub-variante</button>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+        <button class="btn-add-row" onclick="addSubVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar sub-variante</button>
+        <button class="btn-add-row" onclick="prodAbrirPegar('${v.id}')"><i class="ti ti-table"></i>Pegar tabla</button>
+      </div>`:''}
     </div>
   </div>`;
 }
@@ -4974,6 +4998,7 @@ function setVarSel(id){varSel=id;varColapsadas.delete(id);renderVariantes();}
 function renderVariantes(){
   const cont=document.getElementById('prod-variantes-body');
   if(!cont)return;
+  if(prodPegaState){cont.innerHTML=renderPegarPanelHTML();if(prodPegaState.paso==='entrada'){const t=document.getElementById('prod-pega-txt');if(t)t.focus();}return;}
   if(!fProdVariantes.length){cont.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Aún no hay variantes. Agrega la primera con el botón de abajo.</div>';return;}
   if(!fProdVariantes.some(v=>v.id===varSel))varSel=fProdVariantes[0].id;
   varColapsadas.delete(varSel); // la variante seleccionada siempre se muestra desplegada en el detalle
@@ -4986,6 +5011,149 @@ function renderVariantes(){
   </div>`;
   const walk=(nodos)=>{(nodos||[]).forEach(n=>{actualizarUtilidadVariante(n.id);walk(n.hijos)})};
   walk([sel]);
+}
+
+/* ══ Editor 2.0 · Sesión B — PEGAR TABLA (carga masiva de sub-variantes desde Excel/lista) ══ */
+let prodPegaState=null; // {groupId, paso:'entrada'|'preview', texto, headers, dataRows, roles, nombresCosto}
+function prodAbrirPegar(gid){ prodPegaState={groupId:gid, paso:'entrada', texto:''}; renderVariantes(); }
+function prodPegaCancelar(){ prodPegaState=null; renderVariantes(); }
+function prodLimpiaMonto(s){ return String(s||'').replace(/[^\d.,]/g,'').replace(/[.,]+$/,'').trim(); }
+// Separa el texto pegado en filas×columnas (TSV de Excel, CSV con ; o , o líneas "nombre → $precio")
+function prodParseTabla(texto){
+  const lineas=String(texto||'').split(/\r?\n/).map(l=>l.replace(/\s+$/,'')).filter(l=>l.trim());
+  if(!lineas.length)return null;
+  let delim=null;
+  if(lineas.some(l=>l.includes('\t')))delim='\t';
+  else if(lineas.filter(l=>l.includes(';')).length>=Math.max(1,lineas.length-1))delim=';';
+  if(delim){
+    const rows=lineas.map(l=>l.split(delim).map(c=>c.trim()));
+    const ncols=Math.max(...rows.map(r=>r.length));
+    rows.forEach(r=>{while(r.length<ncols)r.push('')});
+    return {rows,ncols};
+  }
+  // "nombre … $precio" por línea
+  const pares=[]; let okPares=true;
+  for(const l of lineas){
+    const m=l.match(/^(.*?)[\s.…→\-–—:=>]*\$?\s*([\d]{1,3}(?:[.,][\d]{3})+|[\d]{2,})\s*$/);
+    if(m&&m[1].trim())pares.push([m[1].replace(/[\s→\-–—:=>.…]+$/,'').trim(),m[2]]);
+    else{okPares=false;break}
+  }
+  if(okPares&&pares.length)return {rows:pares,ncols:2};
+  if(lineas.some(l=>l.includes(','))){
+    const rows=lineas.map(l=>l.split(',').map(c=>c.trim()));
+    const ncols=Math.max(...rows.map(r=>r.length));
+    rows.forEach(r=>{while(r.length<ncols)r.push('')});
+    return {rows,ncols};
+  }
+  return {rows:lineas.map(l=>[l.trim()]),ncols:1};
+}
+// Heurística de roles por columna (siempre corregible en la vista previa)
+function prodDetectaRoles(parse){
+  const {rows,ncols}=parse;
+  const esNum=s=>/^\$?\s*[\d][\d.,]*\s*$/.test(String(s||'').trim());
+  const primera=rows[0]||[];
+  const hayHeader=ncols>1&&!esNum(primera[0])&&primera.slice(1).some(c=>c&&!esNum(c));
+  const headers=hayHeader?primera.map(h=>String(h||'').trim()):null;
+  const dataRows=hayHeader?rows.slice(1):rows;
+  const roles=[],nombresCosto=[]; let usoNombre=false,usoPrecio=false;
+  for(let i=0;i<ncols;i++){
+    const h=(headers&&headers[i]?headers[i]:'').toLowerCase();
+    let role='ignorar',cn='';
+    if(headers){
+      if(/total|utilidad|margen|ganancia/.test(h))role='ignorar';
+      else if(!usoNombre&&(i===0||/nombre|descrip|producto|modelo|tama|referencia/.test(h))){role='nombre';usoNombre=true;}
+      else if(!usoPrecio&&/(precio|venta|p[uú]blico|p\.?p\.?|final|completo)/.test(h)&&!/costo/.test(h)){role='precio';usoPrecio=true;}
+      else if(esNum(dataRows[0]&&dataRows[0][i])||/costo|vr|valor|caucho|m[aá]quina/.test(h)){role='costo';cn=headers[i].replace(/costo\s*/ig,'').trim()||('Costo '+i);}
+    }else{
+      if(i===0)role='nombre';
+      else if(i===1&&!usoPrecio){role='precio';usoPrecio=true;}
+      else{role='costo';cn='Costo '+(i-1);}
+    }
+    roles.push(role); nombresCosto.push(cn);
+  }
+  if(!roles.includes('nombre'))roles[0]='nombre';
+  return {headers,dataRows,roles,nombresCosto};
+}
+function prodPegaDetectar(){
+  const st=prodPegaState; if(!st)return;
+  const txt=(document.getElementById('prod-pega-txt')||{}).value||'';
+  st.texto=txt;
+  const parse=prodParseTabla(txt);
+  if(!parse||!parse.rows.length){ toast('No detecté filas. Pega desde Excel o líneas "nombre → $precio".',false); return; }
+  const det=prodDetectaRoles(parse);
+  st.headers=det.headers; st.dataRows=det.dataRows; st.roles=det.roles; st.nombresCosto=det.nombresCosto;
+  st.paso='preview'; renderVariantes();
+}
+function prodPegaSetRole(i,val){ const st=prodPegaState; if(!st)return; st.roles[i]=val; if(val==='costo'&&!st.nombresCosto[i])st.nombresCosto[i]=(st.headers&&st.headers[i])?st.headers[i]:('Costo '+i); renderVariantes(); }
+function prodPegaSetCostName(i,val){ const st=prodPegaState; if(st)st.nombresCosto[i]=val; }
+function prodPegaAplicar(){
+  const st=prodPegaState; if(!st)return;
+  const grupo=buscarNodoVar(st.groupId); if(!grupo){prodPegaCancelar();return;}
+  grupo.hijos=grupo.hijos||[];
+  const nombreCol=st.roles.indexOf('nombre'), precioCol=st.roles.indexOf('precio');
+  const norm=s=>String(s||'').trim().toLowerCase();
+  let creadas=0,actualizadas=0;
+  st.dataRows.forEach(row=>{
+    const nombre=(nombreCol>=0?String(row[nombreCol]||''):'').trim();
+    if(!nombre)return;
+    const costos=[];
+    st.roles.forEach((r,i)=>{ if(r==='costo'){ const val=prodLimpiaMonto(row[i]); if(val)costos.push({id:uid(),nombre:(st.nombresCosto[i]||'Costo').trim(),valor:val}); } });
+    const precio=precioCol>=0?prodLimpiaMonto(row[precioCol]):'';
+    let hijo=grupo.hijos.find(h=>norm(h.nombre)===norm(nombre));
+    if(hijo){ if(precio)hijo.precio=precio; if(costos.length)hijo.costos=costos; actualizadas++; }
+    else{ const n=nodoVarNuevo(); n.nombre=nombre; n.precio=precio; n.costos=costos; n.modo='precio'; grupo.hijos.push(n); varCostosPlegados.add(n.id); creadas++; }
+  });
+  prodPegaState=null;
+  toast(`${creadas} creada${creadas===1?'':'s'} · ${actualizadas} actualizada${actualizadas===1?'':'s'} ✓`);
+  renderVariantes();
+}
+function renderPegarPanelHTML(){
+  const st=prodPegaState; const grupo=buscarNodoVar(st.groupId);
+  const nomGrupo=grupo?(grupo.nombre||'(grupo)'):'';
+  const esc=s=>String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  if(st.paso==='entrada'){
+    return `<div class="pega-panel">
+      <div class="pega-hd"><b>Pegar tabla</b> en <span class="pega-grp">${esc(nomGrupo)}</span></div>
+      <div style="font-size:11px;color:var(--muted);margin:4px 0 8px">Copia desde Excel (columnas) o pega una lista "nombre → $precio". La primera fila puede ser encabezados. Confirmarás las columnas antes de crear nada.</div>
+      <textarea id="prod-pega-txt" class="pega-txt" placeholder="Ej (desde Excel):&#10;Tamaño&#9;Precio&#9;Costo vinilo&#9;Costo laminado&#10;10x10&#9;15000&#9;3000&#9;1000&#10;20x20&#9;22000&#9;5000&#9;1500">${esc(st.texto||'')}</textarea>
+      <div class="pega-acts">
+        <button class="btn-add-row" onclick="prodPegaCancelar()"><i class="ti ti-x"></i>Cancelar</button>
+        <button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="prodPegaDetectar()"><i class="ti ti-wand"></i>Detectar columnas</button>
+      </div>
+    </div>`;
+  }
+  // preview
+  const st2=st; const ncols=st2.roles.length;
+  const nombreCol=st2.roles.indexOf('nombre');
+  const norm=s=>String(s||'').trim().toLowerCase();
+  const existentes=new Set((grupo&&grupo.hijos||[]).map(h=>norm(h.nombre)));
+  const roleSel=(i)=>`<select class="pega-role" onchange="prodPegaSetRole(${i},this.value)">
+      <option value="nombre"${st2.roles[i]==='nombre'?' selected':''}>Nombre</option>
+      <option value="precio"${st2.roles[i]==='precio'?' selected':''}>Precio público</option>
+      <option value="costo"${st2.roles[i]==='costo'?' selected':''}>Costo…</option>
+      <option value="ignorar"${st2.roles[i]==='ignorar'?' selected':''}>Ignorar</option>
+    </select>${st2.roles[i]==='costo'?`<input class="pega-cn" type="text" value="${esc(st2.nombresCosto[i]||'')}" placeholder="nombre costo" oninput="prodPegaSetCostName(${i},this.value)">`:''}`;
+  const th=st2.headers?`<tr>${st2.headers.map((h,i)=>`<th><div class="pega-h">${esc(h)}</div>${roleSel(i)}</th>`).join('')}</tr>`
+                      :`<tr>${st2.roles.map((r,i)=>`<th>${roleSel(i)}</th>`).join('')}</tr>`;
+  let nuevas=0,actu=0;
+  const body=st2.dataRows.map(row=>{
+    const nombre=nombreCol>=0?String(row[nombreCol]||'').trim():'';
+    const existe=nombre&&existentes.has(norm(nombre));
+    if(!nombre){/* fila sin nombre: se ignora */}
+    else if(existe)actu++; else nuevas++;
+    const badge=!nombre?`<span class="pega-badge ig">sin nombre</span>`:(existe?`<span class="pega-badge up">ACTUALIZA</span>`:`<span class="pega-badge nv">NUEVA</span>`);
+    return `<tr class="${!nombre?'pega-skip':''}">${row.slice(0,ncols).map((c,i)=>`<td class="${st2.roles[i]==='ignorar'?'pega-ig':''}">${esc(c)}</td>`).join('')}<td class="pega-bcell">${badge}</td></tr>`;
+  }).join('');
+  return `<div class="pega-panel">
+    <div class="pega-hd"><b>Vista previa</b> · ${nuevas} nueva${nuevas===1?'':'s'} · ${actu} actualiza${actu===1?'':'n'} · en <span class="pega-grp">${esc(nomGrupo)}</span></div>
+    <div style="font-size:11px;color:var(--muted);margin:3px 0 8px">Ajusta el rol de cada columna si hace falta. Las filas con nombre repetido actualizan la sub-variante existente.</div>
+    <div class="pega-tbl-wrap"><table class="pega-tbl"><thead>${th}</thead><tbody>${body}</tbody></table></div>
+    <div class="pega-acts">
+      <button class="btn-add-row" onclick="prodPegaState.paso='entrada';renderVariantes()"><i class="ti ti-arrow-left"></i>Volver</button>
+      <button class="btn-add-row" onclick="prodPegaCancelar()"><i class="ti ti-x"></i>Cancelar</button>
+      <button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="prodPegaAplicar()"><i class="ti ti-check"></i>Crear / actualizar ${nuevas+actu}</button>
+    </div>
+  </div>`;
 }
 function cargarNodoVar(v){
   return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,
