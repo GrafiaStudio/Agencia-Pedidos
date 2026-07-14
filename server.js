@@ -173,7 +173,7 @@ try { db.exec("ALTER TABLE usuarios ADD COLUMN ultimo_login TEXT DEFAULT ''"); }
 const ROL_COLORES=['navy','teal','purple','green','amber','red','pink','slate'];
 
 // Catálogo de permisos disponibles en Fase 1 (crece en fases siguientes).
-const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','editar_clientes','gestionar_productos','gestionar_inventario','gestionar_eventos','configurar_sistema','administrar_usuarios'];
+const PERMISOS_FASE1=['crear_pedidos','editar_pedidos','reabrir_pedidos','registrar_pagos','ver_costos','ver_utilidad','ver_registros','ver_dashboard','ver_produccion','gestionar_produccion','consumir_inventario','editar_clientes','gestionar_productos','gestionar_inventario','gestionar_eventos','gestionar_bitacora','configurar_sistema','administrar_usuarios'];
 function permisosDeRol(rol){
   if(!rol) return {};
   if(rol.es_admin) return {__admin:true};
@@ -395,6 +395,30 @@ db.exec(`CREATE TABLE IF NOT EXISTS eventos(
   creado_por TEXT DEFAULT '',
   archivado INTEGER DEFAULT 0,
   creado TEXT DEFAULT(datetime('now','localtime'))
+)`);
+// ── BITÁCORA (segundo cerebro) · Fase 1 MVP: tableros + notas ──
+db.exec(`CREATE TABLE IF NOT EXISTS bitacora_tableros(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  color TEXT DEFAULT 'slate',
+  orden INTEGER DEFAULT 0,
+  archivado INTEGER DEFAULT 0,
+  creado TEXT DEFAULT(datetime('now','localtime'))
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS bitacora_notas(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  tablero_id TEXT DEFAULT '',
+  titulo TEXT DEFAULT '',
+  contenido TEXT DEFAULT '',
+  color TEXT DEFAULT '',
+  favorita INTEGER DEFAULT 0,
+  creado_por TEXT DEFAULT '',
+  actualizado_por TEXT DEFAULT '',
+  archivado INTEGER DEFAULT 0,
+  creado TEXT DEFAULT(datetime('now','localtime')),
+  actualizado TEXT DEFAULT(datetime('now','localtime'))
 )`);
 
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
@@ -2002,6 +2026,72 @@ app.put('/api/eventos/:id',requiere('gestionar_eventos'),(req,res)=>{
 app.delete('/api/eventos/:id',requiere('gestionar_eventos'),(req,res)=>{
   const r=db.prepare('UPDATE eventos SET archivado=1 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'Evento no encontrado'});
+  res.json({ok:true});
+});
+
+// ── BITÁCORA · Todos ven; crear/editar/borrar requiere gestionar_bitacora ──
+function notaPublica(n){ if(n){n.favorita=!!n.favorita; n.archivado=!!n.archivado;} return n; }
+app.get('/api/bitacora/tableros',(req,res)=>{
+  res.json(db.prepare('SELECT * FROM bitacora_tableros WHERE workspace_id=? AND archivado=0 ORDER BY orden,nombre').all(req.wsId));
+});
+app.post('/api/bitacora/tableros',requiere('gestionar_bitacora'),(req,res)=>{
+  try{
+    const b=req.body||{}; const nombre=String(b.nombre||'').trim();
+    if(!nombre)return res.status(400).json({error:'El nombre del tablero es obligatorio'});
+    const id=uid();
+    const n=db.prepare('SELECT COUNT(*) c FROM bitacora_tableros WHERE workspace_id=? AND archivado=0').get(req.wsId).c;
+    db.prepare('INSERT INTO bitacora_tableros(id,workspace_id,nombre,color,orden)VALUES(?,?,?,?,?)').run(id,req.wsId,nombre,String(b.color||'slate'),n);
+    res.json(db.prepare('SELECT * FROM bitacora_tableros WHERE id=?').get(id));
+  }catch(e){logError('POST bitacora/tableros',e);res.status(500).json({error:e.message})}
+});
+app.put('/api/bitacora/tableros/:id',requiere('gestionar_bitacora'),(req,res)=>{
+  const t=db.prepare('SELECT * FROM bitacora_tableros WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!t)return res.status(404).json({error:'Tablero no encontrado'});
+  const b=req.body||{};
+  db.prepare('UPDATE bitacora_tableros SET nombre=?,color=? WHERE id=?').run(String(b.nombre??t.nombre).trim(),String(b.color??t.color),t.id);
+  res.json(db.prepare('SELECT * FROM bitacora_tableros WHERE id=?').get(t.id));
+});
+app.delete('/api/bitacora/tableros/:id',requiere('gestionar_bitacora'),(req,res)=>{
+  const r=db.prepare('UPDATE bitacora_tableros SET archivado=1 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'Tablero no encontrado'});
+  db.prepare("UPDATE bitacora_notas SET tablero_id='' WHERE tablero_id=? AND workspace_id=?").run(req.params.id,req.wsId); // las notas no se pierden
+  res.json({ok:true});
+});
+app.get('/api/bitacora/notas',(req,res)=>{
+  let sql='SELECT * FROM bitacora_notas WHERE workspace_id=? AND archivado=0'; const p=[req.wsId];
+  if(req.query.tablero){sql+=' AND tablero_id=?';p.push(req.query.tablero);}
+  if(req.query.favorita==='1')sql+=' AND favorita=1';
+  if(req.query.q){sql+=' AND (titulo LIKE ? OR contenido LIKE ?)';p.push('%'+req.query.q+'%','%'+req.query.q+'%');}
+  sql+=' ORDER BY favorita DESC, actualizado DESC';
+  res.json(db.prepare(sql).all(...p).map(notaPublica));
+});
+app.post('/api/bitacora/notas',requiere('gestionar_bitacora'),(req,res)=>{
+  try{
+    const b=req.body||{};
+    if(!String(b.titulo||'').trim()&&!String(b.contenido||'').trim())return res.status(400).json({error:'Escribe al menos un título o contenido'});
+    const act=actorDe(req); const id=uid();
+    db.prepare('INSERT INTO bitacora_notas(id,workspace_id,tablero_id,titulo,contenido,color,favorita,creado_por,actualizado_por)VALUES(?,?,?,?,?,?,?,?,?)')
+      .run(id,req.wsId,String(b.tablero_id||''),String(b.titulo||'').trim(),String(b.contenido||''),String(b.color||''),b.favorita?1:0,act.nombre||'',act.nombre||'');
+    res.json(notaPublica(db.prepare('SELECT * FROM bitacora_notas WHERE id=?').get(id)));
+  }catch(e){logError('POST bitacora/notas',e);res.status(500).json({error:e.message})}
+});
+app.put('/api/bitacora/notas/:id',requiere('gestionar_bitacora'),(req,res)=>{
+  try{
+    const n=db.prepare('SELECT * FROM bitacora_notas WHERE id=? AND workspace_id=? AND archivado=0').get(req.params.id,req.wsId);
+    if(!n)return res.status(404).json({error:'Nota no encontrada'});
+    const b=req.body||{}; const act=actorDe(req);
+    if(b.favorita!==undefined&&Object.keys(b).length===1){
+      db.prepare('UPDATE bitacora_notas SET favorita=? WHERE id=?').run(b.favorita?1:0,n.id);
+    }else{
+      db.prepare("UPDATE bitacora_notas SET tablero_id=?,titulo=?,contenido=?,color=?,favorita=?,actualizado_por=?,actualizado=datetime('now','localtime') WHERE id=?")
+        .run(String(b.tablero_id??n.tablero_id),String(b.titulo??n.titulo).trim(),String(b.contenido??n.contenido),String(b.color??n.color),(b.favorita??n.favorita)?1:0,act.nombre||'',n.id);
+    }
+    res.json(notaPublica(db.prepare('SELECT * FROM bitacora_notas WHERE id=?').get(n.id)));
+  }catch(e){logError('PUT bitacora/notas/:id',e);res.status(500).json({error:e.message})}
+});
+app.delete('/api/bitacora/notas/:id',requiere('gestionar_bitacora'),(req,res)=>{
+  const r=db.prepare('UPDATE bitacora_notas SET archivado=1 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
+  if(r.changes===0)return res.status(404).json({error:'Nota no encontrada'});
   res.json({ok:true});
 });
 

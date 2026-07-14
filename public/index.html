@@ -365,6 +365,53 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cx-ventas .sub{color:var(--teal-dk);font-weight:800}
 .cx-ventas.cx-sinventas .n,.cx-ventas.cx-sinventas .sub{color:var(--muted);font-weight:600}
 .cx-alert{font-size:9px;font-weight:800;background:#FDE7E9;color:#C0392B;border-radius:20px;padding:2px 8px;letter-spacing:.3px;white-space:nowrap}
+/* ══ BITÁCORA (segundo cerebro) ══ */
+.bit-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.bit-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--white);border-radius:20px;padding:5px 13px;font-size:11px;font-weight:600;color:var(--slate);cursor:pointer;font-family:'Montserrat',sans-serif}
+.bit-chip:hover{border-color:#C9BEF3}
+.bit-chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.bit-chip i{font-size:12px}
+.bit-chip-x{opacity:.45;margin-left:1px;font-size:11px}
+.bit-chip-x:hover{opacity:1;color:var(--red)}
+.bit-chip-add{border-style:dashed;color:var(--teal-dk)}
+.bit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.bit-top{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.bit-nueva{padding:8px 15px;font-size:12px}
+.bit-search{flex:1;max-width:320px}
+.bit-form{background:var(--white);border:1px solid #C9BEF3;border-radius:14px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--sh)}
+.bit-f-titulo{width:100%;border:none;background:transparent;font-size:15px;font-weight:700;color:var(--navy);padding:4px 2px;font-family:'Montserrat',sans-serif}
+.bit-f-titulo:focus{outline:none}
+.bit-f-cont{width:100%;border:none;background:transparent;font-size:12.5px;color:var(--navy);padding:6px 2px;resize:none;min-height:66px;line-height:1.5;font-family:'Montserrat',sans-serif}
+.bit-f-cont:focus{outline:none}
+.bit-f-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;border-top:1px solid var(--line-lt);padding-top:11px}
+.bit-f-tab{width:auto!important;min-width:150px;font-size:11px}
+.bit-f-colors{display:flex;gap:6px}
+.bit-col{width:18px;height:18px;border-radius:50%;border:2px solid var(--white);box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
+.bit-col.on{box-shadow:0 0 0 2px var(--navy)}
+.bit-f-acts{margin-left:auto;display:flex;gap:8px}
+.bit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:14px}
+.bit-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:14px 15px;display:flex;flex-direction:column;gap:9px;box-shadow:var(--sh);transition:box-shadow .14s,transform .14s;min-height:96px}
+.bit-card:hover{box-shadow:var(--sh-lg);transform:translateY(-1px)}
+.bit-card-hd{display:flex;align-items:flex-start;gap:8px}
+.bit-card-tit{flex:1;font-size:13px;font-weight:700;color:var(--navy);line-height:1.3;word-break:break-word}
+.bit-untitled{color:var(--muted);font-weight:600;font-style:italic}
+.bit-fav{border:none;background:transparent;color:var(--muted);cursor:pointer;flex-shrink:0;font-size:15px;padding:0;line-height:1}
+.bit-fav.on{color:#E8A93C}
+.bit-card-body{font-size:11.5px;color:var(--slate);line-height:1.5;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical}
+.bit-card-ft{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:2px}
+.bit-tab-chip{font-size:8.5px;font-weight:800;border-radius:20px;padding:2px 8px;background:var(--line-lt);color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.bit-card-acts{display:flex;align-items:center;gap:7px}
+.bit-meta{font-size:9.5px;color:var(--muted)}
+.bit-card-acts button{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;padding:1px}
+.bit-card-acts button:hover{color:var(--navy)}
+.bit-dot.bc-slate,.bit-col.bc-slate{background:#5E708A}.bit-card.bc-slate{border-left:3px solid #5E708A}.bit-tab-chip.bt-slate{background:#ECEFF4;color:#4A5A70}
+.bit-dot.bc-teal,.bit-col.bc-teal{background:#5B7FA6}.bit-card.bc-teal{border-left:3px solid #5B7FA6}.bit-tab-chip.bt-teal{background:#E7F0F8;color:#3E5C82}
+.bit-dot.bc-purple,.bit-col.bc-purple{background:#7B6EF6}.bit-card.bc-purple{border-left:3px solid #7B6EF6}.bit-tab-chip.bt-purple{background:#EDE9FB;color:#5B4FD6}
+.bit-dot.bc-amber,.bit-col.bc-amber{background:#C79A3C}.bit-card.bc-amber{border-left:3px solid #C79A3C}.bit-tab-chip.bt-amber{background:#FBF0DD;color:#8A6D1B}
+.bit-dot.bc-green,.bit-col.bc-green{background:#3E9B6B}.bit-card.bc-green{border-left:3px solid #3E9B6B}.bit-tab-chip.bt-green{background:#E4F5EC;color:#1E7A4D}
+.bit-dot.bc-red,.bit-col.bc-red{background:#E5484D}.bit-card.bc-red{border-left:3px solid #E5484D}.bit-tab-chip.bt-red{background:#FDE7E9;color:#C0392B}
+.bit-dot.bc-pink,.bit-col.bc-pink{background:#D6568F}.bit-card.bc-pink{border-left:3px solid #D6568F}.bit-tab-chip.bt-pink{background:#FBE7F0;color:#B03A6E}
+.bit-dot.bc-navy,.bit-col.bc-navy{background:#222B46}.bit-card.bc-navy{border-left:3px solid #222B46}.bit-tab-chip.bt-navy{background:#E4E7EF;color:#222B46}
 .cx-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);cursor:pointer;transition:box-shadow .14s}
 .cx-card:hover{box-shadow:var(--sh-lg)}
 .cx-card.open{cursor:default}
@@ -1132,6 +1179,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <button class="nav-item" data-view="costos" data-perm="ver_costos" onclick="showView('costos')"><i class="ti ti-calculator"></i>Costos</button>
     <button class="nav-item" data-view="produccion" data-perm="ver_produccion" onclick="showView('produccion')"><i class="ti ti-tools"></i>Producción</button>
     <button class="nav-item" data-view="inventario" data-perm="gestionar_inventario" onclick="showView('inventario')"><i class="ti ti-packages"></i>Inventario</button>
+    <button class="nav-item" data-view="bitacora" onclick="showView('bitacora')"><i class="ti ti-notebook"></i>Bitácora</button>
     <div class="nav-sec">Rápido</div>
     <button class="nav-item" onclick="filtroRapido('urgente')"><i class="ti ti-alert-triangle"></i>Urgentes<span class="nb" id="sb-urg">0</span></button>
     <button class="nav-item" onclick="filtroRapido('entregado')"><i class="ti ti-circle-check"></i>Entregados</button>
@@ -1330,6 +1378,12 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       </div>
       <div id="cx-cont"></div>
       <div class="empty" id="cx-empty" style="display:none"><i class="ti ti-calculator"></i><p>Aún no hay productos con costos definidos.<br>Defínelos en la ficha de cada producto (Desglose de costos).</p></div>
+    </div>
+
+    <!-- BITÁCORA (segundo cerebro) -->
+    <div id="view-bitacora" class="view">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;max-width:820px">Tu segundo cerebro: captura ideas, pendientes, datos, precios que te pasan, lo que sea — primero registra, después organizas. Nada se pierde, todo queda a mano.</div>
+      <div id="bit-root"></div>
     </div>
 
     <!-- ARCHIVO -->
@@ -3245,7 +3299,7 @@ function showView(v){
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',costos:'Centro de Costos',produccion:'Producción',inventario:'Inventario',ayuda:'Ayuda y About',archivo:'Archivo'};
+  const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',costos:'Centro de Costos',produccion:'Producción',inventario:'Inventario',bitacora:'Bitácora',ayuda:'Ayuda y About',archivo:'Archivo'};
   document.getElementById('tb-title').textContent=titles[v]||'';
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
   document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,dashboard:4,produccion:4,productos:4,costos:4,inventario:4,ayuda:4,configuracion:4,archivo:4}[v]??0]?.classList.add('active');
@@ -3257,8 +3311,94 @@ function showView(v){
   if(v==='costos')cargarCostos();
   if(v==='produccion')cargarProduccion();
   if(v==='inventario')cargarInventario();
+  if(v==='bitacora')cargarBitacora();
   if(v==='archivo')cargarArchivo();
 }
+
+/* ══ BITÁCORA (segundo cerebro) · Fase 1 MVP: capturar + tableros + lista ══ */
+let BIT_TABLEROS=[], BIT_NOTAS=[], bitFiltro='', bitBuscar='', bitDraft=null;
+const BIT_COLORES=['slate','teal','purple','amber','green','red','pink','navy'];
+async function cargarBitacora(){
+  try{ BIT_TABLEROS=await api('GET','/bitacora/tableros'); await cargarBitNotas(); }
+  catch(e){ const r=document.getElementById('bit-root'); if(r)r.innerHTML='<div class="empty"><i class="ti ti-notebook"></i><p>No se pudo cargar la Bitácora.</p></div>'; }
+}
+async function cargarBitNotas(){
+  const p=[];
+  if(bitFiltro==='__fav')p.push('favorita=1'); else if(bitFiltro)p.push('tablero='+encodeURIComponent(bitFiltro));
+  if(bitBuscar)p.push('q='+encodeURIComponent(bitBuscar));
+  BIT_NOTAS=await api('GET','/bitacora/notas'+(p.length?'?'+p.join('&'):''));
+  renderBitacora();
+}
+function bitPuede(){ return puede('gestionar_bitacora'); }
+function bitTablero(id){ return BIT_TABLEROS.find(t=>t.id===id); }
+function bitFiltrar(f){ bitFiltro=f; cargarBitNotas(); }
+function bitSetBuscar(v){ bitBuscar=v; clearTimeout(window.__bitq); window.__bitq=setTimeout(cargarBitNotas,250); }
+function renderBitacora(){
+  const root=document.getElementById('bit-root'); if(!root)return;
+  const esc=s=>String(s||'').replace(/</g,'&lt;'), puedeW=bitPuede();
+  const chips=`<div class="bit-chips">
+    <button class="bit-chip${bitFiltro===''?' active':''}" onclick="bitFiltrar('')">Todas</button>
+    <button class="bit-chip${bitFiltro==='__fav'?' active':''}" onclick="bitFiltrar('__fav')"><i class="ti ti-star"></i>Favoritas</button>
+    ${BIT_TABLEROS.map(t=>`<button class="bit-chip${bitFiltro===t.id?' active':''}" onclick="bitFiltrar('${t.id}')"><span class="bit-dot bc-${t.color}"></span>${esc(t.nombre)}${puedeW?`<i class="ti ti-x bit-chip-x" onclick="event.stopPropagation();bitBorrarTablero('${t.id}')" title="Quitar tablero"></i>`:''}</button>`).join('')}
+    ${puedeW?`<button class="bit-chip bit-chip-add" onclick="bitNuevoTablero()"><i class="ti ti-plus"></i>Tablero</button>`:''}
+  </div>`;
+  const top=`<div class="bit-top">
+    ${puedeW?`<button class="btn-add-row bit-nueva" onclick="bitNueva()"><i class="ti ti-plus"></i>Nueva nota</button>`:''}
+    <div class="search-b bit-search"><i class="ti ti-search"></i><input type="text" value="${esc(bitBuscar)}" placeholder="Buscar en la bitácora…" oninput="bitSetBuscar(this.value)"></div>
+  </div>`;
+  const form=(bitDraft!=null)?bitFormHTML():'';
+  const cards=BIT_NOTAS.length?`<div class="bit-grid">${BIT_NOTAS.map(bitCardHTML).join('')}</div>`
+    :`<div class="empty" style="padding:30px"><i class="ti ti-notebook"></i><p>${(bitBuscar||bitFiltro)?'Sin resultados en este filtro.':'Tu bitácora está vacía. Captura tu primera nota — una idea, un pendiente, un dato.'}</p></div>`;
+  root.innerHTML=chips+top+form+cards;
+  const ta=document.getElementById('bit-f-titulo'); if(ta&&!ta.value)ta.focus();
+}
+function bitCardHTML(n){
+  const esc=s=>String(s||'').replace(/</g,'&lt;'), puedeW=bitPuede();
+  const t=bitTablero(n.tablero_id), cuerpo=String(n.contenido||'').trim();
+  return `<div class="bit-card${n.color?' bc-'+n.color:''}">
+    <div class="bit-card-hd">
+      <div class="bit-card-tit">${n.titulo?esc(n.titulo):'<span class="bit-untitled">Sin título</span>'}</div>
+      ${puedeW?`<button class="bit-fav${n.favorita?' on':''}" onclick="bitFav('${n.id}',${n.favorita?0:1})" title="Favorita"><i class="ti ti-star${n.favorita?'-filled':''}"></i></button>`:''}
+    </div>
+    ${cuerpo?`<div class="bit-card-body">${esc(cuerpo)}</div>`:''}
+    <div class="bit-card-ft">
+      ${t?`<span class="bit-tab-chip bt-${t.color}">${esc(t.nombre)}</span>`:'<span></span>'}
+      <div class="bit-card-acts"><span class="bit-meta">${fd((n.actualizado||n.creado||'').slice(0,10))}</span>${puedeW?`<button onclick="bitEditar('${n.id}')" title="Editar"><i class="ti ti-pencil"></i></button><button onclick="bitArchivar('${n.id}')" title="Archivar"><i class="ti ti-archive"></i></button>`:''}</div>
+    </div>
+  </div>`;
+}
+function bitNueva(){ bitDraft={id:'',titulo:'',contenido:'',tablero_id:(bitFiltro&&bitFiltro!=='__fav')?bitFiltro:'',color:''}; renderBitacora(); }
+function bitEditar(id){ const n=BIT_NOTAS.find(x=>x.id===id); if(!n)return; bitDraft={id:n.id,titulo:n.titulo||'',contenido:n.contenido||'',tablero_id:n.tablero_id||'',color:n.color||''}; renderBitacora(); }
+function bitCancelar(){ bitDraft=null; renderBitacora(); }
+function bitDraftSet(k,v){ if(bitDraft)bitDraft[k]=v; }
+function bitFormHTML(){
+  const d=bitDraft, eA=s=>String(s||'').replace(/"/g,'&quot;'), eT=s=>String(s||'').replace(/</g,'&lt;');
+  return `<div class="bit-form">
+    <input class="bit-f-titulo" id="bit-f-titulo" type="text" value="${eA(d.titulo)}" placeholder="Título (opcional)" oninput="bitDraftSet('titulo',this.value)">
+    <textarea class="bit-f-cont" placeholder="Escribe lo que sea… una idea, un pendiente, un dato, un precio que te pasaron." oninput="bitDraftSet('contenido',this.value);autoTA(this)">${eT(d.contenido)}</textarea>
+    <div class="bit-f-row">
+      <select class="item-inp bit-f-tab" onchange="bitDraftSet('tablero_id',this.value)"><option value="">— Sin tablero —</option>${BIT_TABLEROS.map(t=>`<option value="${t.id}"${t.id===d.tablero_id?' selected':''}>${eT(t.nombre)}</option>`).join('')}</select>
+      <div class="bit-f-colors">${BIT_COLORES.map(c=>`<button type="button" class="bit-col bc-${c}${d.color===c?' on':''}" onclick="bitDraftSet('color','${d.color===c?'':c}');renderBitacora()" title="${c}"></button>`).join('')}</div>
+      <div class="bit-f-acts"><button class="pill" onclick="bitCancelar()">Cancelar</button><button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="bitGuardar()"><i class="ti ti-check"></i>${d.id?'Guardar':'Capturar'}</button></div>
+    </div>
+  </div>`;
+}
+async function bitGuardar(){
+  const d=bitDraft; if(!d)return;
+  if(!(d.titulo||'').trim()&&!(d.contenido||'').trim()){ toast('Escribe al menos un título o contenido',false); return; }
+  try{
+    const body={titulo:d.titulo,contenido:d.contenido,tablero_id:d.tablero_id,color:d.color};
+    if(d.id)await api('PUT','/bitacora/notas/'+d.id,body); else await api('POST','/bitacora/notas',body);
+    bitDraft=null; await cargarBitNotas(); toast('Nota guardada ✓');
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+async function bitFav(id,val){ try{ await api('PUT','/bitacora/notas/'+id,{favorita:val}); await cargarBitNotas(); }catch(e){ toast('Error: '+e.message,false); } }
+async function bitArchivar(id){ if(!confirm('¿Archivar esta nota? No se elimina, queda archivada.'))return; try{ await api('DELETE','/bitacora/notas/'+id); await cargarBitNotas(); }catch(e){ toast('Error: '+e.message,false); } }
+async function bitNuevoTablero(){
+  const nombre=prompt('Nombre del tablero (ej: Ideas, Pendientes, Proveedores):'); if(!nombre||!nombre.trim())return;
+  try{ const t=await api('POST','/bitacora/tableros',{nombre:nombre.trim(),color:BIT_COLORES[BIT_TABLEROS.length%BIT_COLORES.length]}); BIT_TABLEROS.push(t); renderBitacora(); }catch(e){ toast('Error: '+e.message,false); }
+}
+async function bitBorrarTablero(id){ if(!confirm('¿Quitar este tablero? Las notas NO se borran, quedan sin tablero.'))return; try{ await api('DELETE','/bitacora/tableros/'+id); BIT_TABLEROS=BIT_TABLEROS.filter(t=>t.id!==id); if(bitFiltro===id)bitFiltro=''; await cargarBitNotas(); }catch(e){ toast('Error: '+e.message,false); } }
 
 /* ══ STATS ══ */
 async function cargarStats(){
