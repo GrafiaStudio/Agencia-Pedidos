@@ -420,6 +420,15 @@ db.exec(`CREATE TABLE IF NOT EXISTS bitacora_notas(
   creado TEXT DEFAULT(datetime('now','localtime')),
   actualizado TEXT DEFAULT(datetime('now','localtime'))
 )`);
+// F2 · relaciones inteligentes: una nota se enlaza a N entidades (pedido/cliente/producto/…)
+db.exec(`CREATE TABLE IF NOT EXISTS bitacora_relaciones(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  nota_id TEXT NOT NULL,
+  entidad_tipo TEXT NOT NULL,
+  entidad_id TEXT NOT NULL,
+  creado TEXT DEFAULT(datetime('now','localtime'))
+)`);
 
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
 const SEPARADORES_MILES=['.',','];
@@ -2031,6 +2040,32 @@ app.delete('/api/eventos/:id',requiere('gestionar_eventos'),(req,res)=>{
 
 // ── BITÁCORA · Todos ven; crear/editar/borrar requiere gestionar_bitacora ──
 function notaPublica(n){ if(n){n.favorita=!!n.favorita; n.archivado=!!n.archivado;} return n; }
+const BIT_ENTIDADES=['pedido','cliente','producto'];
+function bitMapas(wsId){
+  const ped={}; db.prepare('SELECT id,ref FROM pedidos WHERE workspace_id=?').all(wsId).forEach(p=>ped[p.id]=p.ref);
+  const cli={}; db.prepare('SELECT id,nombre FROM clientes WHERE workspace_id=?').all(wsId).forEach(c=>cli[c.id]=c.nombre);
+  const pro={}; db.prepare('SELECT id,nombre FROM fichas_producto WHERE workspace_id=?').all(wsId).forEach(f=>pro[f.id]=f.nombre);
+  return {ped,cli,pro};
+}
+function bitLabel(tipo,id,m){
+  if(tipo==='pedido')return m.ped[id]?('Pedido #'+m.ped[id]):'Pedido';
+  if(tipo==='cliente')return m.cli[id]||'Cliente';
+  if(tipo==='producto')return m.pro[id]||'Producto';
+  return String(id);
+}
+function relacionesDeNotas(notaIds,wsId,m){
+  const out={}; if(!notaIds.length)return out;
+  const ph=notaIds.map(()=>'?').join(',');
+  db.prepare(`SELECT * FROM bitacora_relaciones WHERE workspace_id=? AND nota_id IN (${ph})`).all(wsId,...notaIds)
+    .forEach(r=>{ (out[r.nota_id]=out[r.nota_id]||[]).push({tipo:r.entidad_tipo,id:r.entidad_id,label:bitLabel(r.entidad_tipo,r.entidad_id,m)}); });
+  return out;
+}
+function guardarRelacionesNota(notaId,wsId,relaciones){
+  db.prepare('DELETE FROM bitacora_relaciones WHERE nota_id=? AND workspace_id=?').run(notaId,wsId);
+  const ins=db.prepare('INSERT INTO bitacora_relaciones(id,workspace_id,nota_id,entidad_tipo,entidad_id)VALUES(?,?,?,?,?)');
+  (Array.isArray(relaciones)?relaciones:[]).forEach(r=>{ const tipo=String(r.tipo||'').trim(), eid=String(r.id||'').trim(); if(tipo&&eid&&BIT_ENTIDADES.includes(tipo))ins.run(uid(),wsId,notaId,tipo,eid); });
+}
+function notaConRel(id,wsId){ const n=notaPublica(db.prepare('SELECT * FROM bitacora_notas WHERE id=?').get(id)); if(n){const m=bitMapas(wsId); n.relaciones=relacionesDeNotas([id],wsId,m)[id]||[];} return n; }
 app.get('/api/bitacora/tableros',(req,res)=>{
   res.json(db.prepare('SELECT * FROM bitacora_tableros WHERE workspace_id=? AND archivado=0 ORDER BY orden,nombre').all(req.wsId));
 });
@@ -2063,7 +2098,22 @@ app.get('/api/bitacora/notas',(req,res)=>{
   if(req.query.favorita==='1')sql+=' AND favorita=1';
   if(req.query.q){sql+=' AND (titulo LIKE ? OR contenido LIKE ?)';p.push('%'+req.query.q+'%','%'+req.query.q+'%');}
   sql+=' ORDER BY favorita DESC, actualizado DESC';
-  res.json(db.prepare(sql).all(...p).map(notaPublica));
+  const notas=db.prepare(sql).all(...p).map(notaPublica);
+  const m=bitMapas(req.wsId); const rel=relacionesDeNotas(notas.map(n=>n.id),req.wsId,m);
+  notas.forEach(n=>n.relaciones=rel[n.id]||[]);
+  res.json(notas);
+});
+// Notas de la Bitácora relacionadas con una entidad (para mostrarlas dentro de su módulo)
+app.get('/api/bitacora/relacionadas',(req,res)=>{
+  const tipo=String(req.query.tipo||''), eid=String(req.query.id||'');
+  if(!tipo||!eid)return res.json([]);
+  const ids=db.prepare('SELECT nota_id FROM bitacora_relaciones WHERE workspace_id=? AND entidad_tipo=? AND entidad_id=?').all(req.wsId,tipo,eid).map(r=>r.nota_id);
+  if(!ids.length)return res.json([]);
+  const ph=ids.map(()=>'?').join(',');
+  const notas=db.prepare(`SELECT * FROM bitacora_notas WHERE workspace_id=? AND archivado=0 AND id IN (${ph}) ORDER BY favorita DESC, actualizado DESC`).all(req.wsId,...ids).map(notaPublica);
+  const m=bitMapas(req.wsId); const rel=relacionesDeNotas(notas.map(n=>n.id),req.wsId,m);
+  notas.forEach(n=>n.relaciones=rel[n.id]||[]);
+  res.json(notas);
 });
 app.post('/api/bitacora/notas',requiere('gestionar_bitacora'),(req,res)=>{
   try{
@@ -2072,7 +2122,8 @@ app.post('/api/bitacora/notas',requiere('gestionar_bitacora'),(req,res)=>{
     const act=actorDe(req); const id=uid();
     db.prepare('INSERT INTO bitacora_notas(id,workspace_id,tablero_id,titulo,contenido,color,favorita,creado_por,actualizado_por)VALUES(?,?,?,?,?,?,?,?,?)')
       .run(id,req.wsId,String(b.tablero_id||''),String(b.titulo||'').trim(),String(b.contenido||''),String(b.color||''),b.favorita?1:0,act.nombre||'',act.nombre||'');
-    res.json(notaPublica(db.prepare('SELECT * FROM bitacora_notas WHERE id=?').get(id)));
+    guardarRelacionesNota(id,req.wsId,b.relaciones);
+    res.json(notaConRel(id,req.wsId));
   }catch(e){logError('POST bitacora/notas',e);res.status(500).json({error:e.message})}
 });
 app.put('/api/bitacora/notas/:id',requiere('gestionar_bitacora'),(req,res)=>{
@@ -2085,8 +2136,9 @@ app.put('/api/bitacora/notas/:id',requiere('gestionar_bitacora'),(req,res)=>{
     }else{
       db.prepare("UPDATE bitacora_notas SET tablero_id=?,titulo=?,contenido=?,color=?,favorita=?,actualizado_por=?,actualizado=datetime('now','localtime') WHERE id=?")
         .run(String(b.tablero_id??n.tablero_id),String(b.titulo??n.titulo).trim(),String(b.contenido??n.contenido),String(b.color??n.color),(b.favorita??n.favorita)?1:0,act.nombre||'',n.id);
+      if(b.relaciones!==undefined)guardarRelacionesNota(n.id,req.wsId,b.relaciones);
     }
-    res.json(notaPublica(db.prepare('SELECT * FROM bitacora_notas WHERE id=?').get(n.id)));
+    res.json(notaConRel(n.id,req.wsId));
   }catch(e){logError('PUT bitacora/notas/:id',e);res.status(500).json({error:e.message})}
 });
 app.delete('/api/bitacora/notas/:id',requiere('gestionar_bitacora'),(req,res)=>{

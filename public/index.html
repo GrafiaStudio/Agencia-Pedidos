@@ -412,6 +412,26 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .bit-dot.bc-red,.bit-col.bc-red{background:#E5484D}.bit-card.bc-red{border-left:3px solid #E5484D}.bit-tab-chip.bt-red{background:#FDE7E9;color:#C0392B}
 .bit-dot.bc-pink,.bit-col.bc-pink{background:#D6568F}.bit-card.bc-pink{border-left:3px solid #D6568F}.bit-tab-chip.bt-pink{background:#FBE7F0;color:#B03A6E}
 .bit-dot.bc-navy,.bit-col.bc-navy{background:#222B46}.bit-card.bc-navy{border-left:3px solid #222B46}.bit-tab-chip.bt-navy{background:#E4E7EF;color:#222B46}
+/* F2 · relaciones */
+.bit-rel{margin-top:8px}
+.bit-rel-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.bit-rel-pick{display:flex;gap:7px;flex-wrap:wrap}
+.bit-rel-tipo,.bit-rel-ent{width:auto!important;min-width:135px;font-size:11px}
+.bit-relchip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;border-radius:20px;padding:3px 9px;background:var(--line-lt);color:var(--slate);max-width:100%}
+.bit-relchip.sm{font-size:9px;padding:2px 8px}
+.bit-relchip i{font-size:11px;flex-shrink:0}
+.bit-relchip-x{opacity:.5;cursor:pointer;margin-left:1px}
+.bit-relchip-x:hover{opacity:1;color:var(--red)}
+.bit-relchip.bt-teal{background:#E7F0F8;color:#3E5C82}
+.bit-relchip.bt-purple{background:#EDE9FB;color:#5B4FD6}
+.bit-relchip.bt-green{background:#E4F5EC;color:#1E7A4D}
+.bit-card-rel{display:flex;flex-wrap:wrap;gap:5px}
+.bit-rel-sec{background:#FBFAFE;border:1px solid #E7E1F8;border-radius:10px;padding:10px 12px;margin-bottom:14px}
+.bit-rel-sec-hd{display:flex;align-items:center;gap:6px;font-size:9px;font-weight:800;color:#6A5AE0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.bit-rel-item{background:var(--white);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.bit-rel-item:last-child{margin-bottom:0}
+.bit-rel-item-t{font-size:12px;font-weight:700;color:var(--navy);line-height:1.3}
+.bit-rel-item-b{font-size:11px;color:var(--slate);line-height:1.45;margin-top:3px;white-space:pre-wrap}
 .cx-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);cursor:pointer;transition:box-shadow .14s}
 .cx-card:hover{box-shadow:var(--sh-lg)}
 .cx-card.open{cursor:default}
@@ -3361,6 +3381,7 @@ function bitCardHTML(n){
       ${puedeW?`<button class="bit-fav${n.favorita?' on':''}" onclick="bitFav('${n.id}',${n.favorita?0:1})" title="Favorita"><i class="ti ti-star${n.favorita?'-filled':''}"></i></button>`:''}
     </div>
     ${cuerpo?`<div class="bit-card-body">${esc(cuerpo)}</div>`:''}
+    ${(n.relaciones&&n.relaciones.length)?`<div class="bit-card-rel">${bitRelChips(n.relaciones,true)}</div>`:''}
     <div class="bit-card-ft">
       ${t?`<span class="bit-tab-chip bt-${t.color}">${esc(t.nombre)}</span>`:'<span></span>'}
       <div class="bit-card-acts"><span class="bit-meta">${fd((n.actualizado||n.creado||'').slice(0,10))}</span>${puedeW?`<button onclick="bitEditar('${n.id}')" title="Editar"><i class="ti ti-pencil"></i></button><button onclick="bitArchivar('${n.id}')" title="Archivar"><i class="ti ti-archive"></i></button>`:''}</div>
@@ -3376,6 +3397,13 @@ function bitFormHTML(){
   return `<div class="bit-form">
     <input class="bit-f-titulo" id="bit-f-titulo" type="text" value="${eA(d.titulo)}" placeholder="Título (opcional)" oninput="bitDraftSet('titulo',this.value)">
     <textarea class="bit-f-cont" placeholder="Escribe lo que sea… una idea, un pendiente, un dato, un precio que te pasaron." oninput="bitDraftSet('contenido',this.value);autoTA(this)">${eT(d.contenido)}</textarea>
+    <div class="bit-rel">
+      ${(d.relaciones&&d.relaciones.length)?`<div class="bit-rel-chips">${bitRelChips(d.relaciones)}</div>`:''}
+      <div class="bit-rel-pick">
+        <select class="item-inp bit-rel-tipo" onchange="bitRelSetTipo(this.value)"><option value="">🔗 Relacionar con…</option><option value="pedido"${d._relTipo==='pedido'?' selected':''}>Pedido</option><option value="cliente"${d._relTipo==='cliente'?' selected':''}>Cliente</option><option value="producto"${d._relTipo==='producto'?' selected':''}>Producto</option></select>
+        ${d._relTipo?`<select class="item-inp bit-rel-ent" onchange="bitRelAdd(this.value)"><option value="">— elegir ${d._relTipo} —</option>${(bitEntCache[d._relTipo]||[]).map(e=>`<option value="${e.id}">${String(e.label).replace(/</g,'&lt;')}</option>`).join('')}</select>`:''}
+      </div>
+    </div>
     <div class="bit-f-row">
       <select class="item-inp bit-f-tab" onchange="bitDraftSet('tablero_id',this.value)"><option value="">— Sin tablero —</option>${BIT_TABLEROS.map(t=>`<option value="${t.id}"${t.id===d.tablero_id?' selected':''}>${eT(t.nombre)}</option>`).join('')}</select>
       <div class="bit-f-colors">${BIT_COLORES.map(c=>`<button type="button" class="bit-col bc-${c}${d.color===c?' on':''}" onclick="bitDraftSet('color','${d.color===c?'':c}');renderBitacora()" title="${c}"></button>`).join('')}</div>
@@ -3387,7 +3415,7 @@ async function bitGuardar(){
   const d=bitDraft; if(!d)return;
   if(!(d.titulo||'').trim()&&!(d.contenido||'').trim()){ toast('Escribe al menos un título o contenido',false); return; }
   try{
-    const body={titulo:d.titulo,contenido:d.contenido,tablero_id:d.tablero_id,color:d.color};
+    const body={titulo:d.titulo,contenido:d.contenido,tablero_id:d.tablero_id,color:d.color,relaciones:(d.relaciones||[]).map(r=>({tipo:r.tipo,id:r.id}))};
     if(d.id)await api('PUT','/bitacora/notas/'+d.id,body); else await api('POST','/bitacora/notas',body);
     bitDraft=null; await cargarBitNotas(); toast('Nota guardada ✓');
   }catch(e){ toast('Error: '+e.message,false); }
@@ -3399,6 +3427,37 @@ async function bitNuevoTablero(){
   try{ const t=await api('POST','/bitacora/tableros',{nombre:nombre.trim(),color:BIT_COLORES[BIT_TABLEROS.length%BIT_COLORES.length]}); BIT_TABLEROS.push(t); renderBitacora(); }catch(e){ toast('Error: '+e.message,false); }
 }
 async function bitBorrarTablero(id){ if(!confirm('¿Quitar este tablero? Las notas NO se borran, quedan sin tablero.'))return; try{ await api('DELETE','/bitacora/tableros/'+id); BIT_TABLEROS=BIT_TABLEROS.filter(t=>t.id!==id); if(bitFiltro===id)bitFiltro=''; await cargarBitNotas(); }catch(e){ toast('Error: '+e.message,false); } }
+/* F2 · relaciones: enlazar una nota a pedido/cliente/producto */
+let bitEntCache={};
+const BIT_REL_ICON={pedido:'clipboard-list',cliente:'user',producto:'box'};
+async function bitFetchEnt(tipo){
+  try{
+    if(tipo==='pedido'){ const l=await api('GET','/pedidos'); const arr=Array.isArray(l)?l:(l.pedidos||l.items||[]); return arr.map(p=>({id:p.id,label:'Pedido #'+p.ref+(p.nombre?' · '+p.nombre:'')})); }
+    if(tipo==='cliente'){ const l=await api('GET','/clientes'); return (l||[]).map(c=>({id:c.id,label:c.nombre})); }
+    if(tipo==='producto'){ const l=await api('GET','/productos'); return (l||[]).map(p=>({id:p.id,label:(p.codigo?p.codigo+' · ':'')+p.nombre})); }
+  }catch(e){}
+  return [];
+}
+async function bitRelSetTipo(tipo){ if(!bitDraft)return; bitDraft._relTipo=tipo; if(tipo&&!bitEntCache[tipo])bitEntCache[tipo]=await bitFetchEnt(tipo); renderBitacora(); }
+function bitRelAdd(id){
+  if(!bitDraft||!bitDraft._relTipo||!id)return;
+  const tipo=bitDraft._relTipo, ent=(bitEntCache[tipo]||[]).find(e=>e.id===id); if(!ent)return;
+  bitDraft.relaciones=bitDraft.relaciones||[];
+  if(!bitDraft.relaciones.some(r=>r.tipo===tipo&&r.id===id))bitDraft.relaciones.push({tipo,id,label:ent.label});
+  renderBitacora();
+}
+function bitRelQuitar(i){ if(bitDraft&&bitDraft.relaciones){ bitDraft.relaciones.splice(i,1); renderBitacora(); } }
+function bitRelChips(rels,sm){ return (rels||[]).map((r,i)=>`<span class="bit-relchip${sm?' sm':''} bt-${r.tipo==='pedido'?'teal':(r.tipo==='cliente'?'purple':'green')}"><i class="ti ti-${BIT_REL_ICON[r.tipo]||'link'}"></i>${String(r.label||'').replace(/</g,'&lt;')}${sm?'':`<i class="ti ti-x bit-relchip-x" onclick="bitRelQuitar(${i})"></i>`}</span>`).join(''); }
+// Notas de la Bitácora relacionadas con una entidad — se muestran dentro de su módulo
+async function bitCargarRelacionadas(tipo,id,contId){
+  const cont=document.getElementById(contId); if(!cont)return;
+  try{
+    const notas=await api('GET','/bitacora/relacionadas?tipo='+tipo+'&id='+encodeURIComponent(id));
+    if(!notas.length){ cont.innerHTML=''; return; }
+    const esc=s=>String(s||'').replace(/</g,'&lt;');
+    cont.innerHTML=`<div class="bit-rel-sec"><div class="bit-rel-sec-hd"><i class="ti ti-notebook"></i>Bitácora · ${notas.length} nota${notas.length===1?'':'s'}</div>${notas.map(n=>`<div class="bit-rel-item${n.color?' bc-'+n.color:''}"><div class="bit-rel-item-t">${n.titulo?esc(n.titulo):'<span class="bit-untitled">Sin título</span>'}${n.favorita?' <i class="ti ti-star-filled" style="color:#E8A93C;font-size:11px"></i>':''}</div>${n.contenido?`<div class="bit-rel-item-b">${esc(n.contenido)}</div>`:''}</div>`).join('')}</div>`;
+  }catch(e){ cont.innerHTML=''; }
+}
 
 /* ══ STATS ══ */
 async function cargarStats(){
@@ -4354,6 +4413,7 @@ async function verCli(id){
   const c=await api('GET',`/clientes/${id}`);
   _cliActual=c;
   renderCliModal(false);
+  bitCargarRelacionadas('cliente',id,'cli-bit'); // F2 · notas de la Bitácora sobre este cliente
   document.getElementById('ovCli').classList.add('open');
 }
 // v3.0 Fase 7 — ficha del cliente en el módulo Clientes; edición solo con permiso editar_clientes
@@ -4387,6 +4447,7 @@ function renderCliModal(editando){
       <div class="sc tl"><div class="sc-l">Tel</div><div class="sc-n" style="font-size:14px">${c.tel||'—'}</div></div>
     </div>
     ${datos}
+    <div id="cli-bit"></div>
     <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px">Historial</div>
     ${(c.pedidos||[]).length?(c.pedidos||[]).map(p=>{
       const resumen=(p.encargosResumen||[]).map(e=>{
