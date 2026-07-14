@@ -1817,6 +1817,7 @@ app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
       // Variantes hoja: costo propio + heredado de grupos (los costos de un grupo aplican a sus hijas)
       const hojas=[];
       const walk=(nodos,herencia,ruta)=>{(nodos||[]).forEach(v=>{
+        if(v.informativa)return; // Centro de Costos: solo COSTOS — las variables informativas (tallas/color/género) no entran
         const propios=(v.costos||[]).reduce((a,c)=>a+(evalExpr(c.valor)||0),0);
         const acum=herencia+propios;
         const nombre=[...ruta,String(v.nombre||'—')];
@@ -1830,8 +1831,10 @@ app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
       });};
       walk(f.variantes||[],0,[]);
       const esMedidas=f.tipo_precio==='medidas';
-      const precio=esMedidas?toNum(f.medida_tarifa_calc):toNum(f.precio_oficial);
-      const costo=esMedidas?toNum(f.costo_medida_tarifa_calc):toNum(f.costo_total);
+      // Medidas cobran por m²/m lineal con tarifas que aceptan DECIMALES (ej. 3,5). toNum borra el
+      // punto decimal (3.5→35) y arruina el margen; toFloatCO respeta la coma decimal colombiana.
+      const precio=esMedidas?toFloatCO(f.medida_tarifa_calc):toNum(f.precio_oficial);
+      const costo=esMedidas?toFloatCO(f.costo_medida_tarifa_calc):toNum(f.costo_total);
       const margen=(precio>0&&costo>0)?precio-costo:null;
       return {id:f.id,nombre:f.nombre,codigo:f.codigo||'',categoria_id:f.categoria_id||'',
         tipo_precio:f.tipo_precio||'unitario',activo:!!f.activo,medida_unidad:f.medida_unidad||'',
