@@ -1866,6 +1866,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
       <div><label>Descuenta inventario</label><select id="prod-inv-item" onchange="onProdInvChange()"><option value="">— No descuenta —</option></select></div>
       <div style="padding-bottom:1px"><div class="ck-box" style="display:inline-flex"><input type="checkbox" id="prod-activo" checked><label for="prod-activo">Activo</label></div></div>
     </div>
+    <div id="prod-bit" style="margin-top:12px"></div>
     <div id="prod-inv-cant-wrap" style="display:none;max-width:300px;margin-top:10px"><label>Cantidad que consume por unidad</label>
       <input type="text" id="prod-inv-cant" placeholder="Ej: 1 · acepta decimales (0.7)">
       <div style="font-size:9.5px;color:var(--muted);margin-top:3px">Al confirmar un pedido descuenta esta cantidad del ítem físico elegido.</div>
@@ -5906,6 +5907,7 @@ function renderRangos(){
 }
 function resetProdForm(){
   fProdInsumos=[];fProdRangos=[];fProdComponentes=[];fProdPrecioBaseRaw='';prodCatSel='';
+  const _pb=document.getElementById('prod-bit');if(_pb)_pb.innerHTML='';
   const _ii=document.getElementById('prod-inv-item');if(_ii)_ii.value='';
   const _ic=document.getElementById('prod-inv-cant');if(_ic)_ic.value='';
   const _iw=document.getElementById('prod-inv-cant-wrap');if(_iw)_iw.style.display='none';
@@ -6047,6 +6049,7 @@ async function abrirEditarProducto(id){
   renderCostosFijos();
   renderVariantes();
   CX_LISTAS_ED=null; cvAsegurarListas().then(()=>renderVariantes()); // B3 · listas frescas para picker/aviso de desactualización
+  bitCargarRelacionadas('producto',editProdId,'prod-bit'); // F2b · notas de la Bitácora sobre este producto
   renderHojaSup();
   renderHojaExtras();
   renderComponentes();
