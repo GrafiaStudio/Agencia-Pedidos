@@ -426,6 +426,14 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cxl-vrow{border-bottom:1px solid var(--line-lt);font-size:11.5px;color:var(--navy)}
 .cxl-vrow .cxl-g-val{font-weight:700;color:var(--teal-dk)}
 .cxl-cod{font-size:9px;font-weight:800;background:var(--line-lt);color:var(--slate);border-radius:6px;padding:1px 5px}
+/* Listas de 1 precio en grid de 3 (descripción + precio juntos, con aire) */
+.cxl-sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 12px;margin-top:3px}
+.cxl-scell{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 10px;border-radius:8px;background:var(--line-lt);min-width:0}
+.cxl-scell .cxl-cod{background:var(--white)}
+.cxl-sdesc{font-size:11px;color:var(--slate);line-height:1.35;min-width:0}
+.cxl-sprice{font-size:11.5px;font-weight:700;color:var(--navy);white-space:nowrap;flex-shrink:0}
+@media(max-width:1100px){.cxl-sgrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:680px){.cxl-sgrid{grid-template-columns:1fr}}
 .cxl-nota{margin-top:8px;font-size:10.5px;color:var(--slate);background:var(--amber-lt);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:6px}
 .cxl-nota i{color:#9B6500;flex-shrink:0}
 .cx-head .pcx-obsbtn{width:26px;height:26px;font-size:12px}
@@ -3201,7 +3209,7 @@ function renderCxListas(cont,q){
       </div>
       ${abierta?`<div class="cx-des">
         ${(l.columnas&&l.columnas.length>1)?`<div class="cxl-vwrap"><div class="cxl-vhd"><span class="cxl-g-desc">Descripción</span>${l.columnas.map(c=>`<span class="cxl-g-val">${pesc(c)}</span>`).join('')}</div>${(l.items||[]).map(it=>`<div class="cxl-vrow"><span class="cxl-g-desc">${pesc(it.descripcion)}${it.codigo?` <span class="cxl-cod">#${pesc(it.codigo)}</span>`:''}</span>${l.columnas.map((c,ci)=>`<span class="cxl-g-val">${fCOP((it.valores&&it.valores[ci]&&it.valores[ci].valor_calc)||0)}</span>`).join('')}</div>`).join('')}</div>`
-        :`${(l.items||[]).map(it=>`<div class="cx-fila cxl-view"><span class="n">${pesc(it.descripcion)}${it.codigo?` <span class="cxl-cod">#${pesc(it.codigo)}</span>`:''}</span><span></span><span></span><span class="sub">${fCOP(it.precio_calc||0)}</span></div>`).join('')}`}
+        :`<div class="cxl-sgrid">${(l.items||[]).map(it=>`<div class="cxl-scell"><span class="cxl-sdesc">${pesc(it.descripcion)}${it.codigo?` <span class="cxl-cod">#${pesc(it.codigo)}</span>`:''}</span><span class="cxl-sprice">${fCOP(it.precio_calc||0)}</span></div>`).join('')}</div>`}
         ${l.notas?`<div class="cxl-nota"><i class="ti ti-info-circle"></i> ${pesc(l.notas)}</div>`:''}
       </div>`:''}
     </div>`;
