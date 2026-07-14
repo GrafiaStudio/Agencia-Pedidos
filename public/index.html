@@ -4414,6 +4414,15 @@ function setMedidaItem(encId,itemId,campo,valor){
   const it=e&&e.items.find(i=>i.id===itemId);
   if(!it||!it._fichaSel)return;
   it[campo]=valor;
+  if(it._fichaSel.tipo_precio==='variantes'){ // variantes con hoja(s) por medida: recalcula sumando las hojas
+    recalcVarItem(it);
+    const elU=document.getElementById('itval-'+itemId);
+    if(elU)elU.value=displayMoneyVal(it.valor_unitario);
+    const hv=document.getElementById('itmedv-hint-'+itemId);
+    if(hv){ const a=parseFloat(it._ancho)||0,b=parseFloat(it._alto)||0,area=a*b; hv.textContent=area>0?(String(Math.round(area*100)/100).replace('.',',')+' m²'):''; }
+    updateItemTotalCell(encId,itemId); actualizarValorTotal(); recalcularCostosAutomaticos();
+    return;
+  }
   const precio=calcPrecioMedidas(it._fichaSel,it._ancho,it._alto);
   it.valor_unitario=String(precio);
   it._autoPrecio=true;
@@ -4430,7 +4439,13 @@ function setMedidaItem(encId,itemId,campo,valor){
   actualizarValorTotal();
   recalcularCostosAutomaticos();
 }
-function varPrecioNodoFE(n,cant){
+function varMedidaTarifa(n){ return toFloatCO(n.medida_tarifa_calc||n.medida_tarifa||0); }
+function varMedidaMinimo(n){ return toFloatCO(n.medida_minimo_calc||n.medida_minimo||0); }
+function varPrecioNodoFE(n,cant,ancho,alto){
+  if(n.modo==='medidas'){
+    const a=parseFloat(ancho)||0, b=parseFloat(alto)||0;
+    return Math.round(Math.max(varMedidaMinimo(n), a*b*varMedidaTarifa(n)));
+  }
   if(n.modo==='hoja'){
     const piezas=parseInt(n.piezas,10)||0, precio=parseFloat(n.precio_calc)||0;
     if(piezas<=0||cant<=0)return 0;
@@ -4440,9 +4455,13 @@ function varPrecioNodoFE(n,cant){
   return (t!=null)?t:(parseFloat(n.precio_calc)||0);
 }
 function varPrecioBaseFE(n){
+  if(n.modo==='medidas')return Math.round(varMedidaTarifa(n));
   if(n.modo==='hoja'){const pz=parseInt(n.piezas,10)||0;return pz>0?Math.round((parseFloat(n.precio_calc)||0)/pz):0;}
   return varPrecioNodoFE(n,1);
 }
+// ¿alguna hoja elegida en el pedido cobra por medida? (para pedir ancho×alto una vez por ítem)
+function varItemTieneMedida(it){ try{ return partesSeleccionadasVar(it).some(s=>(s.opcion||s.parte).modo==='medidas'); }catch(e){ return false; } }
+function varLeafPrecioLbl(n){ return n.modo==='medidas'?('desde '+fCOP(varPrecioBaseFE(n))+' /m²'):fCOP(varPrecioBaseFE(n)); }
 /* Partes (1er nivel) elegidas en el pedido: cada una suma, con su cantidad de instancias.
    - parte hoja: se incluye 1 vez (checkbox).
    - grupo "elige una" (multi=false): aporta la OPCIÓN elegida, 1 vez.
@@ -4471,7 +4490,7 @@ function recalcVarItem(it){
   const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
   const sel=partesSeleccionadasVar(it);
   let total=0;
-  sel.forEach(s=>{total+=varPrecioNodoFE(s.opcion||s.parte,cant>0?cant:1)*(s.qty||1)});
+  sel.forEach(s=>{total+=varPrecioNodoFE(s.opcion||s.parte,cant>0?cant:1,it._ancho,it._alto)*(s.qty||1)});
   it.valor_unitario=sel.length?String(total):'';
   it._autoPrecio=true;
   const nombres=sel.map(s=>{const n=s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre;return (s.qty>1)?(n+' ×'+s.qty):n});
@@ -4486,12 +4505,12 @@ function renderVarSelectsHTML(encId,it){
     if(parte.hijos&&parte.hijos.length){
       if(parte.multi){
         const mapa=(picks[parte.id]&&typeof picks[parte.id]==='object')?picks[parte.id]:{};
-        html+=`<div style="display:flex;flex-direction:column;gap:5px">${parte.hijos.map(op=>`<label style="display:flex;align-items:center;gap:6px;font-size:10px"><input class="item-inp" type="number" min="0" style="width:44px" value="${parseInt(mapa[op.id],10)||''}" placeholder="0" oninput="setVarPickMulti('${encId}','${it.id}','${parte.id}','${op.id}',this.value)"><span>${op.nombre}${parte.informativa?'':` <span style="color:var(--muted)">(${fCOP(varPrecioBaseFE(op))})</span>`}</span></label>`).join('')}</div>`;
+        html+=`<div style="display:flex;flex-direction:column;gap:5px">${parte.hijos.map(op=>`<label style="display:flex;align-items:center;gap:6px;font-size:10px"><input class="item-inp" type="number" min="0" style="width:44px" value="${parseInt(mapa[op.id],10)||''}" placeholder="0" oninput="setVarPickMulti('${encId}','${it.id}','${parte.id}','${op.id}',this.value)"><span>${op.nombre}${parte.informativa?'':` <span style="color:var(--muted)">(${varLeafPrecioLbl(op)})</span>`}</span></label>`).join('')}</div>`;
       }else{
         const val=picks[parte.id]||'';
         html+=`<select class="item-inp" style="width:100%" onchange="setVarPick('${encId}','${it.id}','${parte.id}',this.value)">
             <option value="">— ninguno —</option>
-            ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre}${parte.informativa?'':` — ${fCOP(varPrecioBaseFE(h))}`}</option>`).join('')}
+            ${parte.hijos.map(h=>`<option value="${h.id}"${h.id===val?' selected':''}>${h.nombre}${parte.informativa?'':` — ${varLeafPrecioLbl(h)}`}</option>`).join('')}
           </select>`;
       }
     }else{
@@ -4501,6 +4520,16 @@ function renderVarSelectsHTML(encId,it){
     html+='</div>';
   });
   html+='</div>';
+  if(varItemTieneMedida(it)){
+    html+=`<div class="item-expand" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <span style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Medida</span>
+      <input class="item-inp" style="width:74px" type="number" step="0.01" min="0" value="${it._ancho||''}" placeholder="Ancho (m)" oninput="setMedidaItem('${encId}','${it.id}','_ancho',this.value)">
+      <span style="font-size:11px;color:var(--muted)">×</span>
+      <input class="item-inp" style="width:74px" type="number" step="0.01" min="0" value="${it._alto||''}" placeholder="Alto (m)" oninput="setMedidaItem('${encId}','${it.id}','_alto',this.value)">
+      <span style="font-size:10px;color:var(--muted)">m²</span>
+      <span id="itmedv-hint-${it.id}" style="font-size:10px;font-weight:700;color:var(--teal-dk)"></span>
+    </div>`;
+  }
   return html;
 }
 function setVarPick(encId,itemId,parteId,value){
@@ -4871,8 +4900,8 @@ function moverVariante(id,dir){
 }
 let varItemPlegados=new Set();
 function toggleVarItem(encId,itemId){if(varItemPlegados.has(itemId))varItemPlegados.delete(itemId);else varItemPlegados.add(itemId);renderEncItems(encId)}
-function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'precio',piezas:'',informativa:false}}
-function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,
+function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'precio',piezas:'',informativa:false,medida_tarifa:'',medida_minimo:''}}
+function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,medida_tarifa:v.medida_tarifa||'',medida_minimo:v.medida_minimo||'',
   costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
   tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
   hijos:(v.hijos||[]).map(clonarNodoVar)}}
@@ -4958,7 +4987,7 @@ function htmlNodoVariante(v,nivel){
   const sib=siblingsDeVar(v.id);
   const esPrimero=!sib||sib.idx===0, esUltimo=!sib||sib.idx===sib.arr.length-1;
   const mvTitulo=nivel>1?'sub-variante':'grupo';
-  const mostrarPrecio=!esGrupo&&v.modo!=='hoja';
+  const mostrarPrecio=!esGrupo&&v.modo!=='hoja'&&v.modo!=='medidas';
   // Header EN COLUMNAS (mockup): [nombre] [precio público] [costos de este nivel] en una banda horizontal
   return `<div class="var-node${nivel>1?' var-sub':''}">
     <div class="var-hd">
@@ -4979,19 +5008,24 @@ function htmlNodoVariante(v,nivel){
     <div style="display:${colapsado?'none':'block'}">
     ${esGrupo?'':`
       <div class="var-modos">
-        <label class="var-modo-pill${v.modo!=='hoja'?' active':''}"><input type="radio" hidden name="vmodo-${v.id}" ${v.modo!=='hoja'?'checked':''} onchange="setVarModo('${v.id}','precio')"><span class="rd"></span>Precio por cantidad</label>
+        <label class="var-modo-pill${(v.modo!=='hoja'&&v.modo!=='medidas')?' active':''}"><input type="radio" hidden name="vmodo-${v.id}" ${(v.modo!=='hoja'&&v.modo!=='medidas')?'checked':''} onchange="setVarModo('${v.id}','precio')"><span class="rd"></span>Precio por cantidad</label>
         <label class="var-modo-pill${v.modo==='hoja'?' active':''}"><input type="radio" hidden name="vmodo-${v.id}" ${v.modo==='hoja'?'checked':''} onchange="setVarModo('${v.id}','hoja')"><span class="rd"></span>Por hoja (rendimiento)</label>
-        <div class="var-modo-pill disabled" title="Se activa en la próxima actualización"><span class="rd"></span>Por medidas (ancho×alto)<span class="soon">pronto</span></div>
+        <label class="var-modo-pill${v.modo==='medidas'?' active':''}"><input type="radio" hidden name="vmodo-${v.id}" ${v.modo==='medidas'?'checked':''} onchange="setVarModo('${v.id}','medidas')"><span class="rd"></span>Por medidas (ancho×alto)</label>
       </div>
       ${v.modo==='hoja'?`
         <div class="fr2 fg">
           <div><label class="var-hd-lbl">Piezas por hoja</label><input class="item-inp" type="number" min="1" value="${esc(v.piezas)}" placeholder="Ej: 8" oninput="setVariante('${v.id}','piezas',this.value)"></div>
           <div><label class="var-hd-lbl">Precio por hoja</label><input class="item-inp" type="text" value="${esc(v.precio)}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>
         </div>
-        <div class="var-hint">Al cotizar, el sistema calcula cuántas hojas se necesitan. Ej: 8 piezas/hoja a $1.000 → 100 piezas = 13 hojas = $13.000.</div>`:`
+        <div class="var-hint">Al cotizar, el sistema calcula cuántas hojas se necesitan. Ej: 8 piezas/hoja a $1.000 → 100 piezas = 13 hojas = $13.000.</div>`:(v.modo==='medidas'?`
+        <div class="fr2 fg">
+          <div><label class="var-hd-lbl">Tarifa por m²</label><input class="item-inp" type="text" value="${esc(v.medida_tarifa)}" placeholder="Ej: 8,5" oninput="setVariante('${v.id}','medida_tarifa',this.value)"></div>
+          <div><label class="var-hd-lbl">Cobro mínimo (opcional)</label><input class="item-inp" type="text" value="${esc(v.medida_minimo)}" placeholder="$ 0" oninput="setVariante('${v.id}','medida_minimo',this.value)"></div>
+        </div>
+        <div class="var-hint">Al cotizar se pide ancho × alto (m) y se cobra máx(mínimo, área × tarifa). Acepta decimales con coma (ej. 8,5).</div>`:`
         <div class="var-hd-lbl" style="margin:9px 0 3px">Precios por cantidad (opcional)</div>
         <div class="var-hint">Si lo dejas vacío, se usa el Precio público. Ej: 1 a 6 → $15.000, 7 a 12 → $13.000. El último tramo cubre cantidades mayores.</div>
-        ${htmlTramosVar(v)}`}`}
+        ${htmlTramosVar(v)}`)}`}
     ${sub?`
       <div style="font-size:9px;font-weight:800;color:var(--navy);text-transform:uppercase;margin:12px 0 4px">Sub-variantes (versiones internas)</div>
       ${esGrupo?`<label class="ck-box" style="display:inline-flex;gap:6px;margin-bottom:6px"><input type="checkbox" ${v.multi?'checked':''} onchange="setVarMulti('${v.id}',this.checked)"><span style="font-size:10px">Permite elegir varias opciones (ej. varios estampados). Si está apagado, en el pedido se elige una sola (ej. un tamaño).</span></label>`:''}
@@ -5167,12 +5201,15 @@ function renderPegarPanelHTML(){
 }
 function cargarNodoVar(v){
   return {id:v.id||uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,
+    medida_tarifa:v.medida_tarifa||'',medida_tarifa_calc:v.medida_tarifa_calc||'',medida_minimo:v.medida_minimo||'',medida_minimo_calc:v.medida_minimo_calc||'',
     costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||''})),
     tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
     hijos:(v.hijos||[]).map(cargarNodoVar)};
 }
 function serializarNodoVar(v){
-  return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo:v.modo==='hoja'?'hoja':'precio',piezas:parseInt(v.piezas,10)||null,informativa:v.informativa?1:0,
+  const modo=(v.modo==='hoja'||v.modo==='medidas')?v.modo:'precio';
+  return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo,piezas:parseInt(v.piezas,10)||null,informativa:v.informativa?1:0,
+    medida_tarifa:(v.medida_tarifa||'').toString().trim(),medida_minimo:(v.medida_minimo||'').toString().trim(),
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim()})),
     tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
     hijos:(v.hijos||[]).map(serializarNodoVar)};
@@ -5601,6 +5638,8 @@ function validarProductoBody(b){
       if(info)return null; // opción de variable informativa: solo el nombre (ya validado)
       if(v.hijos&&v.hijos.length){
         for(let j=0;j<v.hijos.length;j++){const e=valNodo(v.hijos[j],etiq+'.'+(j+1));if(e)return e}
+      }else if(v.modo==='medidas'){
+        if(!definidoFE(v.medida_tarifa)||!(toFloatCO(v.medida_tarifa)>0))return`Variante ${etiq}: la tarifa por medida es obligatoria (acepta decimales, ej: 8,5)`;
       }else if(v.modo==='hoja'){
         if(!(parseInt(v.piezas,10)>0))return`Variante ${etiq}: piezas por hoja debe ser un número mayor a 0`;
         if(!definidoFE(v.precio)||evalExpr(v.precio)===null)return`Variante ${etiq}: el precio por hoja no es válido`;

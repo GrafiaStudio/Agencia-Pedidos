@@ -332,6 +332,11 @@ try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN multi INTEGER DEFAULT 0");
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN modo TEXT DEFAULT 'precio'"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN piezas INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN informativa INTEGER DEFAULT 0"); } catch(e){}
+// Editor 2.0 · modo 'medidas' en sub-variantes (cobro por ancho×alto, tarifa por m² con decimales)
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_tarifa TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_tarifa_calc TEXT"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_minimo TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_minimo_calc TEXT"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -822,11 +827,16 @@ function fichaCompleta(f){
     f.precio_oficial=f.componentes.reduce((a,c)=>a+c.cantidad_consumida*toNum(c.precio_unitario_calc),0);
   }else if(f.tipo_precio==='variantes'&&f.variantes.length){
     const hojas=hojasVariantes(f.variantes);
-    f.precio_oficial=hojas.length?Math.min(...hojas.map(v=>{
+    const precioDe=v=>{
       if(v.modo==='hoja'){const pz=parseInt(v.piezas,10)||0;return pz>0?Math.round(toNum(v.precio_calc)/pz):0;}
       const p1=detectarPrecioEscalonado(v.tramos||[],1);
       return p1!=null?p1:toNum(v.precio_calc);
-    })):0;
+    };
+    // Las hojas por medida (tarifa por m²) no son comparables con precios unitarios → se excluyen
+    // del "desde $X". Si TODAS son por medida, el desde = mínima tarifa por m².
+    const noMed=hojas.filter(v=>v.modo!=='medidas');
+    if(noMed.length){ f.precio_oficial=Math.min(...noMed.map(precioDe)); }
+    else{ const tar=hojas.map(v=>toFloatCO(v.medida_tarifa_calc)).filter(x=>x>0); f.precio_oficial=tar.length?Math.min(...tar):0; }
   }else{
     f.precio_oficial=precioOficialFicha(f,f.precio_sugerido);
   }
@@ -906,6 +916,8 @@ function validarFicha(b,wsId,fid){
       const tieneHijos=Array.isArray(v.hijos)&&v.hijos.length;
       if(tieneHijos){
         v.hijos.forEach((h,j)=>validarNodo(h,etiq+'.'+(j+1)));
+      }else if(v.modo==='medidas'){
+        if(!definido(v.medida_tarifa)||!(toFloatCO(v.medida_tarifa)>0))errores.push(`Variante ${etiq}: la tarifa por medida es obligatoria (acepta decimales, ej: 8,5)`);
       }else if(v.modo==='hoja'){
         if(!Number.isInteger(v.piezas)&&!(parseInt(v.piezas,10)>0))errores.push(`Variante ${etiq}: piezas por hoja debe ser un número mayor a 0`);
         if(!definido(v.precio)||evalExpr(v.precio)===null)errores.push(`Variante ${etiq}: el precio por hoja no es válido`);
@@ -1825,6 +1837,7 @@ app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
         else{
           let precio=toNum(v.precio_calc);
           if(v.modo==='hoja'){ const pz=parseInt(v.piezas,10)||0; if(pz>0)precio=Math.round(toNum(v.precio_calc)/pz); }
+          else if(v.modo==='medidas'){ precio=toFloatCO(v.medida_tarifa_calc); }
           else if((v.tramos||[]).length){ const p1=detectarPrecioEscalonado(v.tramos,1); if(p1!=null)precio=p1; }
           hojas.push({nombre:nombre.join(' › '),precio,costo_extra:Math.round(acum)});
         }
@@ -2025,8 +2038,9 @@ function guardarVariantes(fichaId,variantes,wsId){
   const insertarNodo=(v,parentId,i)=>{
     const id=v.id||uid();
     const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)}));
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,v.modo==='hoja'?'hoja':'precio',Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0);
+    const modoV=(v.modo==='hoja'||v.modo==='medidas')?v.modo:'precio';
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo));
     (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));
   };
   (variantes||[]).forEach((v,i)=>insertarNodo(v,'',i));
