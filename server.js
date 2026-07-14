@@ -1822,6 +1822,14 @@ app.post('/api/encargo-estados/reordenar',requiere('configurar_sistema'),(req,re
 app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
   try{
     const filas=db.prepare('SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0 ORDER BY nombre').all(req.wsId);
+    // B5 · Ventas reales por ficha (pedidos NO cotización, no archivados/cancelados): unidades, ingreso, # pedidos
+    const ventasMap={};
+    try{
+      db.prepare(`SELECT i.ficha_id AS fid, i.cantidad AS cant, i.valor_unitario_calc AS vu, e.pedido_id AS pid
+        FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+        WHERE i.workspace_id=? AND i.ficha_id IS NOT NULL AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0`).all(req.wsId)
+        .forEach(r=>{ const m=ventasMap[r.fid]||(ventasMap[r.fid]={und:0,ingreso:0,peds:{}}); const c=toNum(r.cant); m.und+=c; m.ingreso+=c*toNum(r.vu); m.peds[r.pid]=1; });
+    }catch(e){ logError('costos/ventas',e); }
     const productos=filas.map(f=>{
       fichaCompleta(f);
       const insumos=(f.insumos||[]).map(i=>{
@@ -1853,9 +1861,11 @@ app.get('/api/costos',requiere('ver_costos'),(req,res)=>{
       const precio=esMedidas?toFloatCO(f.medida_tarifa_calc):toNum(f.precio_oficial);
       const costo=esMedidas?toFloatCO(f.costo_medida_tarifa_calc):toNum(f.costo_total);
       const margen=(precio>0&&costo>0)?precio-costo:null;
+      const vt=ventasMap[f.id];
       return {id:f.id,nombre:f.nombre,codigo:f.codigo||'',categoria_id:f.categoria_id||'',
         tipo_precio:f.tipo_precio||'unitario',activo:!!f.activo,medida_unidad:f.medida_unidad||'',
         precio,costo,margen,margen_pct:(margen!=null&&precio>0)?Math.round(margen*100/precio):null,
+        ventas_und:vt?vt.und:0, ventas_ingreso:vt?Math.round(vt.ingreso):0, ventas_pedidos:vt?Object.keys(vt.peds).length:0,
         insumos,fijos,variantes:hojas};
     });
     res.json({productos});
