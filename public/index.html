@@ -654,6 +654,45 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cv-stale-banner{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#FBF3DD;border:1px solid #E9D08C;border-radius:9px;padding:8px 11px;margin-bottom:10px;font-size:11.5px;color:#8A6D1B;font-weight:600}
 .cv-stale-banner i{color:#B8860B}
 .cv-stale-banner .btn-add-row{background:#8A6D1B;color:#fff;border-color:#8A6D1B}
+/* B4 · modo cuadrícula (vista Excel) */
+.var-vista{display:inline-flex;gap:2px;background:var(--line-lt);border-radius:9px;padding:3px;margin-bottom:10px}
+.var-vista button{border:none;background:transparent;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--slate);cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'Montserrat',sans-serif}
+.var-vista button.active{background:var(--white);color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.vgrid-wrap{overflow-x:auto;padding-bottom:6px}
+.vgrid{display:flex;gap:10px;align-items:flex-start;min-width:max-content}
+.vgrid-col{flex:0 0 214px;width:214px;border:1px solid var(--line);border-radius:10px;background:var(--white);padding:8px}
+.vgrid-col.info{background:#FBFAFE;border-color:#E7E1F8}
+.vgrid-colhd{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:7px}
+.vgrid-gname{flex:1 1 90px;min-width:0;border:none;border-bottom:2px solid var(--line);background:transparent;font-size:12px;font-weight:800;color:var(--navy);padding:3px 2px}
+.vgrid-gname:focus{outline:none;border-color:#7B6EF6}
+.vgrid-tag{font-size:8px;font-weight:800;text-transform:uppercase;border-radius:20px;padding:2px 7px;letter-spacing:.4px}
+.vgrid-tag.precio{background:#E4F0FB;color:#3E5C82}
+.vgrid-tag.info{background:#EDE9FB;color:#6A5AE0}
+.vgrid-colctrls{display:inline-flex;gap:1px;width:100%;justify-content:flex-end}
+.vgrid-colctrls button{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:2px;font-size:12px}
+.vgrid-colctrls button:hover:not(:disabled){color:var(--navy)}
+.vgrid-colctrls button:disabled{opacity:.25}
+.vgrid-cells{display:flex;flex-direction:column;gap:6px}
+.vgrid-cell{border:1px solid var(--line);border-radius:8px;padding:5px 6px;background:var(--line-lt)}
+.vgrid-cell.info{display:flex;align-items:center;gap:4px;background:var(--white)}
+.vgrid-cellrow{display:flex;align-items:center;gap:4px}
+.vgrid-oname{flex:1 1 auto;min-width:0;border:none;background:var(--white);border-radius:6px;font-size:11px;padding:5px 6px;color:var(--navy)}
+.vgrid-cell.info .vgrid-oname{background:transparent;flex:1}
+.vgrid-oname:focus{outline:1px solid #7B6EF6}
+.vgrid-oprice{width:60px;flex:0 0 60px;border:none;background:var(--white);border-radius:6px;font-size:11px;padding:5px 6px;text-align:right;font-weight:700;color:var(--navy)}
+.vgrid-oprice:focus{outline:1px solid #7B6EF6}
+.vgrid-modo{font-size:8px;font-weight:800;background:#EEEAFB;color:#6A5AE0;border-radius:8px;padding:1px 4px}
+.vgrid-x{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:0 2px;flex:0 0 auto}
+.vgrid-x:hover{color:var(--red)}
+.vgrid-c{margin-top:4px;border:1px dashed var(--line);background:transparent;border-radius:6px;font-size:9.5px;font-weight:700;color:var(--muted);cursor:pointer;padding:3px 7px;display:inline-flex;align-items:center;gap:4px;font-family:'Montserrat',sans-serif}
+.vgrid-c.has{border-style:solid;border-color:#BFE0CE;color:var(--teal-dk);background:#F3FBF6}
+.vgrid-costos{margin-top:5px}
+.vgrid-colfoot{display:flex;gap:5px;margin-top:7px}
+.vgrid-addop{flex:1;border:1.5px dashed var(--teal-lt);background:transparent;border-radius:7px;color:var(--teal-dk);font-size:10px;font-weight:700;cursor:pointer;padding:4px 6px;display:inline-flex;align-items:center;justify-content:center;gap:3px;font-family:'Montserrat',sans-serif}
+.vgrid-addop:hover{background:rgba(91,127,166,.08)}
+.vgrid-addcol{flex:0 0 auto;align-self:stretch;border:1.5px dashed var(--line);background:transparent;border-radius:10px;color:var(--slate);font-size:11px;font-weight:700;cursor:pointer;padding:8px 14px;display:inline-flex;align-items:center;gap:4px;font-family:'Montserrat',sans-serif;min-width:80px;justify-content:center}
+.vgrid-addcol:hover{border-color:#7B6EF6;color:var(--navy)}
+@media(max-width:760px){.vgrid{flex-direction:column;min-width:0}.vgrid-col{flex:1 1 100%;width:100%}.vgrid-addcol{align-self:auto}}
 .chip-lbl{font-size:10px;color:var(--muted);padding:0 1px}
 .chip-x{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:2px;display:flex;align-items:center}
 .chip-x:hover{color:var(--red)}
@@ -5191,17 +5230,68 @@ function renderVariantes(){
   if(!fProdVariantes.length){cont.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Aún no hay variantes. Agrega la primera con el botón de abajo.</div>';return;}
   if(!fProdVariantes.some(v=>v.id===varSel))varSel=fProdVariantes[0].id;
   varColapsadas.delete(varSel); // la variante seleccionada siempre se muestra desplegada en el detalle
-  const sel=fProdVariantes.find(v=>v.id===varSel);
   const stale=cvStaleList();
   const staleBanner=stale.length?`<div class="cv-stale-banner"><span><i class="ti ti-alert-triangle"></i> ${stale.length} costo${stale.length===1?'':'s'} usa${stale.length===1?'':'n'} precios desactualizados de un listado.</span><button class="btn-add-row" onclick="cvActualizarTodos()"><i class="ti ti-refresh"></i>Actualizar</button></div>`:'';
-  cont.innerHTML=staleBanner+`<div class="var-md">
-    <div class="var-md-list">
-      ${fProdVariantes.map(v=>`<button type="button" class="var-md-item${v.id===varSel?' active':''}" onclick="setVarSel('${v.id}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${String(v.nombre||'(sin nombre)').replace(/</g,'&lt;')}</span>${v.informativa?`<span class="var-md-badge" style="background:#EDE9FB;color:#6A5AE0">info</span>`:((v.hijos&&v.hijos.length)?`<span class="var-md-badge">${v.hijos.length}</span>`:'')}</button>`).join('')}
+  const toggle=`<div class="var-vista"><button type="button" class="${varVista==='cuadricula'?'':'active'}" onclick="setVarVista('tarjetas')"><i class="ti ti-layout-list"></i>Tarjetas</button><button type="button" class="${varVista==='cuadricula'?'active':''}" onclick="setVarVista('cuadricula')"><i class="ti ti-table"></i>Cuadrícula</button></div>`;
+  let cuerpo;
+  if(varVista==='cuadricula'){
+    cuerpo=renderVarCuadriculaHTML();
+  }else{
+    const sel=fProdVariantes.find(v=>v.id===varSel);
+    cuerpo=`<div class="var-md">
+      <div class="var-md-list">
+        ${fProdVariantes.map(v=>`<button type="button" class="var-md-item${v.id===varSel?' active':''}" onclick="setVarSel('${v.id}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${String(v.nombre||'(sin nombre)').replace(/</g,'&lt;')}</span>${v.informativa?`<span class="var-md-badge" style="background:#EDE9FB;color:#6A5AE0">info</span>`:((v.hijos&&v.hijos.length)?`<span class="var-md-badge">${v.hijos.length}</span>`:'')}</button>`).join('')}
+      </div>
+      <div class="var-md-detail">${htmlNodoVariante(sel,1)}</div>
+    </div>`;
+  }
+  cont.innerHTML=staleBanner+toggle+cuerpo;
+  if(varVista!=='cuadricula'){ const sel=fProdVariantes.find(v=>v.id===varSel); const walk=(nodos)=>{(nodos||[]).forEach(n=>{actualizarUtilidadVariante(n.id);walk(n.hijos)})}; walk([sel]); }
+}
+let varVista=(function(){try{return localStorage.getItem('varVista')||'tarjetas'}catch(e){return 'tarjetas'}})();
+function setVarVista(v){ varVista=v; try{localStorage.setItem('varVista',v)}catch(e){}; renderVariantes(); }
+/* B4 · Modo CUADRÍCULA — vista tipo Excel del MISMO árbol: grupos=columnas, opciones=filas */
+function renderVarCuadriculaHTML(){
+  return `<div class="vgrid-wrap"><div class="vgrid">
+    ${fProdVariantes.map(g=>htmlGridColumna(g)).join('')}
+    <button type="button" class="vgrid-addcol" onclick="addVariante()"><i class="ti ti-plus"></i>Grupo</button>
+  </div></div>`;
+}
+function htmlGridColumna(g){
+  const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  const info=!!g.informativa, esGrupo=!!(g.hijos&&g.hijos.length);
+  const sib=siblingsDeVar(g.id), first=!sib||sib.idx===0, last=!sib||sib.idx===sib.arr.length-1;
+  const tag=info?'<span class="vgrid-tag info">info</span>':'<span class="vgrid-tag precio">precio</span>';
+  let cells;
+  if(info){ cells=(g.hijos||[]).map(o=>`<div class="vgrid-cell info"><input class="vgrid-oname" type="text" value="${esc(o.nombre)}" placeholder="Opción" oninput="setVariante('${o.id}','nombre',this.value)"><button class="vgrid-x" onclick="remVariante('${o.id}')" title="Quitar"><i class="ti ti-x"></i></button></div>`).join(''); }
+  else if(esGrupo){ cells=(g.hijos||[]).map(htmlGridCelda).join(''); }
+  else { cells=htmlGridCelda(g); }
+  return `<div class="vgrid-col${info?' info':''}">
+    <div class="vgrid-colhd">
+      <input class="vgrid-gname" type="text" value="${esc(g.nombre)}" placeholder="Grupo" oninput="setVariante('${g.id}','nombre',this.value)">
+      ${tag}
+      <span class="vgrid-colctrls"><button type="button" onclick="moverVariante('${g.id}',-1)" ${first?'disabled':''} title="Mover"><i class="ti ti-chevron-left"></i></button><button type="button" onclick="moverVariante('${g.id}',1)" ${last?'disabled':''} title="Mover"><i class="ti ti-chevron-right"></i></button><button type="button" onclick="duplicarVariante('${g.id}')" title="Duplicar"><i class="ti ti-copy"></i></button><button type="button" onclick="remVariante('${g.id}')" title="Eliminar"><i class="ti ti-trash"></i></button></span>
     </div>
-    <div class="var-md-detail">${htmlNodoVariante(sel,1)}</div>
+    <div class="vgrid-cells">${cells}</div>
+    ${(info||esGrupo)?`<div class="vgrid-colfoot"><button type="button" class="vgrid-addop" onclick="addSubVariante('${g.id}')"><i class="ti ti-plus"></i>opción</button><button type="button" class="vgrid-addop" onclick="prodAbrirPegar('${g.id}')" title="Pegar tabla"><i class="ti ti-table"></i></button></div>`:''}
   </div>`;
-  const walk=(nodos)=>{(nodos||[]).forEach(n=>{actualizarUtilidadVariante(n.id);walk(n.hijos)})};
-  walk([sel]);
+}
+function htmlGridCelda(o){
+  const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  const modo=o.modo||'precio', costoTotal=costoTotalVarianteFE(o), plegado=varCostosPlegados.has(o.id);
+  const priceField=modo==='medidas'
+    ? `<input class="vgrid-oprice" type="text" value="${esc(o.medida_tarifa)}" placeholder="/m²" title="Tarifa por m²" oninput="setVariante('${o.id}','medida_tarifa',this.value)">`
+    : `<input class="vgrid-oprice" type="text" value="${esc(o.precio)}" placeholder="$" title="${modo==='hoja'?'Precio por hoja':'Precio público'}" oninput="setVariante('${o.id}','precio',this.value)">`;
+  const modoTag=modo!=='precio'?`<span class="vgrid-modo" title="Editar detalle en vista Tarjetas">${modo==='hoja'?'hoja':'m²'}</span>`:'';
+  return `<div class="vgrid-cell">
+    <div class="vgrid-cellrow">
+      <input class="vgrid-oname" type="text" value="${esc(o.nombre)}" placeholder="Opción" oninput="setVariante('${o.id}','nombre',this.value)">
+      ${priceField}${modoTag}
+      <button class="vgrid-x" onclick="remVariante('${o.id}')" title="Quitar"><i class="ti ti-x"></i></button>
+    </div>
+    <button type="button" class="vgrid-c${costoTotal>0?' has':''}" onclick="toggleVarCostos('${o.id}')" title="Costos de este nivel"><i class="ti ti-coin"></i>${costoTotal>0?fCOP(costoTotal):'costo'}</button>
+    ${plegado?'':`<div class="vgrid-costos">${htmlCostosVar(o)}</div>`}
+  </div>`;
 }
 
 /* ══ Editor 2.0 · Sesión B — PEGAR TABLA (carga masiva de sub-variantes desde Excel/lista) ══ */
