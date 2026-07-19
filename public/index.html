@@ -2300,6 +2300,15 @@ function luminancia(hex){
   return .2126*f(c[0])+.7152*f(c[1])+.0722*f(c[2]);
 }
 function tintaSobre(hex){ return luminancia(hex)>.45?'#161D2E':'#FFFFFF'; }
+// Versión del color de marca que SIEMPRE se lee sobre papel/fondo blanco: si es muy claro
+// (un gris clarito, un amarillo) se va oscureciendo hasta tener contraste suficiente.
+// Se usa para el TEXTO del PDF; los rellenos conservan el color tal cual.
+function inkSeguro(hex){
+  // Umbral 0.18 ≈ contraste 4.5:1 sobre papel blanco (mínimo legible según WCAG para texto).
+  let c=colorValido(hex)?hex:'#222B46', v=0;
+  while(luminancia(c)>.18 && v<40){ c=mezcla(c,'#000000',.12); v++; }
+  return c;
+}
 
 /* C2 · MODO NOCHE — se apoya en los mismos tokens de C1. Solo cambian los NEUTROS
    (fondos, superficies, líneas y tinta); los colores de marca se respetan. */
@@ -3083,6 +3092,9 @@ async function construirPdfPedido(){
   // Tinta que va ENCIMA del color de marca (chip del documento y píldora del TOTAL): si la marca
   // es clara, el texto blanco desaparecería, así que se calcula igual que en la app.
   const NAVY_TXT=hexRgb(tintaSobre(rgbHex(NAVY)))||[255,255,255];
+  // INK · el color de marca usado como TEXTO sobre el papel blanco. Si la marca es clara
+  // (gris muy claro, amarillo), se oscurece lo justo para que las letras no se pierdan.
+  const INK=hexRgb(inkSeguro(rgbHex(NAVY)))||[34,43,70];
   const SLATE=[94,112,138], MUTED=[147,163,185], LINE=[229,236,244], CARD=[244,248,252], RED=[200,50,55], GREEN=[26,107,69];
   const ink=c=>doc.setTextColor(c[0],c[1],c[2]);
   const F=(s,b)=>{doc.setFontSize(s);doc.setFont('helvetica',b||'normal');};
@@ -3098,7 +3110,7 @@ async function construirPdfPedido(){
     try{doc.addImage(logoData.dataURL,'PNG',M,y-3,lw,lh);headX=M+lw+6;logoBottom=y-3+lh;}catch(e){}
   }
   let yl=y+2;
-  if(CFG.nombre_negocio){F(13,'bold');ink(NAVY);doc.text(CFG.nombre_negocio,headX,yl);yl+=5.5;}
+  if(CFG.nombre_negocio){F(13,'bold');ink(INK);doc.text(CFG.nombre_negocio,headX,yl);yl+=5.5;}
   F(8);ink(SLATE);
   [CFG.nit&&`NIT: ${CFG.nit}`,CFG.telefono&&`Tel: ${CFG.telefono}`,CFG.email,CFG.direccion].filter(Boolean).forEach(l=>{doc.text(String(l),headX,yl);yl+=4;});
   // Chip del tipo de documento (derecha)
@@ -3107,7 +3119,7 @@ async function construirPdfPedido(){
   doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]);
   doc.roundedRect(chipX,y-3,chipW,8.5,2,2,'F');
   doc.setTextColor(NAVY_TXT[0],NAVY_TXT[1],NAVY_TXT[2]);doc.text(tipo,chipX+5,y+2.8);
-  F(14,'bold');ink(NAVY);doc.text(`#${p.ref}`,W-M,y+13,{align:'right'});
+  F(14,'bold');ink(INK);doc.text(`#${p.ref}`,W-M,y+13,{align:'right'});
   F(8.5);ink(MUTED);doc.text(fd(p.fecha_pedido),W-M,y+18,{align:'right'});
   y=Math.max(yl,logoBottom+4,y+20)+3;
   doc.setDrawColor(NAVY[0],NAVY[1],NAVY[2]);doc.setLineWidth(0.7);doc.line(M,y,W-M,y);
@@ -3138,8 +3150,8 @@ async function construirPdfPedido(){
     F(7,'bold');ink(MUTED);doc.text(titulo.toUpperCase(),x+5,y+5.5);
     let yy=y+11;
     lineas.forEach(([lab,valr],i)=>{
-      if(!lab&&i===0){F(10,'bold');ink(NAVY);doc.text(String(valr),x+5,yy);}
-      else{F(8);ink(MUTED);doc.text(lab+':',x+5,yy);F(8,'bold');ink(NAVY);doc.text(String(valr),x+5+doc.getTextWidth(lab+': ')+1,yy);}
+      if(!lab&&i===0){F(10,'bold');ink(INK);doc.text(String(valr),x+5,yy);}
+      else{F(8);ink(MUTED);doc.text(lab+':',x+5,yy);F(8,'bold');ink(INK);doc.text(String(valr),x+5+doc.getTextWidth(lab+': ')+1,yy);}
       yy+=4.6;
     });
   };
@@ -3152,7 +3164,7 @@ async function construirPdfPedido(){
     startY:y,margin:{left:M,right:M},
     head:[['Cant.','Detalle','V. Unitario','V. Total']],
     body:lineasDocumento(p,fichasPorId).map(l=>[l.cant||'',l.descripcion,l.esNota?'':(l.unit?fCOP(l.unit):''),l.esNota?'':fCOP(l.monto)]),
-    styles:{fontSize:9,textColor:NAVY,lineColor:LINE,lineWidth:0.15,cellPadding:2.6},
+    styles:{fontSize:9,textColor:INK,lineColor:LINE,lineWidth:0.15,cellPadding:2.6},
     headStyles:{fillColor:NAVY,textColor:255,halign:'left',fontSize:8,fontStyle:'bold'},
     alternateRowStyles:{fillColor:[249,251,253]},
     columnStyles:{0:{cellWidth:15,halign:'center'},2:{cellWidth:30,halign:'right'},3:{cellWidth:30,halign:'right',fontStyle:'bold'}}
@@ -3182,7 +3194,7 @@ async function construirPdfPedido(){
       startY:y,margin:{left:M,right:M},
       head:[['Fecha','Forma de pago','Monto']],
       body:p.pagos.map(pg=>[fd(pg.fecha),metodoLabel(pg.tipo),fCOP(parseInt(String(pg.monto_calc||0).replace(/\D/g,''))||0)]),
-      styles:{fontSize:8.5,textColor:NAVY,lineColor:LINE,lineWidth:0.15,cellPadding:2.2},
+      styles:{fontSize:8.5,textColor:INK,lineColor:LINE,lineWidth:0.15,cellPadding:2.2},
       headStyles:{fillColor:CARD,textColor:SLATE,fontSize:7.5,fontStyle:'bold'},
       columnStyles:{2:{halign:'right'}}
     });
@@ -3202,7 +3214,7 @@ async function construirPdfPedido(){
     doc.setFillColor(CARD[0],CARD[1],CARD[2]);
     doc.roundedRect(M,y,CW,nh,2.5,2.5,'F');
     F(7,'bold');ink(MUTED);doc.text('NOTAS',M+5,y+5.5);
-    F(8.5);ink(NAVY);doc.text(notas,M+5,y+10.5);
+    F(8.5);ink(INK);doc.text(notas,M+5,y+10.5);
     y+=nh+7;
   }
 
