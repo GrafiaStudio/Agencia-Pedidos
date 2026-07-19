@@ -1539,6 +1539,23 @@ app.get('/api/stats',(req,res)=>{
   res.json({activos,urgentes,listos,clientes,pendPago,cotizaciones});
 });
 
+// ── DIAG TEMPORAL (A1) — solo admin, solo rutas (sin secretos). Quitar tras verificar. ──
+app.get('/api/_diag/storage',requiere('configurar_sistema'),(req,res)=>{
+  const mount=process.env.RAILWAY_VOLUME_MOUNT_PATH||'(sin RAILWAY_VOLUME_MOUNT_PATH)';
+  const LEGACY_UP=path.join(__dirname,'public','uploads');
+  const count=(d)=>{try{return fs.readdirSync(d).length}catch(e){return '(no existe)'}};
+  const bajoMount=(p)=>mount&&mount.startsWith('/')?path.resolve(p).startsWith(path.resolve(mount)):null;
+  res.json({
+    RAILWAY_VOLUME_MOUNT_PATH:mount,
+    __dirname,
+    DB_DIR,DB_DIR_files:count(DB_DIR),DB_DIR_bajo_mount:bajoMount(DB_DIR),
+    UP_DIR,UP_DIR_files:count(UP_DIR),UP_DIR_bajo_mount:bajoMount(UP_DIR),
+    LEGACY_UP,LEGACY_UP_files:count(LEGACY_UP),
+    logo_en_UP_DIR:fs.existsSync(path.join(UP_DIR,'1784038816632-lrwnch4jh7.jpg')),
+    logo_en_LEGACY:fs.existsSync(path.join(LEGACY_UP,'1784038816632-lrwnch4jh7.jpg'))
+  });
+});
+
 // ── DASHBOARD EJECUTIVO (v3.0 Fase 6) — solo lectura, agregaciones ──
 app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
   const wsId=req.wsId; const hoyStr=hoy(wsId);
