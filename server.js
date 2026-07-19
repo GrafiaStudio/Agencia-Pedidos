@@ -1421,17 +1421,26 @@ app.get('/api/produccion',requiere('ver_produccion'),(req,res)=>{
   // D1 · adjuntar a cada tarjeta la ÚLTIMA nota de traspaso, para que quien recibe el trabajo
   // vea qué dejó dicho la etapa anterior sin tener que ir a buscarla.
   try{
-    const ultimas=db.prepare(`SELECT e.* FROM produccion_eventos e
-      JOIN (SELECT item_id, MAX(creado) mx FROM produccion_eventos
-            WHERE workspace_id=? AND tipo='traspaso' AND nota<>'' AND item_id<>'' GROUP BY item_id) u
-        ON u.item_id=e.item_id AND u.mx=e.creado
-      WHERE e.workspace_id=? AND e.tipo='traspaso'`).all(req.wsId,req.wsId);
-    const porItem={}; ultimas.forEach(e=>{porItem[e.item_id]=e;});
+    // Último evento de cada tipo por ítem, en una sola consulta por tipo.
+    const ultimoPorTipo=(tipo,exigeNota)=>{
+      const filtroNota=exigeNota?" AND nota<>''":'';
+      const filas=db.prepare(`SELECT e.* FROM produccion_eventos e
+        JOIN (SELECT item_id, MAX(creado) mx FROM produccion_eventos
+              WHERE workspace_id=? AND tipo=? AND item_id<>''${filtroNota} GROUP BY item_id) u
+          ON u.item_id=e.item_id AND u.mx=e.creado
+        WHERE e.workspace_id=? AND e.tipo=?`).all(req.wsId,tipo,req.wsId,tipo);
+      const m={}; filas.forEach(e=>{m[e.item_id]=e;}); return m;
+    };
+    const traspasos=ultimoPorTipo('traspaso',true);
+    const calidades=ultimoPorTipo('calidad',false);
     tarjetas.forEach(t=>{
-      const e=t.item_id?porItem[t.item_id]:null;
+      if(!t.item_id)return;
+      const e=traspasos[t.item_id];
       if(e){ t.traspaso_nota=e.nota||''; t.traspaso_de=e.usuario_nombre||''; t.traspaso_estado=e.estado_hasta||''; t.traspaso_fecha=e.creado||''; }
+      const q=calidades[t.item_id];
+      if(q){ t.calidad=q.resultado||''; t.calidad_nota=q.nota||''; t.calidad_de=q.usuario_nombre||''; t.calidad_fecha=q.creado||''; }
     });
-  }catch(err){ logError('GET /api/produccion (última nota)',err); }
+  }catch(err){ logError('GET /api/produccion (últimos eventos)',err); }
   res.json(tarjetas);
 });
 /* ── PRODUCCIÓN 2.0 (Fase D) ──
@@ -1463,6 +1472,25 @@ app.get('/api/produccion/eventos',requiere('ver_produccion'),(req,res)=>{
   if(tipo){sql+=' AND tipo=?';p.push(tipo);}
   const esAdmin=!!(req.permisos&&req.permisos.__admin);
   res.json(db.prepare(sql+' ORDER BY creado DESC LIMIT 200').all(...p).map(e=>eventoProdVista(e,esAdmin)));
+});
+/* D2 · CONTROL DE CALIDAD — sello de visto bueno en CUALQUIER etapa (no es un estado más
+   del tablero). Cada sello queda registrado; volver a sellar no borra el anterior. */
+const CALIDAD_RESULTADOS=['ok','problema'];
+app.post('/api/produccion/calidad',requiere('gestionar_produccion'),(req,res)=>{
+  const b=req.body||{};
+  if(!CALIDAD_RESULTADOS.includes(b.resultado))return res.status(400).json({error:'Resultado no válido'});
+  const nota=String(b.nota||'').trim();
+  if(b.resultado==='problema'&&!nota)return res.status(400).json({error:'Cuando marcas "con problema" hay que decir qué pasó'});
+  const it=db.prepare(`SELECT i.id,i.detalle,i.encargo_id,e.numero,p.id AS p_id,p.cerrado AS p_cerrado
+    FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+    WHERE i.id=? AND e.workspace_id=?`).get(b.item_id,req.wsId);
+  if(!it)return res.status(404).json({error:'Ítem no encontrado'});
+  if(it.p_cerrado)return res.status(409).json({error:'El pedido está cerrado'});
+  registrarEventoProd(req,{tipo:'calidad',pedido_id:it.p_id,encargo_id:it.encargo_id,item_id:it.id,
+    resultado:b.resultado,nota});
+  const det=String(it.detalle||'ítem').slice(0,40);
+  addHist(it.p_id,`Calidad · Encargo #${it.numero} · "${det}": ${b.resultado==='ok'?'visto bueno':'CON PROBLEMA'}`+(nota?` · ${nota.slice(0,120)}`:''),req.wsId,actorDe(req));
+  res.json({ok:true});
 });
 // Cambiar el estado de UN ÍTEM desde Producción (cada ítem fluye por separado).
 app.put('/api/produccion/item/:id',requiere('gestionar_produccion'),(req,res)=>{

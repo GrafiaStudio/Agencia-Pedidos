@@ -760,6 +760,17 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pcx-trasp-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
 .pcx-trasp-a .btn-add-row{padding:5px 10px;font-size:10.5px}
 
+/* D2 · sello de calidad en la tarjeta */
+.pcx-cal{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:5px 11px;border-radius:20px;
+  border:1.5px solid var(--line);background:var(--white);color:var(--muted);font-size:10px;font-weight:700;
+  cursor:pointer;font-family:'Montserrat',sans-serif;transition:all .12s}
+.pcx-cal i{font-size:13px}
+.pcx-cal:hover{border-color:#C9BEF3}
+.pcx-cal.ok{border-color:#BFE0CE;background:var(--green-lt);color:var(--green)}
+.pcx-cal.prob{border-color:#F0C9C9;background:var(--red-lt);color:var(--red)}
+.pcx-cal-ok{background:var(--green);color:#fff;border-color:var(--green)}
+.pcx-cal-prob{background:var(--red-lt);color:var(--red);border-color:#F0C9C9}
+
 /* C5 · en móvil los filtros de Producción quedaban en 87px y el texto salía cortado
    ("Todos lo…"). Se les da ancho mínimo y que ocupen media fila cada uno. */
 @media(max-width:768px){
@@ -4429,7 +4440,9 @@ function prodCardHTMLp(c,editable){
       <button class="pcx-obsbtn ${c.notas_tec?'has':''}" onclick="prodToggleObs('${k}')" title="Observación técnica (del encargo)"><i class="ti ti-note"></i></button>
       <button class="pcx-obsbtn ${(c.consumos&&c.consumos.length)?'has':''}" onclick="prodToggleStock('${k}')" title="Materiales / Stock (del encargo)"><i class="ti ti-package"></i></button>
     </div>
+    ${prodCalidadBadge(c)}
     ${prodTraspasoPanelHTML(c)}
+    ${prodCalidadPanelHTML(c)}
     <div class="pcx-obs" id="obs-${k}">
       <textarea ${dis} id="obstx-${k}" placeholder="Observaciones técnicas para producción…">${pesc(c.notas_tec||'')}</textarea>
       ${editable?`<div style="display:flex;gap:6px;margin-top:6px"><button class="btn-add-row" style="padding:5px 10px" onclick="prodGuardarObs('${c.encargo_id}','${k}')"><i class="ti ti-check"></i> Guardar nota</button></div>`:'<div class="hint">Solo lectura</div>'}
@@ -4510,6 +4523,44 @@ function prodTraspasoPanelHTML(c){
       <button class="btn-add-row" onclick="prodCancelarTraspaso()">Cancelar</button>
       <button class="btn-add-row" onclick="prodSetEstadoCard('${prodKey(c)}','${pesc(t.estado)}','')">Mover sin nota</button>
       <button class="btn-add-row" style="background:var(--brand);color:var(--brand-txt);border-color:var(--brand)" onclick="prodConfirmarTraspaso()"><i class="ti ti-check"></i>Mover con nota</button>
+    </div>
+  </div>`;
+}
+/* D2 · CONTROL DE CALIDAD — sello en cualquier etapa, sin tocar el tablero.
+   Marcar "con problema" exige decir qué pasó: un problema sin explicación no sirve a nadie. */
+let prodCalidad=null; // key de la tarjeta con el panel abierto
+function prodAbrirCalidad(key){ prodCalidad=(prodCalidad===key)?null:key; renderProduccion();
+  if(prodCalidad)requestAnimationFrame(()=>document.getElementById('cal-nota')?.focus()); }
+async function prodSellarCalidad(key,resultado){
+  const c=PROD_CARDS.find(x=>prodKey(x)===key); if(!c||!c.item_id)return;
+  const nota=((document.getElementById('cal-nota')||{}).value||'').trim();
+  if(resultado==='problema'&&!nota){ toast('Cuéntanos qué pasó para poder resolverlo',false); return; }
+  try{
+    await api('POST','/produccion/calidad',{item_id:c.item_id,resultado,nota});
+    c.calidad=resultado; c.calidad_nota=nota; c.calidad_de=(ME&&(ME.nombre||ME.usuario))||'';
+    prodCalidad=null; renderProduccion();
+    toast(resultado==='ok'?'Visto bueno registrado ✓':'Problema registrado — queda avisado');
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+function prodCalidadBadge(c){
+  if(!c.item_id)return '';
+  const est=c.calidad==='ok'?'ok':(c.calidad==='problema'?'prob':'sin');
+  const txt=est==='ok'?'Calidad OK':(est==='prob'?'Con problema':'Calidad: sin revisar');
+  const ico=est==='ok'?'circle-check':(est==='prob'?'alert-triangle':'circle-dashed');
+  const ttl=c.calidad_nota?`${c.calidad_nota}${c.calidad_de?' — '+c.calidad_de:''}`:'Marcar visto bueno o reportar un problema';
+  return `<button class="pcx-cal ${est}" onclick="prodAbrirCalidad('${prodKey(c)}')" title="${pesc(ttl)}"><i class="ti ti-${ico}"></i>${txt}</button>`;
+}
+function prodCalidadPanelHTML(c){
+  if(prodCalidad!==prodKey(c)||!c.item_id)return '';
+  const k=prodKey(c);
+  return `<div class="pcx-trasp">
+    <div class="pcx-trasp-h"><i class="ti ti-shield-check"></i> Control de calidad</div>
+    ${c.calidad?`<div class="hint" style="margin-bottom:5px">Último sello: <b>${c.calidad==='ok'?'OK':'Con problema'}</b>${c.calidad_de?' · '+pesc(c.calidad_de):''}${c.calidad_nota?' — '+pesc(c.calidad_nota):''}</div>`:''}
+    <textarea id="cal-nota" class="item-inp" placeholder="Nota (obligatoria si hay un problema)"></textarea>
+    <div class="pcx-trasp-a">
+      <button class="btn-add-row" onclick="prodCalidad=null;renderProduccion()">Cancelar</button>
+      <button class="btn-add-row pcx-cal-prob" onclick="prodSellarCalidad('${k}','problema')"><i class="ti ti-alert-triangle"></i>Con problema</button>
+      <button class="btn-add-row pcx-cal-ok" onclick="prodSellarCalidad('${k}','ok')"><i class="ti ti-check"></i>Visto bueno</button>
     </div>
   </div>`;
 }
