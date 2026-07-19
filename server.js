@@ -1521,20 +1521,21 @@ app.put('/api/clientes/:id',requiere('editar_clientes'),(req,res)=>{
 // Stats
 app.get('/api/stats',(req,res)=>{
   const wsId=req.wsId;
-  const activos=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
-  const urgentes=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
+  // Los archivados NO cuentan (deben coincidir con el Dashboard, que filtra archivado=0).
+  const activos=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND archivado=0 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
+  const urgentes=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND archivado=0 AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
   // Listo: todos sus encargos en la etapa FINAL configurada (legacy 'Entregado' cuenta) y pedido activo
   const estadosWs=getEstados(wsId); const estadoFinal=estadosWs.length?estadosWs[estadosWs.length-1].nombre:'Listo';
-  const candidatos=db.prepare("SELECT id FROM pedidos WHERE workspace_id=? AND entregado=0 AND cancelado=0 AND es_cotizacion=0").all(wsId);
+  const candidatos=db.prepare("SELECT id FROM pedidos WHERE workspace_id=? AND archivado=0 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").all(wsId);
   let listos=0;
   candidatos.forEach(p=>{
     const its=db.prepare('SELECT i.estado FROM enc_items i JOIN encargos e ON e.id=i.encargo_id WHERE e.pedido_id=?').all(p.id);
     const src=its.length?its:db.prepare('SELECT estado FROM encargos WHERE pedido_id=?').all(p.id);
     if(src.length&&src.every(x=>x.estado===estadoFinal||x.estado==='Entregado'))listos++;
   });
-  const clientes=db.prepare('SELECT COUNT(*) as n FROM clientes WHERE workspace_id=?').get(wsId).n;
-  const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
-  const cotizaciones=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND es_cotizacion=1").get(wsId).n;
+  const clientes=db.prepare('SELECT COUNT(*) as n FROM clientes WHERE workspace_id=? AND archivado=0').get(wsId).n;
+  const pendPago=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND archivado=0 AND pendiente_pago=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
+  const cotizaciones=db.prepare("SELECT COUNT(*) as n FROM pedidos WHERE workspace_id=? AND archivado=0 AND es_cotizacion=1 AND cancelado=0").get(wsId).n;
   res.json({activos,urgentes,listos,clientes,pendPago,cotizaciones});
 });
 
