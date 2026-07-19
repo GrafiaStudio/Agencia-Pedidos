@@ -2234,7 +2234,9 @@ function guardarVariantes(fichaId,variantes,wsId){
   const insertarNodo=(v,parentId,i)=>{
     const id=v.id||uid();
     const costos=(v.costos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor),lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''}));
-    const modoV=(v.modo==='hoja'||v.modo==='medidas')?v.modo:'precio';
+    // A4 · 'fijo' = precio fijo directo (ningún modo marcado): la tarjeta queda compacta, sin
+    // tramos. Para el cálculo se comporta igual que 'precio' (cae al mismo else en todas partes).
+    const modoV=(v.modo==='hoja'||v.modo==='medidas'||v.modo==='fijo')?v.modo:'precio';
     db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo));
     (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));

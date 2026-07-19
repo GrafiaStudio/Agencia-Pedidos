@@ -5250,12 +5250,20 @@ function moverVariante(id,dir){
 }
 let varItemPlegados=new Set();
 function toggleVarItem(encId,itemId){if(varItemPlegados.has(itemId))varItemPlegados.delete(itemId);else varItemPlegados.add(itemId);renderEncItems(encId)}
-function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'precio',piezas:'',informativa:false,medida_tarifa:'',medida_minimo:''}}
+// A4 · las variantes nuevas arrancan en 'fijo' (compactas): solo Precio público, sin desplegar tramos.
+function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'fijo',piezas:'',informativa:false,medida_tarifa:'',medida_minimo:''}}
 function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,medida_tarifa:v.medida_tarifa||'',medida_minimo:v.medida_minimo||'',
   costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||'',lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
   tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
   hijos:(v.hijos||[]).map(clonarNodoVar)}}
 function setVarModo(id,modo){const v=buscarNodoVar(id);if(v){v.modo=modo;renderVariantes()}}
+// A4 · los 3 modos son opcionales: tocar el que ya está activo lo quita y deja "precio fijo".
+function setVarModoTog(id,modo){
+  const v=buscarNodoVar(id); if(!v)return;
+  const cur=(v.modo==='hoja'||v.modo==='medidas'||v.modo==='fijo')?v.modo:'precio';
+  v.modo=(cur===modo)?'fijo':modo;
+  renderVariantes();
+}
 function duplicarVariante(id){
   const buscar=(lista)=>{
     const i=lista.findIndex(n=>n.id===id);
@@ -5398,12 +5406,21 @@ function htmlNodoVariante(v,nivel){
   const esPrimero=!sib||sib.idx===0, esUltimo=!sib||sib.idx===sib.arr.length-1;
   const mvTitulo=nivel>1?'sub-variante':'grupo';
   const mostrarPrecio=!esGrupo&&v.modo!=='hoja'&&v.modo!=='medidas';
+  // A4 · modo efectivo. 'fijo' = ningún pill marcado (precio fijo directo, tarjeta compacta).
+  const modoAct=(v.modo==='hoja'||v.modo==='medidas'||v.modo==='fijo')?v.modo:'precio';
+  // A4 · si el precio lo rigen los tramos, el campo "Precio público" quedaba vacío y confundía:
+  // ahora se rotula y muestra como marcador el precio del tramo que cubre 1 unidad.
+  const tramosV=(v.tramos||[]);
+  const tramoUno=tramosV.length?detectarPrecioEscalonado(tramosV,1):null;
+  const rigenTramos=tramosV.length&&!String(v.precio||'').trim();
+  const phPrecio=rigenTramos?(tramoUno!=null?`${fCOP(evalExpr(tramoUno)||0)} (por tramo)`:'(por tramo)'):'$ 0';
+  const lblPrecio='Precio público'+(tramosV.length?' <span style="font-weight:600;color:var(--muted);text-transform:none">· por tramo</span>':'');
   // Header EN COLUMNAS (mockup): [nombre] [precio público] [costos de este nivel] en una banda horizontal
   return `<div class="var-node${nivel>1?' var-sub':''}">
     <div class="var-hd">
       <button class="item-del vhd-chev" title="Plegar/desplegar" onclick="toggleVarCard('${v.id}')"><i class="ti ti-chevron-${colapsado?'right':'down'}"></i></button>
       <div class="var-hd-col vhd-nombre"><label class="var-hd-lbl">${nivel>1?'Sub-variante':'Variante'}${esGrupo?' (grupo)':''}</label><input class="item-inp" type="text" value="${esc(v.nombre)}" placeholder="${nivel>1?'Ej: Con vidrio':'Ej: 20×25'}" oninput="setVariante('${v.id}','nombre',this.value)"></div>
-      ${mostrarPrecio?`<div class="var-hd-col vhd-precio"><label class="var-hd-lbl">Precio público</label><input class="item-inp" type="text" value="${esc(v.precio)}" placeholder="$ 0" oninput="setVariante('${v.id}','precio',this.value)"></div>`:''}
+      ${mostrarPrecio?`<div class="var-hd-col vhd-precio"><label class="var-hd-lbl">${lblPrecio}</label><input class="item-inp" type="text" value="${esc(v.precio)}" placeholder="${esc(phPrecio)}" oninput="setVariante('${v.id}','precio',this.value)"></div>`:''}
       <div class="var-hd-col vhd-costos">
         <label class="costos-hd" onclick="toggleVarCostos('${v.id}')"><i class="ti ti-chevron-${costosPlegados?'right':'down'}"></i>Costos de este nivel${esGrupo?' (se suman a las sub-variantes)':''}</label>
         ${costosPlegados?'':htmlCostosVar(v)}
@@ -5418,9 +5435,9 @@ function htmlNodoVariante(v,nivel){
     <div style="display:${colapsado?'none':'block'}">
     ${esGrupo?'':`
       <div class="var-modos">
-        <label class="var-modo-pill${(v.modo!=='hoja'&&v.modo!=='medidas')?' active':''}"><input type="radio" hidden name="vmodo-${v.id}" ${(v.modo!=='hoja'&&v.modo!=='medidas')?'checked':''} onchange="setVarModo('${v.id}','precio')"><span class="rd"></span>Precio por cantidad</label>
-        <label class="var-modo-pill${v.modo==='hoja'?' active':''}"><input type="radio" hidden name="vmodo-${v.id}" ${v.modo==='hoja'?'checked':''} onchange="setVarModo('${v.id}','hoja')"><span class="rd"></span>Por hoja (rendimiento)</label>
-        <label class="var-modo-pill${v.modo==='medidas'?' active':''}"><input type="radio" hidden name="vmodo-${v.id}" ${v.modo==='medidas'?'checked':''} onchange="setVarModo('${v.id}','medidas')"><span class="rd"></span>Por medidas (ancho×alto)</label>
+        <label class="var-modo-pill${modoAct==='precio'?' active':''}" title="Tócalo de nuevo para quitarlo y dejar precio fijo" onclick="setVarModoTog('${v.id}','precio')"><span class="rd"></span>Precio por cantidad</label>
+        <label class="var-modo-pill${modoAct==='hoja'?' active':''}" title="Tócalo de nuevo para quitarlo y dejar precio fijo" onclick="setVarModoTog('${v.id}','hoja')"><span class="rd"></span>Por hoja (rendimiento)</label>
+        <label class="var-modo-pill${modoAct==='medidas'?' active':''}" title="Tócalo de nuevo para quitarlo y dejar precio fijo" onclick="setVarModoTog('${v.id}','medidas')"><span class="rd"></span>Por medidas (ancho×alto)</label>
       </div>
       ${v.modo==='hoja'?`
         <div class="fr2 fg">
@@ -5432,10 +5449,11 @@ function htmlNodoVariante(v,nivel){
           <div><label class="var-hd-lbl">Tarifa por m²</label><input class="item-inp" type="text" value="${esc(v.medida_tarifa)}" placeholder="Ej: 8,5" oninput="setVariante('${v.id}','medida_tarifa',this.value)"></div>
           <div><label class="var-hd-lbl">Cobro mínimo (opcional)</label><input class="item-inp" type="text" value="${esc(v.medida_minimo)}" placeholder="$ 0" oninput="setVariante('${v.id}','medida_minimo',this.value)"></div>
         </div>
-        <div class="var-hint">Al cotizar se pide ancho × alto (m) y se cobra máx(mínimo, área × tarifa). Acepta decimales con coma (ej. 8,5).</div>`:`
+        <div class="var-hint">Al cotizar se pide ancho × alto (m) y se cobra máx(mínimo, área × tarifa). Acepta decimales con coma (ej. 8,5).</div>`:(v.modo==='fijo'?`
+        <div class="var-hint">Precio fijo: se cobra el <b>Precio público</b> tal cual, sin tramos.${tramosV.length?` <b style="color:#B4541F">Ojo: este nivel tiene ${tramosV.length} tramo(s) guardados y siguen mandando sobre el precio. Toca "Precio por cantidad" para verlos o borrarlos.</b>`:' Toca "Precio por cantidad" si quieres cobrar distinto según el volumen.'}</div>`:`
         <div class="var-hd-lbl" style="margin:9px 0 3px">Precios por cantidad (opcional)</div>
         <div class="var-hint">Si lo dejas vacío, se usa el Precio público. Ej: 1 a 6 → $15.000, 7 a 12 → $13.000. El último tramo cubre cantidades mayores.</div>
-        ${htmlTramosVar(v)}`)}`}
+        ${htmlTramosVar(v)}`))}`}
     ${sub?`
       <div style="font-size:9px;font-weight:800;color:var(--navy);text-transform:uppercase;margin:12px 0 4px">Sub-variantes (versiones internas)</div>
       ${esGrupo?`<label class="ck-box" style="display:inline-flex;gap:6px;margin-bottom:6px"><input type="checkbox" ${v.multi?'checked':''} onchange="setVarMulti('${v.id}',this.checked)"><span style="font-size:10px">Permite elegir varias opciones (ej. varios estampados). Si está apagado, en el pedido se elige una sola (ej. un tamaño).</span></label>`:''}
@@ -5670,7 +5688,8 @@ function cargarNodoVar(v){
     hijos:(v.hijos||[]).map(cargarNodoVar)};
 }
 function serializarNodoVar(v){
-  const modo=(v.modo==='hoja'||v.modo==='medidas')?v.modo:'precio';
+  // A4 · 'fijo' debe sobrevivir al guardado (si no, la tarjeta se volvería a desplegar).
+  const modo=(v.modo==='hoja'||v.modo==='medidas'||v.modo==='fijo')?v.modo:'precio';
   return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo,piezas:parseInt(v.piezas,10)||null,informativa:v.informativa?1:0,
     medida_tarifa:(v.medida_tarifa||'').toString().trim(),medida_minimo:(v.medida_minimo||'').toString().trim(),
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim(),lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
