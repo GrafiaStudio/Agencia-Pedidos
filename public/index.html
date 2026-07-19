@@ -747,6 +747,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cv-stale-banner i{color:#B8860B}
 .cv-stale-banner .btn-add-row{background:#8A6D1B;color:#fff;border-color:#8A6D1B}
 /* B4 · modo cuadrícula (vista Excel) */
+/* C5 · en móvil los filtros de Producción quedaban en 87px y el texto salía cortado
+   ("Todos lo…"). Se les da ancho mínimo y que ocupen media fila cada uno. */
+@media(max-width:768px){
+  .prod-bar>select{flex:1 1 46%;min-width:150px}
+  .prod-bar>.search-b{flex:1 1 100%}
+}
+
 /* ══ C2 · MODO NOCHE ══
    Los tokens (tinta, superficies, líneas) ya los cambia aplicarTemaColor(). Aquí solo se
    corrigen las superficies que estaban fijas en claro dentro del CSS. Los colores de marca
@@ -1141,7 +1148,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
   .prod-board{scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;gap:10px}
   .prod-col{flex:0 0 86vw;width:86vw;scroll-snap-align:center;max-height:calc(100vh - 235px)}
   .prod-bar{gap:6px}
-  .prod-bar select{min-width:0!important;flex:1}
+  .prod-bar select{min-width:150px;flex:1 1 46%}
   /* Producción multi-vista en móvil */
   .plist-head{display:none}
   .plist-row{grid-template-columns:1fr 1fr;row-gap:7px;padding:11px 13px}
@@ -1710,6 +1717,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
     <button class="mas-item" data-perm="gestionar_inventario" onclick="irDesdeMas('inventario')"><i class="ti ti-packages"></i>Inventario</button>
     <button class="mas-item" onclick="irDesdeMas('archivo')"><i class="ti ti-archive"></i>Archivo</button>
     <button class="mas-item" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
+    <button class="mas-item" id="masTema" onclick="alternarModoTema()"><i class="ti ti-moon"></i>Modo noche</button>
     <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
     <button class="mas-item" data-perm="configurar_sistema" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
     <button class="mas-item" onclick="cerrarMas();abrirPerfil()"><i class="ti ti-user-circle"></i>Mi perfil</button>
@@ -2304,9 +2312,14 @@ function alternarModoTema(){
   toast(esNoche()?'Modo noche activado 🌙':'Modo día activado ☀️');
 }
 function pintarBotonTema(){
-  const b=document.getElementById('btnTema'); if(!b)return;
-  b.innerHTML=`<i class="ti ti-${esNoche()?'sun':'moon'}"></i>`;
-  b.title=esNoche()?'Cambiar a modo día':'Cambiar a modo noche';
+  const b=document.getElementById('btnTema');
+  if(b){
+    b.innerHTML=`<i class="ti ti-${esNoche()?'sun':'moon'}"></i>`;
+    b.title=esNoche()?'Cambiar a modo día':'Cambiar a modo noche';
+  }
+  // C5 · en móvil la barra superior se oculta, así que el cambio vive en el menú "Más"
+  const m=document.getElementById('masTema');
+  if(m)m.innerHTML=`<i class="ti ti-${esNoche()?'sun':'moon'}"></i>${esNoche()?'Modo día':'Modo noche'}`;
 }
 // Cambio en vivo desde el selector o el campo de texto (se ve al instante, se guarda al Guardar)
 function cfgColorCambio(cual,val,desdeTexto){
