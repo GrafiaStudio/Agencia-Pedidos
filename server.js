@@ -844,6 +844,34 @@ function detectarPrecioEscalonado(rangos,cantidad){
   if(ultimo.hasta!=null&&cantidad>ultimo.hasta)return ultimo.precio;
   return null;
 }
+// Precio de UNA unidad de una hoja/parte de variante (A3). El precio suele vivir en los TRAMOS,
+// no en precio_calc: si hay tramo que cubre la cantidad 1 se usa ese; si los tramos arrancan por
+// encima de 1, se usa el primer tramo (evita devolver 0 y mostrar "desde $0").
+function precioVarUnidad(v){
+  if(!v)return 0;
+  if(v.modo==='hoja'){const pz=parseInt(v.piezas,10)||0;return pz>0?Math.round(toNum(v.precio_calc)/pz):0;}
+  const tr=Array.isArray(v.tramos)?v.tramos:[];
+  const p1=detectarPrecioEscalonado(tr,1);
+  if(p1!=null)return toNum(p1);
+  if(tr.length)return toNum(tr[0].precio);
+  return toNum(v.precio_calc);
+}
+// A3 · "Desde $X" de un producto por variantes = precio del PRODUCTO BASE a 1 unidad: la PRIMERA
+// parte (variante principal) que tenga precio. Antes se tomaba el mínimo de TODAS las hojas, y
+// ganaba una informativa sin precio (Talla/Color → "desde $0") o un add-on barato (empaque
+// $1.000/$2.000). Se ignoran informativas y hojas por medida (tarifa/m², no comparable).
+function precioDesdeVariantes(variantes){
+  for(const parte of (variantes||[])){
+    if(parte.informativa)continue;
+    const hijos=(parte.hijos||[]).filter(h=>!h.informativa);
+    const cands=(hijos.length?hijos:[parte]).filter(v=>v.modo!=='medidas');
+    const precios=cands.map(precioVarUnidad).filter(x=>x>0);
+    if(precios.length)return Math.min(...precios);
+  }
+  // Sin precios unitarios (p. ej. todo por medida) → desde = mínima tarifa por m².
+  const tar=hojasVariantes(variantes).filter(v=>!v.informativa).map(v=>toFloatCO(v.medida_tarifa_calc)).filter(x=>x>0);
+  return tar.length?Math.min(...tar):0;
+}
 function precioOficialFicha(ficha,precioSugerido){
   if(ficha.tipo_precio==='medidas')return toFloatCO(ficha.medida_tarifa_calc);
   if(ficha.tipo_precio==='pliego'){
@@ -876,17 +904,7 @@ function fichaCompleta(f){
   if((f.tipo_precio==='combo'||f.tipo_precio==='promocional')&&f.combo_precio_modo==='individual'&&f.componentes.length){
     f.precio_oficial=f.componentes.reduce((a,c)=>a+c.cantidad_consumida*toNum(c.precio_unitario_calc),0);
   }else if(f.tipo_precio==='variantes'&&f.variantes.length){
-    const hojas=hojasVariantes(f.variantes);
-    const precioDe=v=>{
-      if(v.modo==='hoja'){const pz=parseInt(v.piezas,10)||0;return pz>0?Math.round(toNum(v.precio_calc)/pz):0;}
-      const p1=detectarPrecioEscalonado(v.tramos||[],1);
-      return p1!=null?p1:toNum(v.precio_calc);
-    };
-    // Las hojas por medida (tarifa por m²) no son comparables con precios unitarios → se excluyen
-    // del "desde $X". Si TODAS son por medida, el desde = mínima tarifa por m².
-    const noMed=hojas.filter(v=>v.modo!=='medidas');
-    if(noMed.length){ f.precio_oficial=Math.min(...noMed.map(precioDe)); }
-    else{ const tar=hojas.map(v=>toFloatCO(v.medida_tarifa_calc)).filter(x=>x>0); f.precio_oficial=tar.length?Math.min(...tar):0; }
+    f.precio_oficial=precioDesdeVariantes(f.variantes);
   }else{
     f.precio_oficial=precioOficialFicha(f,f.precio_sugerido);
   }
