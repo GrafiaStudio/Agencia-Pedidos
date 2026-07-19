@@ -741,6 +741,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cv-stale-banner i{color:#B8860B}
 .cv-stale-banner .btn-add-row{background:#8A6D1B;color:#fff;border-color:#8A6D1B}
 /* B4 · modo cuadrícula (vista Excel) */
+.dl-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin-bottom:10px}
 .var-barra{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .var-vista{display:inline-flex;gap:2px;background:var(--line-lt);border-radius:9px;padding:3px}
 .var-vista button{border:none;background:transparent;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--slate);cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'Montserrat',sans-serif}
@@ -5416,7 +5417,7 @@ async function cvAutoEnlazarUI(){
   if(!(CX_LISTAS_ED||[]).length){ toast('Aún no hay Listados de costos. Créalos en Costos → Listados de costos.',false); return; }
   const r=cvAutoEnlazar(fProdVariantes);
   renderVariantes();
-  if(!r.enlazados){ toast('Ninguna variante coincide (por nombre exacto) con tus listados.',false); return; }
+  if(!r.enlazados){ toast('Ninguna variante se llama igual que un ítem de tus listados. Usa "Desde un Listado" para traerlos y vincularlos.',false); return; }
   toast(`${r.enlazados} costo${r.enlazados===1?'':'s'} enlazado${r.enlazados===1?'':'s'} desde ${r.listas.join(', ')} ✓`);
 }
 function htmlTramosVar(v){
@@ -5516,6 +5517,7 @@ function htmlNodoVariante(v,nivel){
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
         <button class="btn-add-row" onclick="addSubVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar sub-variante</button>
         <button class="btn-add-row" onclick="prodAbrirPegar('${v.id}')"><i class="ti ti-table"></i>Pegar tabla</button>
+        <button class="btn-add-row" title="Trae los ítems de un Listado de costos como sub-variantes, con el costo vinculado y el precio según tu rentabilidad" onclick="prodAbrirDesdeLista('${v.id}')"><i class="ti ti-list-check"></i>Desde un Listado</button>
       </div>`:''}
     </div>
   </div>`;
@@ -5526,6 +5528,7 @@ function renderVariantes(){
   const cont=document.getElementById('prod-variantes-body');
   if(!cont)return;
   if(prodPegaState){cont.innerHTML=renderPegarPanelHTML();if(prodPegaState.paso==='entrada'){const t=document.getElementById('prod-pega-txt');if(t)t.focus();}return;}
+  if(prodListaState){cont.innerHTML=renderDesdeListaHTML();return;}
   if(!fProdVariantes.length){cont.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Aún no hay variantes. Agrega la primera con el botón de abajo.</div>';return;}
   if(!fProdVariantes.some(v=>v.id===varSel))varSel=fProdVariantes[0].id;
   varColapsadas.delete(varSel); // la variante seleccionada siempre se muestra desplegada en el detalle
@@ -5598,6 +5601,117 @@ function htmlGridCelda(o){
 let prodPegaState=null; // {groupId, paso:'entrada'|'preview', texto, headers, dataRows, roles, nombresCosto}
 function prodAbrirPegar(gid){ prodPegaState={groupId:gid, paso:'entrada', texto:''}; renderVariantes(); }
 function prodPegaCancelar(){ prodPegaState=null; renderVariantes(); }
+
+/* B1b · "Desde un Listado" — en vez de adivinar por nombre, se ELIGE el listado y cómo se
+   convierte el costo en precio. Crea las sub-variantes ya vinculadas al listado, así heredan
+   el costo del proveedor y avisan cuando cambie. */
+let prodListaState=null; // {groupId, lista_id, columna, margenTipo, margenValor}
+async function prodAbrirDesdeLista(gid){
+  await cvAsegurarListas();
+  const listas=CX_LISTAS_ED||[];
+  if(!listas.length){ toast('Aún no hay Listados de costos. Créalos en Costos → Listados de costos.',false); return; }
+  const l0=listas[0];
+  prodListaState={groupId:gid,lista_id:l0.id,columna:cvColsLista(l0)[0],margenTipo:'porcentaje',margenValor:''};
+  renderVariantes();
+}
+function prodListaCancelar(){ prodListaState=null; renderVariantes(); }
+function prodListaSet(k,val){
+  const st=prodListaState; if(!st)return;
+  st[k]=val;
+  if(k==='lista_id'){ const l=cvListaDe(val); st.columna=l?cvColsLista(l)[0]:''; }
+  renderVariantes();
+}
+// Convierte un costo en precio según la regla elegida.
+function prodListaPrecio(costo,tipo,valor){
+  const c=Number(costo)||0;
+  const v=parseFloat(String(valor==null?'':valor).replace(',','.'));
+  if(!c||!isFinite(v)||!v)return c;
+  if(tipo==='multiplicador')return Math.round(c*v);
+  if(tipo==='suma')return Math.round(c+v);
+  return Math.round(c+c*(v/100)); // porcentaje
+}
+function prodListaAplicar(){
+  const st=prodListaState; if(!st)return;
+  const grupo=buscarNodoVar(st.groupId), l=cvListaDe(st.lista_id);
+  if(!grupo||!l){ prodListaCancelar(); return; }
+  grupo.hijos=grupo.hijos||[];
+  const norm=s=>String(s||'').trim().toLowerCase();
+  let creadas=0,actualizadas=0;
+  (l.items||[]).forEach(it=>{
+    const nombre=String(it.descripcion||'').trim(); if(!nombre)return;
+    const costo=cvValorItem(l,it,st.columna); if(costo==null)return;
+    let hijo=grupo.hijos.find(h=>norm(h.nombre)===norm(nombre));
+    if(!hijo){ hijo=nodoVarNuevo(); hijo.nombre=nombre; grupo.hijos.push(hijo); varCostosPlegados.add(hijo.id); creadas++; }
+    else actualizadas++;
+    hijo.precio=String(prodListaPrecio(costo,st.margenTipo,st.margenValor));
+    hijo.costos=hijo.costos||[];
+    let c=hijo.costos.find(x=>x.lista_id===l.id&&x.item_id===it.id);
+    if(!c){ c={id:uid(),nombre,valor:'',lista_id:l.id,item_id:it.id,columna:st.columna}; hijo.costos.push(c); }
+    c.valor=String(costo); c.columna=st.columna; if(!String(c.nombre||'').trim())c.nombre=nombre;
+  });
+  const tit=l.titulo||l.proveedor||'listado';
+  prodListaState=null; renderVariantes();
+  toast(`${creadas} creada${creadas===1?'':'s'} · ${actualizadas} actualizada${actualizadas===1?'':'s'} desde ${tit}, con costo vinculado ✓`);
+}
+function renderDesdeListaHTML(){
+  const st=prodListaState, grupo=buscarNodoVar(st.groupId);
+  const esc=s=>String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const listas=CX_LISTAS_ED||[], l=cvListaDe(st.lista_id);
+  const cols=l?cvColsLista(l):[], items=l?(l.items||[]):[];
+  const norm=s=>String(s||'').trim().toLowerCase();
+  const existentes=new Set((grupo&&grupo.hijos||[]).map(h=>norm(h.nombre)));
+  const lblRegla=st.margenTipo==='multiplicador'?'Multiplicar el costo por'
+                :st.margenTipo==='suma'?'Sumarle al costo'
+                :'Agregarle al costo un %';
+  const filas=items.map(it=>{
+    const costo=cvValorItem(l,it,st.columna);
+    const precio=prodListaPrecio(costo,st.margenTipo,st.margenValor);
+    const nueva=!existentes.has(norm(it.descripcion));
+    return `<tr><td>${esc(it.descripcion)}${it.codigo?` <span style="color:var(--muted)">(${esc(it.codigo)})</span>`:''}</td>
+      <td style="text-align:right">${costo==null?'—':fCOP(costo)}</td>
+      <td style="text-align:right"><b>${costo==null?'—':fCOP(precio)}</b></td>
+      <td><span class="pega-badge ${nueva?'nueva':'actu'}">${nueva?'NUEVA':'ACTUALIZA'}</span></td></tr>`;
+  }).join('');
+  return `<div class="pega-panel">
+    <div class="pega-hd"><b>Desde un Listado</b> en <span class="pega-grp">${esc(grupo?grupo.nombre||'(grupo)':'')}</span></div>
+    <div style="font-size:11px;color:var(--muted);margin:4px 0 9px">Trae los ítems del listado como sub-variantes, con el <b>costo ya vinculado</b> (si el proveedor sube el precio, la app te avisa) y el precio calculado con tu regla de rentabilidad.</div>
+    <div class="dl-form">
+      <div><label class="var-hd-lbl">Listado de costos</label>
+        <select class="item-inp" onchange="prodListaSet('lista_id',this.value)">${listas.map(x=>`<option value="${x.id}"${x.id===st.lista_id?' selected':''}>${esc(x.titulo||x.proveedor)} · ${esc(x.proveedor)}</option>`).join('')}</select></div>
+      <div><label class="var-hd-lbl">Columna de costo</label>
+        <select class="item-inp" onchange="prodListaSet('columna',this.value)">${cols.map(c=>`<option value="${esc(c)}"${c===st.columna?' selected':''}>${esc(c)}</option>`).join('')}</select></div>
+      <div><label class="var-hd-lbl">Rentabilidad</label>
+        <select class="item-inp" onchange="prodListaSet('margenTipo',this.value)">
+          <option value="porcentaje"${st.margenTipo==='porcentaje'?' selected':''}>Por porcentaje (%)</option>
+          <option value="multiplicador"${st.margenTipo==='multiplicador'?' selected':''}>Por multiplicación (×)</option>
+          <option value="suma"${st.margenTipo==='suma'?' selected':''}>Sumar una constante ($)</option>
+        </select></div>
+      <div><label class="var-hd-lbl">${lblRegla}</label>
+        <input class="item-inp" type="text" value="${esc(st.margenValor)}" placeholder="${st.margenTipo==='multiplicador'?'Ej: 1,8':(st.margenTipo==='suma'?'Ej: 5.000':'Ej: 40')}" oninput="prodListaState.margenValor=this.value;renderDesdeListaPreview()"></div>
+    </div>
+    <div class="pega-tw"><table class="pega-tbl" id="dl-preview"><thead><tr><th>Ítem del listado</th><th style="text-align:right">Costo</th><th style="text-align:right">Precio público</th><th></th></tr></thead><tbody>${filas||'<tr><td colspan="4">Este listado no tiene ítems.</td></tr>'}</tbody></table></div>
+    <div class="pega-acts">
+      <button class="btn-add-row" onclick="prodListaCancelar()"><i class="ti ti-x"></i>Cancelar</button>
+      <button class="btn-add-row" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="prodListaAplicar()"><i class="ti ti-check"></i>Crear sub-variantes (${items.length})</button>
+    </div>
+  </div>`;
+}
+// Redibuja solo la tabla mientras se escribe el valor (para no perder el foco del input)
+function renderDesdeListaPreview(){
+  const st=prodListaState; if(!st)return;
+  const l=cvListaDe(st.lista_id); if(!l)return;
+  const tb=document.querySelector('#dl-preview tbody'); if(!tb)return;
+  const esc=s=>String(s||'').replace(/</g,'&lt;');
+  const grupo=buscarNodoVar(st.groupId);
+  const norm=s=>String(s||'').trim().toLowerCase();
+  const existentes=new Set((grupo&&grupo.hijos||[]).map(h=>norm(h.nombre)));
+  tb.innerHTML=(l.items||[]).map(it=>{
+    const costo=cvValorItem(l,it,st.columna);
+    const precio=prodListaPrecio(costo,st.margenTipo,st.margenValor);
+    const nueva=!existentes.has(norm(it.descripcion));
+    return `<tr><td>${esc(it.descripcion)}</td><td style="text-align:right">${costo==null?'—':fCOP(costo)}</td><td style="text-align:right"><b>${costo==null?'—':fCOP(precio)}</b></td><td><span class="pega-badge ${nueva?'nueva':'actu'}">${nueva?'NUEVA':'ACTUALIZA'}</span></td></tr>`;
+  }).join('');
+}
 function prodLimpiaMonto(s){ return String(s||'').replace(/[^\d.,]/g,'').replace(/[.,]+$/,'').trim(); }
 // Separa el texto pegado en filas×columnas (TSV de Excel, CSV con ; o , o líneas "nombre → $precio")
 function prodParseTabla(texto){
