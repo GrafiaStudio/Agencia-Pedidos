@@ -1613,17 +1613,42 @@ app.get('/api/export/csv',requiere('ver_registros'),(req,res)=>{
   else if(estado==='cancelado')sql+=' AND cancelado=1';
   else if(estado&&estado!=='todos')sql+=' AND entregado=0 AND cancelado=0';
   const pedidos=db.prepare(sql+' ORDER BY creado DESC').all(...params).map(pedidoCompleto);
-  const rows=[['Ref','Cliente','Tel','Estado','Urgente','Encargos','Valor Total','Pagado','Saldo','F.Pedido','F.Entrega','Notas']];
-  pedidos.forEach(p=>{
-    const encRes=(p.encargos||[]).map(e=>`[${(e.categorias||[]).join(', ')}] ${(e.items||[]).map(i=>`${i.cantidad} ${i.detalle}`).join(', ')}`).join(' | ');
-    const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0);
-    const val=p.valor_total||0;
-    const estado=p.entregado?'Entregado':p.cancelado?'Cancelado':p.urgente?'Urgente':'Activo';
-    rows.push([p.ref,p.nombre,p.tel||'',estado,p.urgente?'Sí':'No',encRes,val,pag,Math.max(0,val-pag),p.fecha_pedido||'',p.fecha_entrega||'',p.notas||'']);
-  });
-  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const estadoDe=p=>p.entregado?'Entregado':p.cancelado?'Cancelado':p.es_cotizacion?'Cotización':p.urgente?'Urgente':'Activo';
+  const costoDe=p=>(p.costos||[]).reduce((a,c)=>a+toNum(c.monto_calc),0);
+  let rows,nombreArch;
+  // B3 · dos formas de exportar. "items" pone UNA FILA POR ÍTEM para poder filtrar, sumar y
+  // hacer tablas dinámicas en Excel; antes todo iba aplastado en una sola celda "Encargos".
+  if(req.query.tipo==='items'){
+    nombreArch='pedidos_grafia_detalle_por_item.csv';
+    rows=[['Ref','Cliente','Tel','Estado','F.Pedido','F.Entrega','Encargo','Categorías','Cantidad','Detalle','Nota del ítem','Estado del ítem','V. Unitario','V. Total ítem']];
+    pedidos.forEach(p=>{
+      const est=estadoDe(p);
+      (p.encargos||[]).forEach(e=>{
+        const cats=(e.categorias||[]).join(', ');
+        (e.items||[]).forEach(i=>{
+          const cant=parseInt(String(i.cantidad||0).replace(/\D/g,''))||0;
+          const unit=toNum(i.valor_unitario_calc);
+          rows.push([p.ref,p.nombre,p.tel||'',est,p.fecha_pedido||'',p.fecha_entrega||'',
+            e.numero||'',cats,i.cantidad||'',i.detalle||'',i.nota||'',i.estado||'',unit,cant*unit]);
+        });
+      });
+    });
+  }else{
+    nombreArch='pedidos_grafia_resumen.csv';
+    // Resumen: un pedido por fila, ahora CON costos y utilidad (antes no salían).
+    rows=[['Ref','Cliente','Tel','Estado','Urgente','Encargos','Valor Total','Costos','Utilidad','Pagado','Saldo','F.Pedido','F.Entrega','Notas']];
+    pedidos.forEach(p=>{
+      const encRes=(p.encargos||[]).map(e=>`[${(e.categorias||[]).join(', ')}] ${(e.items||[]).map(i=>`${i.cantidad} ${i.detalle}`).join(', ')}`).join(' | ');
+      const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0);
+      const val=p.valor_total||0, cos=costoDe(p);
+      rows.push([p.ref,p.nombre,p.tel||'',estadoDe(p),p.urgente?'Sí':'No',encRes,val,cos,val-cos,pag,Math.max(0,val-pag),p.fecha_pedido||'',p.fecha_entrega||'',p.notas||'']);
+    });
+  }
+  // Los números van SIN comillas para que Excel los sume; el texto sí entrecomillado.
+  const celda=c=>(typeof c==='number'&&Number.isFinite(c))?String(c):'"'+String(c).replace(/"/g,'""')+'"';
+  const csv='\uFEFF'+rows.map(r=>r.map(celda).join(',')).join('\n');
   res.setHeader('Content-Type','text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition','attachment; filename="pedidos_grafia.csv"');
+  res.setHeader('Content-Disposition',`attachment; filename="${nombreArch}"`);
   res.send(csv);
 });
 

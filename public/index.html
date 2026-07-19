@@ -1834,6 +1834,13 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
     <div class="fg"><label>Filtrar por</label>
       <select id="exp-est"><option value="todos">Todos</option><option value="activo">Activos</option><option value="entregado">Entregados</option><option value="cancelado">Cancelados</option></select>
     </div>
+    <div class="fg"><label>Formato</label>
+      <select id="exp-tipo" onchange="expTipoCambio()">
+        <option value="resumen">Resumen — un pedido por fila (con costos y utilidad)</option>
+        <option value="items">Detalle por ítem — una fila por ítem</option>
+      </select>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:5px" id="exp-hint">Ideal para ver el estado del negocio: valor, costos, utilidad, pagado y saldo de cada pedido.</div>
+    </div>
     <button class="btn-pri" style="width:100%;justify-content:center" onclick="exportar()"><i class="ti ti-file-spreadsheet"></i>Descargar CSV</button>
   </div>
 </div>
@@ -6883,18 +6890,26 @@ function cerrarMas(){document.getElementById('ovMas').classList.remove('open')}
 function irDesdeMas(v){cerrarMas();showView(v)}
 function abrirExp(){document.getElementById('ovExp').classList.add('open')}
 function cerrarExp(){document.getElementById('ovExp').classList.remove('open')}
+// B3 · el aviso cambia según el formato elegido
+function expTipoCambio(){
+  const t=(document.getElementById('exp-tipo')||{}).value, h=document.getElementById('exp-hint');
+  if(h)h.textContent=(t==='items')
+    ? 'Una fila por ítem (cantidad, detalle, nota, valor). Ideal para filtrar y hacer tablas dinámicas por producto.'
+    : 'Ideal para ver el estado del negocio: valor, costos, utilidad, pagado y saldo de cada pedido.';
+}
 async function exportar(){
   const e=document.getElementById('exp-est').value;
+  const tipo=(document.getElementById('exp-tipo')||{}).value||'resumen';
   cerrarExp();toast('Descargando…');
   try{
     const tk=getToken();
-    const r=await fetch(`/api/export/csv?estado=${e}`,{headers:tk?{'Authorization':'Bearer '+tk}:{}});
+    const r=await fetch(`/api/export/csv?estado=${e}&tipo=${tipo}`,{headers:tk?{'Authorization':'Bearer '+tk}:{}});
     if(r.status===401){clearToken();showPinScreen('Sesión expirada, ingresa el PIN de nuevo');return}
     if(!r.ok){toast('Error al descargar',false);return}
     const blob=await r.blob();
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download='pedidos_grafia.csv';
+    a.href=url;a.download=(tipo==='items')?'pedidos_grafia_detalle_por_item.csv':'pedidos_grafia_resumen.csv';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }catch(err){toast('Error al descargar el archivo',false)}
