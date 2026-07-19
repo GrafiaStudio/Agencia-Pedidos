@@ -235,6 +235,9 @@ try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_activo INTEGER D
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_porcentaje INTEGER DEFAULT 19"); } catch(e){}
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN iva_desglosado INTEGER DEFAULT 0"); } catch(e){}
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN info_pdf TEXT DEFAULT ''"); } catch(e){}
+// C1 · colores de marca editables: una sola fuente de verdad para la app Y el PDF.
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN color_primario TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN color_acento TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_actual INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_minimo INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN regla_lleva INTEGER"); } catch(e){}
@@ -456,8 +459,13 @@ const CFG_DEFAULTS={
   metodos_pago:['efectivo','transferencia','nequi','daviplata','otro'],
   info_pdf:'',
   alertas_entrega:1,dias_anticipacion_entrega:3,
-  iva_activo:0,iva_porcentaje:19,iva_desglosado:0
+  iva_activo:0,iva_porcentaje:19,iva_desglosado:0,
+  // C1 · colores de marca (los de fábrica de GRAFÍA). Alimentan la app y el PDF.
+  color_primario:'#222B46',color_acento:'#5B7FA6'
 };
+// Solo aceptamos hex #RGB o #RRGGBB (evita inyectar cualquier cosa en el CSS/PDF).
+const HEX_RE=/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const colorOk=(v,porDefecto)=>HEX_RE.test(String(v||'').trim())?String(v).trim():porDefecto;
 function getConfiguracion(wsId){
   const row=db.prepare('SELECT * FROM configuracion_negocio WHERE workspace_id=?').get(wsId);
   if(!row)return{...CFG_DEFAULTS};
@@ -484,7 +492,9 @@ function getConfiguracion(wsId){
     dias_anticipacion_entrega:row.dias_anticipacion_entrega??CFG_DEFAULTS.dias_anticipacion_entrega,
     iva_activo:row.iva_activo?1:0,
     iva_porcentaje:row.iva_porcentaje??CFG_DEFAULTS.iva_porcentaje,
-    iva_desglosado:row.iva_desglosado?1:0
+    iva_desglosado:row.iva_desglosado?1:0,
+    color_primario:colorOk(row.color_primario,CFG_DEFAULTS.color_primario),
+    color_acento:colorOk(row.color_acento,CFG_DEFAULTS.color_acento)
   };
 }
 
@@ -1772,15 +1782,16 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
     const actual=getConfiguracion(req.wsId);
     const nuevo={...actual,...b};
     db.prepare(`INSERT INTO configuracion_negocio
-        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,info_pdf,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado)
-      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@info_pdf,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado)
+        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,info_pdf,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado,color_primario,color_acento)
+      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@info_pdf,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado,@color_primario,@color_acento)
       ON CONFLICT(workspace_id) DO UPDATE SET
         nombre_negocio=excluded.nombre_negocio,direccion=excluded.direccion,telefono=excluded.telefono,
         email=excluded.email,nit=excluded.nit,moneda_prefijo=excluded.moneda_prefijo,decimales=excluded.decimales,
         separador_miles=excluded.separador_miles,formato_fecha=excluded.formato_fecha,zona_horaria=excluded.zona_horaria,
         dias_validez_cotizacion=excluded.dias_validez_cotizacion,estado_default_cotizacion=excluded.estado_default_cotizacion,
         metodos_pago=excluded.metodos_pago,info_pdf=excluded.info_pdf,alertas_entrega=excluded.alertas_entrega,dias_anticipacion_entrega=excluded.dias_anticipacion_entrega,
-        iva_activo=excluded.iva_activo,iva_porcentaje=excluded.iva_porcentaje,iva_desglosado=excluded.iva_desglosado`)
+        iva_activo=excluded.iva_activo,iva_porcentaje=excluded.iva_porcentaje,iva_desglosado=excluded.iva_desglosado,
+        color_primario=excluded.color_primario,color_acento=excluded.color_acento`)
       .run({
         workspace_id:req.wsId,
         nombre_negocio:nuevo.nombre_negocio||'',
@@ -1801,7 +1812,9 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
         dias_anticipacion_entrega:Number.isInteger(nuevo.dias_anticipacion_entrega)?nuevo.dias_anticipacion_entrega:3,
         iva_activo:nuevo.iva_activo?1:0,
         iva_porcentaje:Number.isInteger(nuevo.iva_porcentaje)?nuevo.iva_porcentaje:19,
-        iva_desglosado:nuevo.iva_desglosado?1:0
+        iva_desglosado:nuevo.iva_desglosado?1:0,
+        color_primario:colorOk(nuevo.color_primario,CFG_DEFAULTS.color_primario),
+        color_acento:colorOk(nuevo.color_acento,CFG_DEFAULTS.color_acento)
       });
     res.json(getConfiguracion(req.wsId));
   }catch(e){logError('PUT /api/configuracion',e);res.status(500).json({error:e.message})}

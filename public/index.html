@@ -19,6 +19,7 @@
   --green:#2BAD72;--green-lt:#E4F7EE;
   --purple:#7B6EF6;--purple-lt:#EEEAFF;
   --orange:#F07140;--orange-lt:#FEF0E8;
+  --sb-grad:linear-gradient(180deg,#3D4C7A 0%,#232C4C 52%,#161B2E 100%);
   --r:13px;--r-sm:9px;--r-lg:22px;
   --sh:0 4px 20px rgba(74,98,142,.10);--sh-lg:0 14px 42px rgba(74,98,142,.20);
 }
@@ -35,7 +36,7 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 
 /* LAYOUT */
 .layout{display:flex;min-height:100vh}
-.sidebar{width:220px;flex-shrink:0;background:linear-gradient(180deg,#3D4C7A 0%,#232C4C 52%,#161B2E 100%);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50;overflow-y:auto}
+.sidebar{width:220px;flex-shrink:0;background:var(--sb-grad);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:50;overflow-y:auto}
 .main{margin-left:220px;flex:1;min-width:0}
 
 /* SIDEBAR */
@@ -741,6 +742,11 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cv-stale-banner i{color:#B8860B}
 .cv-stale-banner .btn-add-row{background:#8A6D1B;color:#fff;border-color:#8A6D1B}
 /* B4 · modo cuadrícula (vista Excel) */
+/* C1 · selector de colores de marca */
+.cl-row{display:flex;align-items:center;gap:9px}
+.cl-pick{width:48px;height:38px;padding:3px;border-radius:11px;border:1.5px solid var(--line);background:var(--white);cursor:pointer;flex-shrink:0}
+.cl-hex{flex:1;font-family:'DM Mono',monospace;text-transform:uppercase}
+.cl-hint{font-size:10px;color:var(--muted);margin-top:4px}
 .dl-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin-bottom:10px}
 .var-barra{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .var-vista{display:inline-flex;gap:2px;background:var(--line-lt);border-radius:9px;padding:3px}
@@ -1444,6 +1450,26 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
           <div><label>Email</label><input type="text" id="cfg-email" placeholder="contacto@negocio.com"></div>
         </div>
         <div class="fg"><label>Dirección</label><input type="text" id="cfg-direccion" placeholder="Opcional"></div>
+
+        <div class="msec" style="margin-top:20px"><span class="tri"></span>Colores de tu marca</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;max-width:640px">Estos dos colores mandan en <b>toda la app y también en el PDF</b>. Los demás tonos (fondos suaves, hover, degradado del menú) se calculan solos. Los cambios se ven al instante; se guardan al tocar Guardar.</div>
+        <div class="fr2 fg">
+          <div><label>Color principal</label>
+            <div class="cl-row">
+              <input type="color" class="cl-pick" id="cfg-color-primario" oninput="cfgColorCambio('primario',this.value)">
+              <input type="text" class="cl-hex" id="cfg-color-primario-hex" placeholder="#222B46" oninput="cfgColorCambio('primario',this.value,true)">
+            </div>
+            <div class="cl-hint">Menú lateral, títulos y encabezado del PDF.</div>
+          </div>
+          <div><label>Color de acento</label>
+            <div class="cl-row">
+              <input type="color" class="cl-pick" id="cfg-color-acento" oninput="cfgColorCambio('acento',this.value)">
+              <input type="text" class="cl-hex" id="cfg-color-acento-hex" placeholder="#5B7FA6" oninput="cfgColorCambio('acento',this.value,true)">
+            </div>
+            <div class="cl-hint">Botones, enlaces y detalles destacados.</div>
+          </div>
+        </div>
+        <button class="btn-add-row" type="button" onclick="cfgColoresFabrica()"><i class="ti ti-arrow-back-up"></i>Volver a los colores de fábrica</button>
       </div>
 
       <div id="cfg-preferencias" class="cfg-panel">
@@ -2201,8 +2227,62 @@ const METODOS_PAGO_CATALOGO=[
   {key:'contraentrega',label:'Contraentrega'},
   {key:'otro',label:'Otro'}
 ];
+/* C1 · TOKENS DE COLOR DE MARCA — una sola fuente de verdad para la app y el PDF.
+   El usuario define 2 colores; el resto de tonos (hover, fondos suaves, degradado del
+   menú) se derivan solos para que nunca queden combinaciones rotas. */
+const COLOR_FABRICA={primario:'#222B46',acento:'#5B7FA6'};
+function hexRgb(h){
+  let s=String(h||'').trim().replace('#','');
+  if(s.length===3)s=s.split('').map(c=>c+c).join('');
+  if(!/^[0-9a-fA-F]{6}$/.test(s))return null;
+  return [parseInt(s.slice(0,2),16),parseInt(s.slice(2,4),16),parseInt(s.slice(4,6),16)];
+}
+function rgbHex(r){ return '#'+r.map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
+// mezcla(color, destino, cuanto) — 0 = queda igual, 1 = queda el destino
+function mezcla(hex,destino,cuanto){
+  const a=hexRgb(hex),b=hexRgb(destino);
+  if(!a||!b)return hex;
+  return rgbHex(a.map((v,i)=>v+(b[i]-v)*cuanto));
+}
+function colorValido(h){ return !!hexRgb(h); }
+// Cambio en vivo desde el selector o el campo de texto (se ve al instante, se guarda al Guardar)
+function cfgColorCambio(cual,val,desdeTexto){
+  if(!colorValido(val))return; // mientras se escribe "#22..." simplemente no se aplica aún
+  const hex=val.trim().toUpperCase();
+  if(cual==='primario')CFG.color_primario=hex; else CFG.color_acento=hex;
+  const pick=document.getElementById('cfg-color-'+cual);
+  const txt=document.getElementById('cfg-color-'+cual+'-hex');
+  if(pick&&desdeTexto)pick.value=hex;
+  if(txt&&!desdeTexto)txt.value=hex;
+  aplicarTemaColor();
+}
+function cfgColoresFabrica(){
+  CFG.color_primario=COLOR_FABRICA.primario; CFG.color_acento=COLOR_FABRICA.acento;
+  pintarColoresCfg(); aplicarTemaColor(); toast('Colores de fábrica restaurados (recuerda Guardar)');
+}
+function pintarColoresCfg(){
+  const p=colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario;
+  const a=colorValido(CFG.color_acento)?CFG.color_acento:COLOR_FABRICA.acento;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
+  set('cfg-color-primario',p); set('cfg-color-primario-hex',p.toUpperCase());
+  set('cfg-color-acento',a);   set('cfg-color-acento-hex',a.toUpperCase());
+}
+function aplicarTemaColor(){
+  const p=colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario;
+  const a=colorValido(CFG.color_acento)?CFG.color_acento:COLOR_FABRICA.acento;
+  const s=document.documentElement.style;
+  s.setProperty('--navy',p);
+  s.setProperty('--navy2',mezcla(p,'#FFFFFF',.12));
+  s.setProperty('--teal',a);
+  s.setProperty('--teal-lt',mezcla(a,'#FFFFFF',.90));
+  s.setProperty('--teal-dk',mezcla(a,'#000000',.22));
+  s.setProperty('--magenta',a);
+  s.setProperty('--yellow',mezcla(a,'#FFFFFF',.45));
+  s.setProperty('--sb-grad',`linear-gradient(180deg,${mezcla(p,'#FFFFFF',.18)} 0%,${p} 52%,${mezcla(p,'#000000',.38)} 100%)`);
+}
 const CFG_DEFAULTS={
   nombre_negocio:'',logo_ruta:'',direccion:'',telefono:'',email:'',nit:'',
+  color_primario:COLOR_FABRICA.primario,color_acento:COLOR_FABRICA.acento,
   moneda_prefijo:'$',decimales:0,separador_miles:'.',formato_fecha:'DD/MM/AAAA',
   zona_horaria:'America/Bogota',dias_validez_cotizacion:15,estado_default_cotizacion:0,
   metodos_pago:[{key:'efectivo',label:'Efectivo',datos:'',activo:true},{key:'transferencia',label:'Transferencia',datos:'',activo:true},{key:'nequi',label:'Nequi',datos:'',activo:true},{key:'daviplata',label:'Daviplata',datos:'',activo:true}],
@@ -2237,6 +2317,7 @@ async function cargarConfiguracion(){
 }
 
 function aplicarPerfilNegocio(){
+  aplicarTemaColor(); // C1 · los colores de marca se aplican apenas carga la configuración
   if(CFG.logo_ruta)document.getElementById('sbLogoImg').src=CFG.logo_ruta;
   const elN=document.getElementById('sbBizName');
   if(CFG.nombre_negocio){elN.textContent=CFG.nombre_negocio;elN.style.display='block'}
@@ -2256,6 +2337,7 @@ function pintarConfiguracion(){
   document.getElementById('cfg-telefono').value=CFG.telefono||'';
   document.getElementById('cfg-email').value=CFG.email||'';
   document.getElementById('cfg-nit').value=CFG.nit||'';
+  pintarColoresCfg(); // C1
   const prev=document.getElementById('cfg-logo-preview');
   if(CFG.logo_ruta){prev.src=CFG.logo_ruta;prev.style.display='block'}
   else{prev.style.display='none'}
@@ -2578,6 +2660,8 @@ async function guardarConfiguracion(){
     telefono:document.getElementById('cfg-telefono').value.trim(),
     email:document.getElementById('cfg-email').value.trim(),
     nit:document.getElementById('cfg-nit').value.trim(),
+    color_primario:colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario,
+    color_acento:colorValido(CFG.color_acento)?CFG.color_acento:COLOR_FABRICA.acento,
     moneda_prefijo:document.getElementById('cfg-moneda-prefijo').value.trim()||'$',
     decimales:document.getElementById('cfg-decimales').checked?1:0,
     separador_miles:document.getElementById('cfg-separador').value,
@@ -2874,7 +2958,10 @@ async function construirPdfPedido(){
   const doc=new jsPDF({format:'letter'});
   const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
   const M=15, CW=W-M*2;
-  const NAVY=[34,43,70], SLATE=[94,112,138], MUTED=[147,163,185], LINE=[229,236,244], CARD=[244,248,252], RED=[200,50,55], GREEN=[26,107,69];
+  // C1 · el PDF usa el MISMO color de marca que la app (antes era azul fijo, y a marcas de
+  // otros colores no les servía). Una sola fuente de verdad: CFG.color_primario.
+  const NAVY=hexRgb(colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario)||[34,43,70];
+  const SLATE=[94,112,138], MUTED=[147,163,185], LINE=[229,236,244], CARD=[244,248,252], RED=[200,50,55], GREEN=[26,107,69];
   const ink=c=>doc.setTextColor(c[0],c[1],c[2]);
   const F=(s,b)=>{doc.setFontSize(s);doc.setFont('helvetica',b||'normal');};
   let y=16;
