@@ -6427,14 +6427,22 @@ function recalcularCostosAutomaticos(){
       if(f.tipo_precio==='variantes'){
         const sel=partesSeleccionadasVar(it);
         if(!sel.length)return;
-        let costoUnit=costoTotalInsumosFicha(f.insumos);
+        // B2 · una LÍNEA POR PARTE/OPCIÓN en vez de un único total sumado, para poder revisar
+        // y ajustar cada costo por separado (camiseta ×6 = costo · DTF ×6 = costo).
+        // El total no cambia: es la misma suma, solo desglosada.
+        const ins=costoTotalInsumosFicha(f.insumos);
+        if(ins>0)push('Insumos: '+f.nombre, ins);
         const partesUsadas=new Set();
         sel.forEach(s=>{
-          if(!partesUsadas.has(s.parte.id)){partesUsadas.add(s.parte.id);costoUnit+=costoTotalCostosArr(s.parte.costos)}
-          if(s.opcion)costoUnit+=costoTotalCostosArr(s.opcion.costos)*(s.qty||1);
+          if(!partesUsadas.has(s.parte.id)){
+            partesUsadas.add(s.parte.id);
+            push(f.nombre+' — '+s.parte.nombre, costoTotalCostosArr(s.parte.costos));
+          }
+          if(s.opcion){
+            const q=s.qty||1;
+            push(f.nombre+' — '+s.parte.nombre+': '+s.opcion.nombre+(q>1?(' ×'+q):''), costoTotalCostosArr(s.opcion.costos)*q);
+          }
         });
-        const cadena=sel.map(s=>{const n=s.opcion?(s.parte.nombre+': '+s.opcion.nombre):s.parte.nombre;return (s.qty>1)?(n+' ×'+s.qty):n}).join(' + ');
-        push('Costos: '+f.nombre+(cadena?' — '+cadena:''), costoUnit);
       }else{
         if(f.insumos&&f.insumos.length) push('Insumos: '+f.nombre, costoTotalInsumosFicha(f.insumos));
         // Costo por medida (proveedor): ancho×alto×tarifa con su mínimo
