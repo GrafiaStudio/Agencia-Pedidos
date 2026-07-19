@@ -446,6 +446,35 @@ db.exec(`CREATE TABLE IF NOT EXISTS bitacora_relaciones(
   creado TEXT DEFAULT(datetime('now','localtime'))
 )`);
 
+// ── PRODUCCIÓN 2.0 (Fase D) · eventos de taller ──
+// Registro APPEND-ONLY: nunca se sobrescribe ni se borra (manifiesto: todo trazable).
+// Un solo lugar para los tres casos, distinguidos por `tipo`:
+//   traspaso → una etapa termina y deja nota para la que recibe (el corazón del handoff)
+//   calidad  → sello de visto bueno / con problema en cualquier etapa
+//   dano     → reporte de daño (anónimo EN PANTALLA: el autor se guarda, no se muestra)
+// Guardar el nombre del usuario junto al id evita que el historial se rompa si luego
+// se desactiva o renombra a esa persona.
+db.exec(`CREATE TABLE IF NOT EXISTS produccion_eventos(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  tipo TEXT DEFAULT 'traspaso',
+  pedido_id TEXT DEFAULT '',
+  encargo_id TEXT DEFAULT '',
+  item_id TEXT DEFAULT '',
+  estado_desde TEXT DEFAULT '',
+  estado_hasta TEXT DEFAULT '',
+  nota TEXT DEFAULT '',
+  resultado TEXT DEFAULT '',
+  cantidad TEXT DEFAULT '',
+  origen TEXT DEFAULT '',
+  usuario_id TEXT DEFAULT '',
+  usuario_nombre TEXT DEFAULT '',
+  anonimo INTEGER DEFAULT 0,
+  creado TEXT DEFAULT(datetime('now','localtime'))
+)`);
+try{ db.exec("CREATE INDEX IF NOT EXISTS idx_prodev_item ON produccion_eventos(workspace_id,item_id,creado)"); }catch(e){}
+try{ db.exec("CREATE INDEX IF NOT EXISTS idx_prodev_tipo ON produccion_eventos(workspace_id,tipo,creado)"); }catch(e){}
+
 const FORMATOS_FECHA=['DD/MM/AAAA','MM/DD/AAAA','AAAA-MM-DD'];
 const SEPARADORES_MILES=['.',','];
 const METODOS_PAGO_VALIDOS=['efectivo','transferencia','nequi','daviplata','contraentrega','otro'];
@@ -1389,11 +1418,55 @@ app.get('/api/produccion',requiere('ver_produccion'),(req,res)=>{
       }
     });
   });
+  // D1 · adjuntar a cada tarjeta la ÚLTIMA nota de traspaso, para que quien recibe el trabajo
+  // vea qué dejó dicho la etapa anterior sin tener que ir a buscarla.
+  try{
+    const ultimas=db.prepare(`SELECT e.* FROM produccion_eventos e
+      JOIN (SELECT item_id, MAX(creado) mx FROM produccion_eventos
+            WHERE workspace_id=? AND tipo='traspaso' AND nota<>'' AND item_id<>'' GROUP BY item_id) u
+        ON u.item_id=e.item_id AND u.mx=e.creado
+      WHERE e.workspace_id=? AND e.tipo='traspaso'`).all(req.wsId,req.wsId);
+    const porItem={}; ultimas.forEach(e=>{porItem[e.item_id]=e;});
+    tarjetas.forEach(t=>{
+      const e=t.item_id?porItem[t.item_id]:null;
+      if(e){ t.traspaso_nota=e.nota||''; t.traspaso_de=e.usuario_nombre||''; t.traspaso_estado=e.estado_hasta||''; t.traspaso_fecha=e.creado||''; }
+    });
+  }catch(err){ logError('GET /api/produccion (última nota)',err); }
   res.json(tarjetas);
+});
+/* ── PRODUCCIÓN 2.0 (Fase D) ──
+   Un evento NUNCA se edita ni se borra: es el rastro de lo que pasó en el taller. */
+function registrarEventoProd(req,d){
+  try{
+    const u=req.usuario||{};
+    db.prepare(`INSERT INTO produccion_eventos
+      (id,workspace_id,tipo,pedido_id,encargo_id,item_id,estado_desde,estado_hasta,nota,resultado,cantidad,origen,usuario_id,usuario_nombre,anonimo)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(uid(),req.wsId,d.tipo||'traspaso',d.pedido_id||'',d.encargo_id||'',d.item_id||'',
+           d.estado_desde||'',d.estado_hasta||'',String(d.nota||'').slice(0,1000),d.resultado||'',
+           String(d.cantidad||''),d.origen||'',u.id||'',u.nombre||u.usuario||'',d.anonimo?1:0);
+  }catch(e){ logError('registrarEventoProd',e); }
+}
+// Los eventos anónimos ocultan el autor a todo el mundo MENOS al administrador.
+function eventoProdVista(ev,esAdmin){
+  const o={...ev, anonimo:!!ev.anonimo};
+  if(o.anonimo&&!esAdmin){ o.usuario_id=''; o.usuario_nombre=''; }
+  return o;
+}
+// Línea de tiempo de un ítem (lo que dejó cada etapa) — la ve quien recibe el trabajo.
+app.get('/api/produccion/eventos',requiere('ver_produccion'),(req,res)=>{
+  const{item_id,encargo_id,pedido_id,tipo}=req.query;
+  let sql='SELECT * FROM produccion_eventos WHERE workspace_id=?'; const p=[req.wsId];
+  if(item_id){sql+=' AND item_id=?';p.push(item_id);}
+  if(encargo_id){sql+=' AND encargo_id=?';p.push(encargo_id);}
+  if(pedido_id){sql+=' AND pedido_id=?';p.push(pedido_id);}
+  if(tipo){sql+=' AND tipo=?';p.push(tipo);}
+  const esAdmin=!!(req.permisos&&req.permisos.__admin);
+  res.json(db.prepare(sql+' ORDER BY creado DESC LIMIT 200').all(...p).map(e=>eventoProdVista(e,esAdmin)));
 });
 // Cambiar el estado de UN ÍTEM desde Producción (cada ítem fluye por separado).
 app.put('/api/produccion/item/:id',requiere('gestionar_produccion'),(req,res)=>{
-  const it=db.prepare(`SELECT i.id,i.estado,i.detalle,i.cantidad,e.numero,e.responsable_id,e.notas_tec,p.cerrado AS p_cerrado,p.id AS p_id
+  const it=db.prepare(`SELECT i.id,i.estado,i.detalle,i.cantidad,i.encargo_id,e.numero,e.responsable_id,e.notas_tec,p.cerrado AS p_cerrado,p.id AS p_id
     FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
     WHERE i.id=? AND e.workspace_id=?`).get(req.params.id,req.wsId);
   if(!it)return res.status(404).json({error:'Ítem no encontrado'});
@@ -1408,7 +1481,11 @@ app.put('/api/produccion/item/:id',requiere('gestionar_produccion'),(req,res)=>{
   db.prepare('UPDATE enc_items SET estado=? WHERE id=?').run(b.estado,it.id);
   const act=actorDe(req);
   const det=String(it.detalle||'ítem').slice(0,40);
-  addHist(it.p_id,`Producción · Encargo #${it.numero} · "${det}": ${it.estado||'—'} → ${b.estado}`,req.wsId,act);
+  // D1 · queda el traspaso registrado (quién, cuándo, desde/hasta y la nota para quien recibe)
+  registrarEventoProd(req,{tipo:'traspaso',pedido_id:it.p_id,encargo_id:it.encargo_id,item_id:it.id,
+    estado_desde:it.estado||'',estado_hasta:b.estado,nota:String(b.nota||'').trim()});
+  const nota=String(b.nota||'').trim();
+  addHist(it.p_id,`Producción · Encargo #${it.numero} · "${det}": ${it.estado||'—'} → ${b.estado}`+(nota?` · Nota: ${nota.slice(0,120)}`:''),req.wsId,act);
   res.json({ok:true});
 });
 // Equipo asignable (usuarios activos del workspace) — accesible con solo ver_produccion.

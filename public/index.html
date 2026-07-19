@@ -747,6 +747,19 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cv-stale-banner i{color:#B8860B}
 .cv-stale-banner .btn-add-row{background:#8A6D1B;color:#fff;border-color:#8A6D1B}
 /* B4 · modo cuadrícula (vista Excel) */
+/* D1 · traspaso entre etapas: la nota que dejó quien venía antes, y el panel al mover */
+.pcx-recibido{display:flex;gap:7px;align-items:flex-start;background:var(--teal-lt);border:1px solid transparent;
+  border-radius:var(--r-sm);padding:8px 10px;margin-top:8px;font-size:10.5px;color:var(--slate);line-height:1.45}
+.pcx-recibido i{color:var(--teal-dk);font-size:13px;flex-shrink:0;margin-top:1px}
+.pcx-recibido b{color:var(--navy);font-weight:700}
+.pcx-trasp{margin-top:8px;background:var(--line-lt);border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 10px}
+.pcx-trasp-h{font-size:10.5px;color:var(--slate);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.pcx-trasp-h i{color:var(--teal-dk);font-size:14px}
+.pcx-trasp-h b{color:var(--navy)}
+.pcx-trasp textarea{min-height:46px;font-size:11px}
+.pcx-trasp-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.pcx-trasp-a .btn-add-row{padding:5px 10px;font-size:10.5px}
+
 /* C5 · en móvil los filtros de Producción quedaban en 87px y el texto salía cortado
    ("Todos lo…"). Se les da ancho mínimo y que ocupen media fila cada uno. */
 @media(max-width:768px){
@@ -4406,15 +4419,17 @@ function prodCardHTMLp(c,editable){
     <div class="pcx-items"><i class="ti ti-user" style="font-size:10px"></i> ${pesc(c.cliente)}</div>
     ${cats?`<div class="tags" style="margin:5px 0 0">${cats}</div>`:''}
     ${prodEntrega(c)}
+    ${prodNotaRecibidaHTML(c)}
     <div class="pcx-row">
       ${av}
       <select class="pcx-resp" ${dis} onchange="prodSetResp('${c.encargo_id}',this.value)" title="Responsable (del encargo completo)">${respOpts}</select>
     </div>
     <div class="pcx-row">
-      <select class="pcx-est" ${dis} onchange="prodSetEstadoCard('${k}',this.value)" title="Estado de este ítem" style="flex:1">${estOpts}</select>
+      <select class="pcx-est" ${dis} onchange="prodPedirTraspaso('${k}',this.value)" title="Estado de este ítem" style="flex:1">${estOpts}</select>
       <button class="pcx-obsbtn ${c.notas_tec?'has':''}" onclick="prodToggleObs('${k}')" title="Observación técnica (del encargo)"><i class="ti ti-note"></i></button>
       <button class="pcx-obsbtn ${(c.consumos&&c.consumos.length)?'has':''}" onclick="prodToggleStock('${k}')" title="Materiales / Stock (del encargo)"><i class="ti ti-package"></i></button>
     </div>
+    ${prodTraspasoPanelHTML(c)}
     <div class="pcx-obs" id="obs-${k}">
       <textarea ${dis} id="obstx-${k}" placeholder="Observaciones técnicas para producción…">${pesc(c.notas_tec||'')}</textarea>
       ${editable?`<div style="display:flex;gap:6px;margin-top:6px"><button class="btn-add-row" style="padding:5px 10px" onclick="prodGuardarObs('${c.encargo_id}','${k}')"><i class="ti ti-check"></i> Guardar nota</button></div>`:'<div class="hint">Solo lectura</div>'}
@@ -4452,19 +4467,57 @@ function prodEntrega(c){
   else{lbl='Entrega '+fd(c.fecha_entrega);col='var(--slate)';}
   return `<div class="pcx-entrega" style="color:${col}"><i class="ti ti-calendar"></i>${lbl}</div>`;
 }
-async function prodSetEstadoCard(key,estado){
+/* D1 · TRASPASO ENTRE ETAPAS — al mover un ítem se ofrece dejar una nota para quien recibe
+   el trabajo. Queda registrada con autor y fecha (append-only), y aparece en la tarjeta
+   de la siguiente etapa. */
+let prodTraspaso=null; // {key, estado}
+function prodPedirTraspaso(key,estado){
   const c=PROD_CARDS.find(x=>prodKey(x)===key); if(!c)return;
   const destino=ENC_ESTADOS_FULL.find(e=>e.nombre===estado);
   if(destino){
     if(destino.requiere_responsable&&!c.responsable_id){ toast(`El estado "${estado}" requiere un responsable asignado`,false); renderProduccion(); return; }
     if(destino.requiere_notas&&!(c.notas_tec||'').trim()){ toast(`El estado "${estado}" requiere una observación técnica`,false); renderProduccion(); return; }
   }
+  prodTraspaso={key,estado};
+  renderProduccion();
+  requestAnimationFrame(()=>document.getElementById('trasp-nota')?.focus());
+}
+function prodCancelarTraspaso(){ prodTraspaso=null; renderProduccion(); }
+async function prodSetEstadoCard(key,estado,nota){
+  const c=PROD_CARDS.find(x=>prodKey(x)===key); if(!c)return;
+  prodTraspaso=null;
   try{
-    if(c.item_id) await api('PUT',`/produccion/item/${c.item_id}`,{estado});
+    if(c.item_id) await api('PUT',`/produccion/item/${c.item_id}`,{estado,nota:nota||''});
     else await api('PUT',`/produccion/encargo/${c.encargo_id}`,{estado});
     c.estado=estado;
-    renderProduccion(); toast('Estado actualizado ✓');
+    if(nota&&c.item_id){ c.traspaso_nota=nota; c.traspaso_de=(ME&&(ME.nombre||ME.usuario))||''; c.traspaso_estado=estado; }
+    renderProduccion(); toast(nota?'Movido con nota para quien recibe ✓':'Estado actualizado ✓');
   }catch(e){ toast('Error: '+e.message,false); cargarProduccion(); }
+}
+function prodConfirmarTraspaso(){
+  const t=prodTraspaso; if(!t)return;
+  const nota=(document.getElementById('trasp-nota')||{}).value||'';
+  prodSetEstadoCard(t.key,t.estado,nota.trim());
+}
+// Panel que aparece en la tarjeta al cambiar de etapa
+function prodTraspasoPanelHTML(c){
+  const t=prodTraspaso;
+  if(!t||t.key!==prodKey(c))return '';
+  return `<div class="pcx-trasp">
+    <div class="pcx-trasp-h"><i class="ti ti-arrow-right-circle"></i> Pasa a <b>${pesc(t.estado)}</b></div>
+    <textarea id="trasp-nota" class="item-inp" placeholder="¿Algo que deba saber quien recibe? (opcional)"></textarea>
+    <div class="pcx-trasp-a">
+      <button class="btn-add-row" onclick="prodCancelarTraspaso()">Cancelar</button>
+      <button class="btn-add-row" onclick="prodSetEstadoCard('${prodKey(c)}','${pesc(t.estado)}','')">Mover sin nota</button>
+      <button class="btn-add-row" style="background:var(--brand);color:var(--brand-txt);border-color:var(--brand)" onclick="prodConfirmarTraspaso()"><i class="ti ti-check"></i>Mover con nota</button>
+    </div>
+  </div>`;
+}
+// Nota que dejó la etapa anterior (lo primero que debería ver quien recibe)
+function prodNotaRecibidaHTML(c){
+  if(!c.traspaso_nota)return '';
+  const de=c.traspaso_de?` · ${pesc(c.traspaso_de)}`:'';
+  return `<div class="pcx-recibido"><i class="ti ti-message-2"></i><div><b>Dejó dicho${de}:</b> ${pesc(c.traspaso_nota)}</div></div>`;
 }
 function prodCardsDeEncargo(encId){ return PROD_CARDS.filter(x=>x.encargo_id===encId); }
 async function prodSetResp(encId,rid){
