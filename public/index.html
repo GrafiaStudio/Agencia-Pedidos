@@ -741,7 +741,8 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .cv-stale-banner i{color:#B8860B}
 .cv-stale-banner .btn-add-row{background:#8A6D1B;color:#fff;border-color:#8A6D1B}
 /* B4 · modo cuadrícula (vista Excel) */
-.var-vista{display:inline-flex;gap:2px;background:var(--line-lt);border-radius:9px;padding:3px;margin-bottom:10px}
+.var-barra{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.var-vista{display:inline-flex;gap:2px;background:var(--line-lt);border-radius:9px;padding:3px}
 .var-vista button{border:none;background:transparent;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--slate);cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'Montserrat',sans-serif}
 .var-vista button.active{background:var(--white);color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .vgrid-wrap{overflow-x:auto;padding-bottom:6px}
@@ -5364,6 +5365,53 @@ function cvPickerHTML(v){
 }
 function cvStaleList(){ const out=[]; (function walk(ns){(ns||[]).forEach(n=>{(n.costos||[]).forEach(c=>{if(c.lista_id&&cvEstadoVinculo(c).estado==='stale'){const f=cvBuscarItem(c);out.push({vid:n.id,c,actual:cvValorItem(f.l,f.it,c.columna),prov:f.l.proveedor});}});walk(n.hijos)})})(fProdVariantes); return out; }
 function cvActualizarTodos(){ cvStaleList().forEach(s=>{ if(s.actual!=null)s.c.valor=String(s.actual); }); renderVariantes(); toast('Precios actualizados desde los listados ✓'); }
+/* B1 · DATOS INTELIGENTES — los Listados de costos dejan de ser solo informativos.
+   Si una variante se llama igual que un ítem de un listado, se le crea el costo YA VINCULADO
+   ({lista_id,item_id,columna}), así hereda el precio y avisa cuando el proveedor lo cambie.
+   Coincidencia EXACTA por descripción o código (normalizada): no adivinamos parecidos. */
+function cvNormNom(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function cvBuscarItemPorNombre(nombre){
+  const n=cvNormNom(nombre); if(!n)return null;
+  for(const l of (CX_LISTAS_ED||[])){
+    for(const it of (l.items||[])){
+      if(cvNormNom(it.descripcion)===n||(it.codigo&&cvNormNom(it.codigo)===n))return {l,it};
+    }
+  }
+  return null;
+}
+// Recorre las HOJAS no informativas y vincula las que encuentren pareja y aún no la tengan.
+function cvAutoEnlazar(nodos){
+  let enlazados=0; const listas=new Set();
+  (function walk(list){
+    (list||[]).forEach(v=>{
+      if(v.informativa)return;               // las informativas no llevan costos (B0)
+      const hijos=v.hijos||[];
+      if(!hijos.length){
+        const f=cvBuscarItemPorNombre(v.nombre);
+        if(f&&!(v.costos||[]).some(c=>c.lista_id===f.l.id&&c.item_id===f.it.id)){
+          const columna=cvColsLista(f.l)[0];
+          const val=cvValorItem(f.l,f.it,columna);
+          if(val!=null){
+            v.costos=v.costos||[];
+            v.costos.push({id:uid(),nombre:f.it.descripcion||f.l.titulo||f.l.proveedor,
+              valor:String(val),lista_id:f.l.id,item_id:f.it.id,columna});
+            enlazados++; listas.add(f.l.titulo||f.l.proveedor||'listado');
+          }
+        }
+      }
+      walk(hijos);
+    });
+  })(nodos);
+  return {enlazados,listas:[...listas]};
+}
+async function cvAutoEnlazarUI(){
+  await cvAsegurarListas();
+  if(!(CX_LISTAS_ED||[]).length){ toast('Aún no hay Listados de costos. Créalos en Costos → Listados de costos.',false); return; }
+  const r=cvAutoEnlazar(fProdVariantes);
+  renderVariantes();
+  if(!r.enlazados){ toast('Ninguna variante coincide (por nombre exacto) con tus listados.',false); return; }
+  toast(`${r.enlazados} costo${r.enlazados===1?'':'s'} enlazado${r.enlazados===1?'':'s'} desde ${r.listas.join(', ')} ✓`);
+}
 function htmlTramosVar(v){
   return `<div class="var-chips">
     ${(v.tramos||[]).map(t=>`<div class="var-chip">
@@ -5476,7 +5524,8 @@ function renderVariantes(){
   varColapsadas.delete(varSel); // la variante seleccionada siempre se muestra desplegada en el detalle
   const stale=cvStaleList();
   const staleBanner=stale.length?`<div class="cv-stale-banner"><span><i class="ti ti-alert-triangle"></i> ${stale.length} costo${stale.length===1?'':'s'} usa${stale.length===1?'':'n'} precios desactualizados de un listado.</span><button class="btn-add-row" onclick="cvActualizarTodos()"><i class="ti ti-refresh"></i>Actualizar</button></div>`:'';
-  const toggle=`<div class="var-vista"><button type="button" class="${varVista==='cuadricula'?'':'active'}" onclick="setVarVista('tarjetas')"><i class="ti ti-layout-list"></i>Tarjetas</button><button type="button" class="${varVista==='cuadricula'?'active':''}" onclick="setVarVista('cuadricula')"><i class="ti ti-table"></i>Cuadrícula</button></div>`;
+  const toggle=`<div class="var-barra"><div class="var-vista"><button type="button" class="${varVista==='cuadricula'?'':'active'}" onclick="setVarVista('tarjetas')"><i class="ti ti-layout-list"></i>Tarjetas</button><button type="button" class="${varVista==='cuadricula'?'active':''}" onclick="setVarVista('cuadricula')"><i class="ti ti-table"></i>Cuadrícula</button></div>
+    <button type="button" class="btn-add-row" title="Busca variantes que se llamen igual que un ítem de tus Listados de costos y les enlaza el costo" onclick="cvAutoEnlazarUI()"><i class="ti ti-link"></i>Enlazar costos desde Listados</button></div>`;
   let cuerpo;
   if(varVista==='cuadricula'){
     cuerpo=renderVarCuadriculaHTML();
@@ -5611,7 +5660,7 @@ function prodPegaDetectar(){
 }
 function prodPegaSetRole(i,val){ const st=prodPegaState; if(!st)return; st.roles[i]=val; if(val==='costo'&&!st.nombresCosto[i])st.nombresCosto[i]=(st.headers&&st.headers[i])?st.headers[i]:('Costo '+i); renderVariantes(); }
 function prodPegaSetCostName(i,val){ const st=prodPegaState; if(st)st.nombresCosto[i]=val; }
-function prodPegaAplicar(){
+async function prodPegaAplicar(){
   const st=prodPegaState; if(!st)return;
   const grupo=buscarNodoVar(st.groupId); if(!grupo){prodPegaCancelar();return;}
   grupo.hijos=grupo.hijos||[];
@@ -5629,8 +5678,12 @@ function prodPegaAplicar(){
     else{ const n=nodoVarNuevo(); n.nombre=nombre; n.precio=precio; n.costos=costos; n.modo='precio'; grupo.hijos.push(n); varCostosPlegados.add(n.id); creadas++; }
   });
   prodPegaState=null;
-  toast(`${creadas} creada${creadas===1?'':'s'} · ${actualizadas} actualizada${actualizadas===1?'':'s'} ✓`);
+  // B1 · si lo pegado coincide por nombre con un Listado de costos, enlazar sus costos.
+  await cvAsegurarListas();
+  const auto=cvAutoEnlazar(grupo.hijos);
   renderVariantes();
+  toast(`${creadas} creada${creadas===1?'':'s'} · ${actualizadas} actualizada${actualizadas===1?'':'s'}`
+    +(auto.enlazados?` · ${auto.enlazados} costo${auto.enlazados===1?'':'s'} enlazado${auto.enlazados===1?'':'s'} desde ${auto.listas.join(', ')}`:'')+' ✓');
 }
 function renderPegarPanelHTML(){
   const st=prodPegaState; const grupo=buscarNodoVar(st.groupId);
