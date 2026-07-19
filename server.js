@@ -12,8 +12,21 @@ const app=express();
 const PORT=process.env.PORT||3000;
 
 const DB_DIR=path.join(__dirname,'db');
-const UP_DIR=path.join(__dirname,'public','uploads');
+// A1 · Los archivos subidos (logo, adjuntos) DEBEN vivir en el volumen persistente, no en el
+// código. db/ es donde Railway monta el volumen (por eso la BD sobrevive); antes UP_DIR estaba
+// en public/uploads (parte del código → se recreaba vacío en cada deploy y se perdía el logo).
+const UP_DIR=path.join(DB_DIR,'uploads');
 [DB_DIR,UP_DIR].forEach(d=>{if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true})});
+// Migración única: rescatar lo que haya quedado en la ruta vieja (efímera) hacia el volumen.
+try{
+  const LEGACY_UP=path.join(__dirname,'public','uploads');
+  if(LEGACY_UP!==UP_DIR&&fs.existsSync(LEGACY_UP)){
+    for(const f of fs.readdirSync(LEGACY_UP)){
+      const src=path.join(LEGACY_UP,f),dst=path.join(UP_DIR,f);
+      try{if(fs.statSync(src).isFile()&&!fs.existsSync(dst))fs.copyFileSync(src,dst)}catch(e){}
+    }
+  }
+}catch(e){}
 
 const APP_PIN=process.env.APP_PIN||'1234';
 const JWT_SECRET=process.env.JWT_SECRET||'grafia-dev-secret-cambiar-en-railway';
