@@ -2814,6 +2814,9 @@ function lineasDocumento(p,fichasPorId){
         lineas.push({cant,descripcion:desc,unit,monto:totItem});
       }
     });
+    // Anotación del encargo (A2): antes no salía en el PDF. Fila propia, sin valores.
+    const anot=(enc.anotacion||'').trim();
+    if(anot)lineas.push({cant:'',descripcion:`Nota: ${anot}`,unit:0,monto:0,esNota:true});
   });
   if(!lineas.length)lineas.push({cant:'',descripcion:'(sin detalle)',unit:0,monto:p.valor_total||0});
   return lineas;
@@ -2930,7 +2933,7 @@ async function construirPdfPedido(){
   doc.autoTable({
     startY:y,margin:{left:M,right:M},
     head:[['Cant.','Detalle','V. Unitario','V. Total']],
-    body:lineasDocumento(p,fichasPorId).map(l=>[l.cant||'',l.descripcion,l.unit?fCOP(l.unit):'',fCOP(l.monto)]),
+    body:lineasDocumento(p,fichasPorId).map(l=>[l.cant||'',l.descripcion,l.esNota?'':(l.unit?fCOP(l.unit):''),l.esNota?'':fCOP(l.monto)]),
     styles:{fontSize:9,textColor:NAVY,lineColor:LINE,lineWidth:0.15,cellPadding:2.6},
     headStyles:{fillColor:NAVY,textColor:255,halign:'left',fontSize:8,fontStyle:'bold'},
     alternateRowStyles:{fillColor:[249,251,253]},
