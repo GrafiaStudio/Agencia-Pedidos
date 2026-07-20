@@ -438,6 +438,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .bit-rel-item:last-child{margin-bottom:0}
 .bit-rel-item-t{font-size:12px;font-weight:700;color:var(--navy);line-height:1.3}
 .bit-rel-item-b{font-size:11px;color:var(--slate);line-height:1.45;margin-top:3px;white-space:pre-wrap}
+/* F3 · adjuntos de la Bitácora */
+.bit-adj-box{display:flex;flex-direction:column;gap:6px;margin:2px 0 4px}
+.bit-adj-list{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bit-adj{display:inline-flex;align-items:center;gap:5px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 9px;font-size:10px;max-width:100%}
+.bit-adj a{display:inline-flex;align-items:center;gap:5px;color:var(--navy);text-decoration:none;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+.bit-adj a:hover{text-decoration:underline}
+.bit-adj.pend{border-style:dashed;color:var(--muted)}
+.bit-adj-pz{color:var(--muted);font-size:9px;flex-shrink:0}
+.bit-adj-x{cursor:pointer;color:var(--muted);font-size:12px;flex-shrink:0}
+.bit-adj-x:hover{color:var(--red)}
+.bit-adj-hint{font-size:9px;color:var(--muted)}
+.bit-card-adj{margin:8px 0 2px;display:flex;flex-direction:column;gap:6px}
+.bit-thumbs{display:flex;flex-wrap:wrap;gap:6px}
+.bit-thumbs img{width:62px;height:62px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
 /* F2b · captura rápida desde la entidad: escribir la nota sin salir del pedido */
 .bit-rel-add{margin-left:auto;background:none;border:1px solid #D9D0F3;color:#6A5AE0;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;transition:background .14s}
 .bit-rel-add:hover{background:#EDE9FB}
@@ -3696,6 +3710,7 @@ function bitCardHTML(n){
       ${puedeW?`<button class="bit-fav${n.favorita?' on':''}" onclick="bitFav('${n.id}',${n.favorita?0:1})" title="Favorita"><i class="ti ti-star${n.favorita?'-filled':''}"></i></button>`:''}
     </div>
     ${cuerpo?`<div class="bit-card-body">${esc(cuerpo)}</div>`:''}
+    ${bitAdjPreviewHTML(n)}
     ${(n.relaciones&&n.relaciones.length)?`<div class="bit-card-rel">${bitRelChips(n.relaciones,true)}</div>`:''}
     <div class="bit-card-ft">
       ${t?`<span class="bit-tab-chip bt-${t.color}">${esc(t.nombre)}</span>`:'<span></span>'}
@@ -3703,8 +3718,69 @@ function bitCardHTML(n){
     </div>
   </div>`;
 }
-function bitNueva(){ bitDraft={id:'',titulo:'',contenido:'',tablero_id:(bitFiltro&&bitFiltro!=='__fav')?bitFiltro:'',color:''}; renderBitacora(); }
-function bitEditar(id){ const n=BIT_NOTAS.find(x=>x.id===id); if(!n)return; bitDraft={id:n.id,titulo:n.titulo||'',contenido:n.contenido||'',tablero_id:n.tablero_id||'',color:n.color||''}; renderBitacora(); }
+/* En la tarjeta: las imágenes se ven como miniatura (la foto de la factura se reconoce de un
+   vistazo, leer su nombre de archivo no sirve de nada) y el resto queda como chip con su nombre. */
+function bitAdjPreviewHTML(n){
+  const adj=n.adjuntos||[]; if(!adj.length)return '';
+  const imgs=adj.filter(bitEsImagen), otros=adj.filter(a=>!bitEsImagen(a));
+  return `<div class="bit-card-adj">
+    ${imgs.length?`<div class="bit-thumbs">${imgs.map(a=>`<a href="${a.ruta}" target="_blank" rel="noopener" title="${String(a.nombre||'').replace(/</g,'&lt;')}"><img src="${a.ruta}" alt="${String(a.nombre||'').replace(/"/g,'&quot;')}" loading="lazy"></a>`).join('')}</div>`:''}
+    ${otros.length?`<div class="bit-adj-list">${otros.map(a=>bitAdjChipHTML(a,false)).join('')}</div>`:''}
+  </div>`;
+}
+function bitNueva(){ bitDraft={id:'',titulo:'',contenido:'',tablero_id:(bitFiltro&&bitFiltro!=='__fav')?bitFiltro:'',color:'',adjuntos:[],_nuevos:[]}; renderBitacora(); }
+function bitEditar(id){ const n=BIT_NOTAS.find(x=>x.id===id); if(!n)return; bitDraft={id:n.id,titulo:n.titulo||'',contenido:n.contenido||'',tablero_id:n.tablero_id||'',color:n.color||'',relaciones:(n.relaciones||[]).slice(),adjuntos:(n.adjuntos||[]).slice(),_nuevos:[]}; renderBitacora(); }
+/* F3 · ADJUNTOS en el editor. Los archivos elegidos en una nota NUEVA se quedan en memoria
+   (`_nuevos`) y se suben cuando la nota ya tiene id — así se puede adjuntar desde el primer
+   momento sin obligar a guardar antes, que rompería la idea de capturar en 10 segundos. */
+const BIT_ADJ_MAX=8*1024*1024; // el servidor rechaza por encima de esto; avisar aquí es más amable
+function bitAdjElegir(){ const i=document.getElementById('bit-adj-inp'); if(i)i.click(); }
+function bitAdjAgregar(ev){
+  if(!bitDraft)return;
+  const files=[...(ev.target.files||[])];
+  const grandes=files.filter(f=>f.size>BIT_ADJ_MAX).map(f=>f.name);
+  bitDraft._nuevos=(bitDraft._nuevos||[]).concat(files.filter(f=>f.size<=BIT_ADJ_MAX));
+  ev.target.value='';
+  if(grandes.length)toast('Estos pasan de 8 MB y no se adjuntaron: '+grandes.join(', '),false);
+  renderBitacora();
+}
+function bitAdjQuitarNuevo(i){ if(bitDraft&&bitDraft._nuevos){ bitDraft._nuevos.splice(i,1); renderBitacora(); } }
+async function bitAdjBorrar(adjId){
+  if(!confirm('¿Quitar este adjunto? Se borra el archivo.'))return;
+  try{
+    await api('DELETE','/bitacora/adjuntos/'+adjId);
+    if(bitDraft)bitDraft.adjuntos=(bitDraft.adjuntos||[]).filter(a=>a.id!==adjId);
+    await cargarBitNotas();
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+async function bitAdjSubir(notaId,files){
+  if(!files||!files.length)return;
+  const fd=new FormData();
+  files.forEach(f=>fd.append('files',f));
+  const r=await fetch('/api/bitacora/notas/'+notaId+'/adjuntos',{method:'POST',headers:{Authorization:'Bearer '+getToken()},body:fd});
+  if(!r.ok){ let m='No se pudieron subir los adjuntos'; try{m=(await r.json()).error||m}catch(e){} throw new Error(m); }
+  return r.json();
+}
+function bitEsImagen(a){ return /^image\//.test(a.tipo||''); }
+function bitPeso(n){ n=Number(n)||0; return n<1024?n+' B':(n<1048576?(Math.round(n/102.4)/10+' KB'):(Math.round(n/104857.6)/10+' MB')); }
+function bitAdjChipHTML(a,editable){
+  const nom=String(a.nombre||'').replace(/</g,'&lt;');
+  const icono=bitEsImagen(a)?'photo':(/pdf/.test(a.tipo||'')?'file-type-pdf':(/^audio\//.test(a.tipo||'')?'microphone':'paperclip'));
+  return `<span class="bit-adj">
+    <a href="${a.ruta}" target="_blank" rel="noopener" title="${nom}"><i class="ti ti-${icono}"></i>${nom}</a>
+    <span class="bit-adj-pz">${bitPeso(a.tamano)}</span>
+    ${editable?`<i class="ti ti-x bit-adj-x" title="Quitar" onclick="bitAdjBorrar('${a.id}')"></i>`:''}
+  </span>`;
+}
+function bitAdjBloqueHTML(){
+  const d=bitDraft, ya=(d.adjuntos||[]), nue=(d._nuevos||[]);
+  return `<div class="bit-adj-box">
+    <input type="file" id="bit-adj-inp" multiple style="display:none" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,audio/*" onchange="bitAdjAgregar(event)">
+    <button type="button" class="btn-add-row" onclick="bitAdjElegir()"><i class="ti ti-paperclip"></i>Adjuntar archivo</button>
+    ${ya.length?`<div class="bit-adj-list">${ya.map(a=>bitAdjChipHTML(a,true)).join('')}</div>`:''}
+    ${nue.length?`<div class="bit-adj-list">${nue.map((f,i)=>`<span class="bit-adj pend"><i class="ti ti-upload"></i>${String(f.name).replace(/</g,'&lt;')}<span class="bit-adj-pz">${bitPeso(f.size)}</span><i class="ti ti-x bit-adj-x" title="Quitar" onclick="bitAdjQuitarNuevo(${i})"></i></span>`).join('')}<span class="bit-adj-hint">se suben al guardar</span></div>`:''}
+  </div>`;
+}
 function bitCancelar(){ bitDraft=null; renderBitacora(); }
 function bitDraftSet(k,v){ if(bitDraft)bitDraft[k]=v; }
 function bitFormHTML(){
@@ -3719,6 +3795,7 @@ function bitFormHTML(){
         ${d._relTipo?`<select class="item-inp bit-rel-ent" onchange="bitRelAdd(this.value)"><option value="">— elegir ${d._relTipo} —</option>${(bitEntCache[d._relTipo]||[]).map(e=>`<option value="${e.id}">${String(e.label).replace(/</g,'&lt;')}</option>`).join('')}</select>`:''}
       </div>
     </div>
+    ${bitAdjBloqueHTML()}
     <div class="bit-f-row">
       <select class="item-inp bit-f-tab" onchange="bitDraftSet('tablero_id',this.value)"><option value="">— Sin tablero —</option>${BIT_TABLEROS.map(t=>`<option value="${t.id}"${t.id===d.tablero_id?' selected':''}>${eT(t.nombre)}</option>`).join('')}</select>
       <div class="bit-f-colors">${BIT_COLORES.map(c=>`<button type="button" class="bit-col bc-${c}${d.color===c?' on':''}" onclick="bitDraftSet('color','${d.color===c?'':c}');renderBitacora()" title="${c}"></button>`).join('')}</div>
@@ -3731,8 +3808,16 @@ async function bitGuardar(){
   if(!(d.titulo||'').trim()&&!(d.contenido||'').trim()){ toast('Escribe al menos un título o contenido',false); return; }
   try{
     const body={titulo:d.titulo,contenido:d.contenido,tablero_id:d.tablero_id,color:d.color,relaciones:(d.relaciones||[]).map(r=>({tipo:r.tipo,id:r.id}))};
-    if(d.id)await api('PUT','/bitacora/notas/'+d.id,body); else await api('POST','/bitacora/notas',body);
-    bitDraft=null; await cargarBitNotas(); toast('Nota guardada ✓');
+    const guardada=d.id?await api('PUT','/bitacora/notas/'+d.id,body):await api('POST','/bitacora/notas',body);
+    // F3 · los adjuntos elegidos antes de existir la nota se suben ahora que ya tiene id.
+    // Si la subida falla, la nota YA está guardada: hay que decirlo, no fingir que todo salió bien.
+    let avisoAdj='';
+    if((d._nuevos||[]).length){
+      try{ await bitAdjSubir(guardada.id,d._nuevos); }
+      catch(e){ avisoAdj=' · pero los adjuntos no subieron: '+e.message; }
+    }
+    bitDraft=null; await cargarBitNotas();
+    avisoAdj?toast('Nota guardada'+avisoAdj,false):toast('Nota guardada ✓');
   }catch(e){ toast('Error: '+e.message,false); }
 }
 async function bitFav(id,val){ try{ await api('PUT','/bitacora/notas/'+id,{favorita:val}); await cargarBitNotas(); }catch(e){ toast('Error: '+e.message,false); } }

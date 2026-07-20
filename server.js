@@ -454,6 +454,20 @@ db.exec(`CREATE TABLE IF NOT EXISTS bitacora_relaciones(
   creado TEXT DEFAULT(datetime('now','localtime'))
 )`);
 
+// F3 · adjuntos de la Bitácora. Los archivos van al MISMO volumen que el resto (UP_DIR =
+// db/uploads), nunca a public/: lo que vive en el código se borra en cada deploy.
+db.exec(`CREATE TABLE IF NOT EXISTS bitacora_adjuntos(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  nota_id TEXT NOT NULL,
+  nombre TEXT NOT NULL,
+  tipo TEXT DEFAULT '',
+  ruta TEXT NOT NULL,
+  tamano INTEGER DEFAULT 0,
+  creado TEXT DEFAULT(datetime('now','localtime'))
+)`);
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_bit_adj_nota ON bitacora_adjuntos(nota_id)"); } catch(e){}
+
 // ── PRODUCCIÓN 2.0 (Fase D) · eventos de taller ──
 // Registro APPEND-ONLY: nunca se sobrescribe ni se borra (manifiesto: todo trazable).
 // Un solo lugar para los tres casos, distinguidos por `tipo`:
@@ -2355,7 +2369,19 @@ function guardarRelacionesNota(notaId,wsId,relaciones){
   const ins=db.prepare('INSERT INTO bitacora_relaciones(id,workspace_id,nota_id,entidad_tipo,entidad_id)VALUES(?,?,?,?,?)');
   (Array.isArray(relaciones)?relaciones:[]).forEach(r=>{ const tipo=String(r.tipo||'').trim(), eid=String(r.id||'').trim(); if(tipo&&eid&&BIT_ENTIDADES.includes(tipo))ins.run(uid(),wsId,notaId,tipo,eid); });
 }
-function notaConRel(id,wsId){ const n=notaPublica(db.prepare('SELECT * FROM bitacora_notas WHERE id=?').get(id)); if(n){const m=bitMapas(wsId); n.relaciones=relacionesDeNotas([id],wsId,m)[id]||[];} return n; }
+// F3 · adjuntos por nota, en una sola consulta para no dispararle N veces a la BD.
+function adjuntosDeNotas(notaIds,wsId){
+  const out={}; if(!notaIds.length)return out;
+  const ph=notaIds.map(()=>'?').join(',');
+  db.prepare(`SELECT id,nota_id,nombre,tipo,ruta,tamano FROM bitacora_adjuntos WHERE workspace_id=? AND nota_id IN (${ph}) ORDER BY creado`).all(wsId,...notaIds)
+    .forEach(a=>{ (out[a.nota_id]=out[a.nota_id]||[]).push({id:a.id,nombre:a.nombre,tipo:a.tipo,ruta:a.ruta,tamano:a.tamano}); });
+  return out;
+}
+function notaConRel(id,wsId){
+  const n=notaPublica(db.prepare('SELECT * FROM bitacora_notas WHERE id=?').get(id));
+  if(n){ const m=bitMapas(wsId); n.relaciones=relacionesDeNotas([id],wsId,m)[id]||[]; n.adjuntos=adjuntosDeNotas([id],wsId)[id]||[]; }
+  return n;
+}
 app.get('/api/bitacora/tableros',(req,res)=>{
   res.json(db.prepare('SELECT * FROM bitacora_tableros WHERE workspace_id=? AND archivado=0 ORDER BY orden,nombre').all(req.wsId));
 });
@@ -2390,7 +2416,8 @@ app.get('/api/bitacora/notas',(req,res)=>{
   sql+=' ORDER BY favorita DESC, actualizado DESC';
   const notas=db.prepare(sql).all(...p).map(notaPublica);
   const m=bitMapas(req.wsId); const rel=relacionesDeNotas(notas.map(n=>n.id),req.wsId,m);
-  notas.forEach(n=>n.relaciones=rel[n.id]||[]);
+  const adj=adjuntosDeNotas(notas.map(n=>n.id),req.wsId);
+  notas.forEach(n=>{n.relaciones=rel[n.id]||[]; n.adjuntos=adj[n.id]||[];});
   res.json(notas);
 });
 // Notas de la Bitácora relacionadas con una entidad (para mostrarlas dentro de su módulo)
@@ -2402,7 +2429,8 @@ app.get('/api/bitacora/relacionadas',(req,res)=>{
   const ph=ids.map(()=>'?').join(',');
   const notas=db.prepare(`SELECT * FROM bitacora_notas WHERE workspace_id=? AND archivado=0 AND id IN (${ph}) ORDER BY favorita DESC, actualizado DESC`).all(req.wsId,...ids).map(notaPublica);
   const m=bitMapas(req.wsId); const rel=relacionesDeNotas(notas.map(n=>n.id),req.wsId,m);
-  notas.forEach(n=>n.relaciones=rel[n.id]||[]);
+  const adj=adjuntosDeNotas(notas.map(n=>n.id),req.wsId);
+  notas.forEach(n=>{n.relaciones=rel[n.id]||[]; n.adjuntos=adj[n.id]||[];});
   res.json(notas);
 });
 app.post('/api/bitacora/notas',requiere('gestionar_bitacora'),(req,res)=>{
@@ -2434,6 +2462,34 @@ app.put('/api/bitacora/notas/:id',requiere('gestionar_bitacora'),(req,res)=>{
 app.delete('/api/bitacora/notas/:id',requiere('gestionar_bitacora'),(req,res)=>{
   const r=db.prepare('UPDATE bitacora_notas SET archivado=1 WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'Nota no encontrada'});
+  res.json({ok:true});
+});
+/* F3 · ADJUNTOS. Una nota puede llevar la foto de la factura, el PDF del proveedor o el
+   audio de la llamada — es lo que convierte la Bitácora en memoria real del negocio.
+   El archivo se guarda en el volumen (UP_DIR) igual que los archivos de pedido; se
+   comprueba ANTES de recibirlo que la nota exista y sea de este workspace. */
+app.post('/api/bitacora/notas/:id/adjuntos',requiere('gestionar_bitacora'),(req,res,next)=>{
+  const n=db.prepare('SELECT id FROM bitacora_notas WHERE id=? AND workspace_id=? AND archivado=0').get(req.params.id,req.wsId);
+  if(!n)return res.status(404).json({error:'Nota no encontrada'});
+  next();
+},upload.array('files',6),(req,res)=>{
+  try{
+    const notaId=req.params.id, out=[];
+    (req.files||[]).forEach(f=>{
+      const id=uid(), ruta='/uploads/'+f.filename;
+      db.prepare('INSERT INTO bitacora_adjuntos(id,workspace_id,nota_id,nombre,tipo,ruta,tamano)VALUES(?,?,?,?,?,?,?)')
+        .run(id,req.wsId,notaId,f.originalname,f.mimetype||'',ruta,f.size||0);
+      out.push({id,nombre:f.originalname,tipo:f.mimetype||'',ruta,tamano:f.size||0});
+    });
+    res.json(out);
+  }catch(e){logError('POST bitacora adjuntos',e);res.status(500).json({error:e.message})}
+});
+app.delete('/api/bitacora/adjuntos/:id',requiere('gestionar_bitacora'),(req,res)=>{
+  const a=db.prepare('SELECT * FROM bitacora_adjuntos WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+  if(!a)return res.status(404).json({error:'Adjunto no encontrado'});
+  // basename() evita que una ruta manipulada saque el borrado fuera de la carpeta de subidas.
+  try{ const fp=path.join(UP_DIR,path.basename(a.ruta)); if(fs.existsSync(fp))fs.unlinkSync(fp); }catch(e){ logError('borrar archivo adjunto',e); }
+  db.prepare('DELETE FROM bitacora_adjuntos WHERE id=?').run(a.id);
   res.json({ok:true});
 });
 
