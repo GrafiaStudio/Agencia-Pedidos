@@ -438,6 +438,20 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .bit-rel-item:last-child{margin-bottom:0}
 .bit-rel-item-t{font-size:12px;font-weight:700;color:var(--navy);line-height:1.3}
 .bit-rel-item-b{font-size:11px;color:var(--slate);line-height:1.45;margin-top:3px;white-space:pre-wrap}
+/* F4 · panel de resultados de la búsqueda global */
+.gb-panel{display:none;position:absolute;top:calc(100% + 7px);right:0;width:min(430px,86vw);max-height:min(64vh,470px);overflow-y:auto;
+  background:var(--white);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-lg);z-index:120;padding:6px}
+.gb-panel.open{display:block}
+.gb-grupo{display:flex;align-items:center;gap:6px;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:9px 10px 5px}
+.gb-n{margin-left:auto;font-weight:600;color:var(--muted);letter-spacing:0}
+.gb-item{padding:7px 10px;border-radius:10px;cursor:pointer}
+.gb-item:hover,.gb-item.sel{background:var(--bg)}
+.gb-t{font-size:12px;font-weight:600;color:var(--navy);line-height:1.35;display:flex;align-items:center;gap:5px}
+.gb-s{font-size:10px;color:var(--muted);line-height:1.4;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gb-panel mark{background:#FFF0C2;color:inherit;border-radius:3px;padding:0 1px}
+.gb-ic{font-size:11px;color:var(--muted);flex-shrink:0}
+.gb-fav{color:#E8A93C}
+.gb-vacio{padding:16px 12px;font-size:11px;color:var(--muted);text-align:center}
 /* F3 · adjuntos de la Bitácora */
 .bit-adj-box{display:flex;flex-direction:column;gap:6px;margin:2px 0 4px}
 .bit-adj-list{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -1359,7 +1373,11 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
   <div class="topbar">
     <div class="tb-title" id="tb-title">Pedidos</div>
     <div class="tb-right">
-      <div class="search-b"><i class="ti ti-search"></i><input type="text" id="s-inp" placeholder="Buscar…" oninput="buscar(this.value)"></div>
+      <div class="search-b" style="position:relative">
+        <i class="ti ti-search"></i>
+        <input type="text" id="s-inp" placeholder="Buscar en todo…" autocomplete="off" oninput="buscar(this.value)" onkeydown="gbTecla(event)" onfocus="gbAbrirSiHay()">
+        <div class="gb-panel" id="gb-panel" onclick="event.stopPropagation()"></div>
+      </div>
       <div style="position:relative">
         <button class="icon-btn" id="bell-btn" onclick="toggleCampana(event)" title="Recordatorios"><i class="ti ti-bell"></i><span class="bell-badge" id="bell-badge" style="display:none"></span></button>
         <div class="bell-panel" id="bell-panel" onclick="event.stopPropagation()"></div>
@@ -3933,7 +3951,101 @@ function renderFiltros(){
 }
 async function setFiltro(id){filtroAct=id;busq='';document.getElementById('s-inp').value='';renderFiltros();await cargarPedidos();showView('pedidos')}
 async function filtroRapido(id){filtroAct=id;busq='';renderFiltros();await cargarPedidos();showView('pedidos')}
-function buscar(q){busq=q;filtroAct='todos';renderFiltros();cargarPedidos()}
+/* ── F4 · BÚSQUEDA GLOBAL (frontend) ─────────────────────────────────────────────────
+   El buscador de arriba seguía filtrando SOLO la lista de pedidos. Ahora, además de eso
+   (que ya es costumbre y no se toca), despliega resultados de pedidos, clientes,
+   productos y Bitácora, y lleva de un clic al sitio exacto.
+   Manifiesto: una sola fuente de verdad — una pregunta, no cuatro búsquedas distintas. */
+let gbRes=null, gbAbierto=false, gbSel=-1, gbTimer=null, gbUltimaQ='', gbPidiendo=0;
+function buscar(q){
+  busq=q; filtroAct='todos'; renderFiltros(); cargarPedidos();   // comportamiento de siempre
+  clearTimeout(gbTimer);
+  const t=String(q||'').trim();
+  if(t.length<2){ gbRes=null; gbAbierto=false; gbPintar(); return; }
+  gbTimer=setTimeout(()=>gbBuscar(t),250);   // esperar a que deje de teclear, no una consulta por letra
+}
+async function gbBuscar(t){
+  const turno=++gbPidiendo;
+  try{
+    const r=await api('GET','/buscar?q='+encodeURIComponent(t));
+    if(turno!==gbPidiendo)return;   // llegó tarde: ya hay una búsqueda más nueva
+    gbRes=r; gbUltimaQ=t; gbAbierto=true; gbSel=-1; gbPintar();
+  }catch(e){ if(turno===gbPidiendo){ gbRes=null; gbAbierto=false; gbPintar(); } }
+}
+function gbAbrirSiHay(){ if(gbRes&&gbRes.total){ gbAbierto=true; gbPintar(); } }
+function gbCerrar(){ gbAbierto=false; gbSel=-1; gbPintar(); }
+const GB_GRUPOS=[
+  {k:'pedidos',   t:'Pedidos',   ic:'clipboard-text'},
+  {k:'clientes',  t:'Clientes',  ic:'users'},
+  {k:'productos', t:'Productos', ic:'box'},
+  {k:'notas',     t:'Bitácora',  ic:'notebook'}
+];
+function gbPlanos(){
+  if(!gbRes)return [];
+  const out=[];
+  GB_GRUPOS.forEach(g=>(gbRes[g.k]||[]).forEach(it=>out.push({grupo:g.k,...it})));
+  return out;
+}
+// Resalta lo que se buscó dentro del texto, para que se vea POR QUÉ salió ese resultado.
+function gbMarcar(txt,q){
+  const s=String(txt==null?'':txt).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+  if(!q)return s;
+  const i=s.toLowerCase().indexOf(q.toLowerCase());
+  if(i<0)return s;
+  return s.slice(0,i)+'<mark>'+s.slice(i,i+q.length)+'</mark>'+s.slice(i+q.length);
+}
+function gbPintar(){
+  const p=document.getElementById('gb-panel'); if(!p)return;
+  if(!gbAbierto||!gbRes){ p.classList.remove('open'); p.innerHTML=''; return; }
+  const q=gbUltimaQ;
+  if(!gbRes.total){
+    p.innerHTML=`<div class="gb-vacio">Nada que coincida con “${gbMarcar(q,'')}”.</div>`;
+    p.classList.add('open'); return;
+  }
+  let i=-1, html='';
+  GB_GRUPOS.forEach(g=>{
+    const items=gbRes[g.k]||[]; if(!items.length)return;
+    html+=`<div class="gb-grupo"><i class="ti ti-${g.ic}"></i>${g.t}<span class="gb-n">${items.length}</span></div>`;
+    items.forEach(it=>{
+      i++;
+      const sub=[it.sub,it.extra].filter(Boolean).join(' · ');
+      const marca=(it.adjuntos?`<i class="ti ti-paperclip gb-ic" title="${it.adjuntos} adjunto(s)"></i>`:'')
+                 +(it.favorita?'<i class="ti ti-star-filled gb-ic gb-fav"></i>':'');
+      html+=`<div class="gb-item${i===gbSel?' sel':''}" data-i="${i}" onclick="gbIr(${i})">
+        <div class="gb-t">${gbMarcar(it.titulo,q)}${marca}</div>
+        ${sub?`<div class="gb-s">${gbMarcar(sub,q)}</div>`:''}
+      </div>`;
+    });
+  });
+  p.innerHTML=html;
+  p.classList.add('open');
+}
+function gbTecla(ev){
+  if(ev.key==='Escape'){ gbCerrar(); return; }
+  if(!gbAbierto||!gbRes)return;
+  const n=gbPlanos().length; if(!n)return;
+  if(ev.key==='ArrowDown'){ ev.preventDefault(); gbSel=(gbSel+1)%n; gbPintar(); gbVerSel(); }
+  else if(ev.key==='ArrowUp'){ ev.preventDefault(); gbSel=(gbSel-1+n)%n; gbPintar(); gbVerSel(); }
+  else if(ev.key==='Enter'&&gbSel>=0){ ev.preventDefault(); gbIr(gbSel); }
+}
+function gbVerSel(){ const el=document.querySelector('.gb-item.sel'); if(el&&el.scrollIntoView)el.scrollIntoView({block:'nearest'}); }
+async function gbIr(i){
+  const it=gbPlanos()[i]; if(!it)return;
+  gbCerrar();
+  const inp=document.getElementById('s-inp'); if(inp)inp.blur();
+  try{
+    if(it.grupo==='pedidos'){ showView('pedidos'); await abrirEditar(it.id); }
+    else if(it.grupo==='clientes'){ showView('clientes'); await verCli(it.id); }
+    else if(it.grupo==='productos'){ showView('productos'); await abrirEditarProducto(it.id); }
+    else if(it.grupo==='notas'){
+      // La Bitácora no abre nota por nota: se filtra por el mismo texto y la nota queda a la vista.
+      showView('bitacora'); bitBuscar=gbUltimaQ; bitFiltro='';
+      await cargarBitacora();   // el buscador de la Bitácora se repinta con bitBuscar ya puesto
+    }
+  }catch(e){ toast('No se pudo abrir: '+e.message,false); }
+}
+// El módulo Bitácora tiene su propio .search-b: se acota al de la barra superior.
+document.addEventListener('click',e=>{ if(gbAbierto&&!e.target.closest('.topbar .search-b'))gbCerrar(); });
 
 /* Estado general derivado de los encargos — usa los estados configurables (Fase 4.1) */
 const EST_ALIAS={'En diseño':'Diseño','En producción':'Producción'};

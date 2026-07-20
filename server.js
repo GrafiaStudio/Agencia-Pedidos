@@ -2493,6 +2493,63 @@ app.delete('/api/bitacora/adjuntos/:id',requiere('gestionar_bitacora'),(req,res)
   res.json({ok:true});
 });
 
+/* ── F4 · BÚSQUEDA GLOBAL ────────────────────────────────────────────────────────────
+   Una sola pregunta que barre pedidos, clientes, productos y notas de la Bitácora.
+   Es el cimiento del AI Gateway: cuando la IA pregunte "qué sé de Textiles ABC",
+   consumirá este mismo camino, no la base de datos directamente.
+   Respeta permisos: nadie ve por el buscador lo que no puede ver por su módulo. */
+function bLike(q){ return '%'+String(q).replace(/[%_]/g,m=>'\\'+m)+'%'; }
+function recorte(txt,q,largo){
+  const s=String(txt||'').replace(/\s+/g,' ').trim();
+  if(!s)return '';
+  const i=s.toLowerCase().indexOf(String(q).toLowerCase());
+  if(i<0)return s.slice(0,largo)+(s.length>largo?'…':'');
+  const desde=Math.max(0,i-30);
+  return (desde>0?'…':'')+s.slice(desde,desde+largo)+(desde+largo<s.length?'…':'');
+}
+app.get('/api/buscar',(req,res)=>{
+  try{
+    const q=String(req.query.q||'').trim();
+    if(q.length<2)return res.json({q,pedidos:[],clientes:[],productos:[],notas:[],total:0});
+    const L=bLike(q), ws=req.wsId, perm=req.permisos||{};
+    const puede=k=>!!(perm.__admin||perm[k]===true);
+    const TOPE=8;
+    const out={q,pedidos:[],clientes:[],productos:[],notas:[]};
+
+    // Pedidos: por referencia, cliente o anotaciones. Los archivados no estorban la búsqueda.
+    out.pedidos=db.prepare(`SELECT id,ref,nombre,fecha_entrega,entregado,cancelado,es_cotizacion,notas
+      FROM pedidos WHERE workspace_id=? AND archivado=0 AND (ref LIKE ? ESCAPE '\\' OR nombre LIKE ? ESCAPE '\\' OR notas LIKE ? ESCAPE '\\')
+      ORDER BY creado DESC LIMIT ?`).all(ws,L,L,L,TOPE)
+      .map(p=>({id:p.id,titulo:'#'+p.ref+' · '+p.nombre,
+        sub:(p.cancelado?'Cancelado':(p.entregado?'Entregado':(p.es_cotizacion?'Cotización':'En curso')))+(p.fecha_entrega?(' · entrega '+p.fecha_entrega):''),
+        extra:recorte(p.notas,q,90)}));
+
+    if(puede('editar_clientes')||puede('crear_pedidos')){
+      out.clientes=db.prepare(`SELECT id,nombre,tel,email,nit FROM clientes WHERE workspace_id=? AND archivado=0
+        AND (nombre LIKE ? ESCAPE '\\' OR tel LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\' OR nit LIKE ? ESCAPE '\\')
+        ORDER BY nombre LIMIT ?`).all(ws,L,L,L,L,TOPE)
+        .map(c=>({id:c.id,titulo:c.nombre,sub:[c.tel,c.email].filter(Boolean).join(' · ')}));
+    }
+    if(puede('gestionar_productos')||puede('crear_pedidos')){
+      out.productos=db.prepare(`SELECT id,nombre,codigo,descripcion FROM fichas_producto WHERE workspace_id=? AND archivado=0
+        AND (nombre LIKE ? ESCAPE '\\' OR codigo LIKE ? ESCAPE '\\' OR descripcion LIKE ? ESCAPE '\\')
+        ORDER BY nombre LIMIT ?`).all(ws,L,L,L,TOPE)
+        .map(p=>({id:p.id,titulo:p.nombre,sub:p.codigo||'',extra:recorte(p.descripcion,q,90)}));
+    }
+    // La Bitácora la ve todo el mundo (igual que su módulo); escribir sí pide permiso.
+    const notas=db.prepare(`SELECT id,titulo,contenido,tablero_id,favorita FROM bitacora_notas
+      WHERE workspace_id=? AND archivado=0 AND (titulo LIKE ? ESCAPE '\\' OR contenido LIKE ? ESCAPE '\\')
+      ORDER BY favorita DESC, actualizado DESC LIMIT ?`).all(ws,L,L,TOPE);
+    const adj=adjuntosDeNotas(notas.map(n=>n.id),ws);
+    const m=bitMapas(ws); const rel=relacionesDeNotas(notas.map(n=>n.id),ws,m);
+    out.notas=notas.map(n=>({id:n.id,titulo:n.titulo||'(sin título)',sub:recorte(n.contenido,q,90),
+      favorita:!!n.favorita, adjuntos:(adj[n.id]||[]).length, relaciones:rel[n.id]||[]}));
+
+    out.total=out.pedidos.length+out.clientes.length+out.productos.length+out.notas.length;
+    res.json(out);
+  }catch(e){logError('GET /api/buscar',e);res.status(500).json({error:e.message})}
+});
+
 // ── PRODUCTOS (fichas de producto) ──
 app.get('/api/productos',(req,res)=>{
   const{q,activo}=req.query; let sql='SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0'; const params=[req.wsId];
