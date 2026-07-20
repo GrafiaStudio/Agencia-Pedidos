@@ -2870,8 +2870,15 @@ REGLAS QUE NO SE ROMPEN:
 - Las fechas del contexto YA vienen en día/mes/año (ej: 03/08/2026). Escríbelas tal cual; nunca las conviertas a otro formato ni las recalcules.
 - Si te piden algo que implique cambiar datos (crear, editar, borrar), explicas cómo hacerlo en la app: tú no ejecutas cambios.
 - Prefieres 3 líneas útiles a 10 de relleno. Sin saludos de cortesía ni "¡claro que sí!".
-- Si la pregunta es ambigua, respondes con lo más probable y ofreces la alternativa en una línea.`;
+- Si la pregunta es ambigua, respondes con lo más probable y ofreces la alternativa en una línea.
+- COTIZACIONES DE VARIOS ÍTEMS: da primero TODOS los ítems con su precio, una línea corta por ítem, y al final el total. Las aclaraciones y las dudas van al final, en dos líneas máximo. Es preferible cotizar los 7 ítems escuetamente que explicar largo los 2 primeros y dejar el resto sin responder.`;
 
+/* Una respuesta cortada a media palabra ("Sin datos en el catál") parece un error del
+   sistema y deja sin saber qué faltaba. Si el proveedor avisa que la cortó, se dice. */
+function iaAvisoCorte(txt,razon){
+  if(razon!=='max_tokens'&&razon!=='length')return txt;
+  return txt+'\n\n⚠️ Aquí se me acabó el espacio de respuesta y quedó cortada. Pídeme lo que falta por partes (por ejemplo: primero los pendones, luego las camisetas).';
+}
 function iaMotivoVacio(razon){
   if(razon==='max_tokens')return 'La respuesta se cortó por longitud antes de escribir nada. Pregunta por partes (primero el pendón, luego las camisetas).';
   if(razon==='refusal')return 'El modelo se negó a responder esa pregunta.';
@@ -2934,7 +2941,7 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
       // Devolver '' en silencio dejaba un "(sin respuesta)" sin explicación. Si no hay texto,
       // se dice POR QUÉ: casi siempre es que se agotó el cupo de respuesta.
       if(!txt)throw new Error(iaMotivoVacio(j.stop_reason));
-      return txt;
+      return iaAvisoCorte(txt,j.stop_reason);
     }
     if(cfg.proveedor==='openai'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
@@ -2945,7 +2952,7 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
       if(!r.ok)throw new Error((j.error&&j.error.message)||('El proveedor respondió '+r.status));
       const t1=((j.choices||[])[0]?.message?.content||'').trim();
       if(!t1)throw new Error(iaMotivoVacio((j.choices||[])[0]?.finish_reason));
-      return t1;
+      return iaAvisoCorte(t1,(j.choices||[])[0]?.finish_reason);
     }
     if(cfg.proveedor==='ollama'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
@@ -2956,7 +2963,7 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
       if(!r.ok)throw new Error(j.error||('El modelo local respondió '+r.status));
       const t2=String(j.message?.content||'').trim();
       if(!t2)throw new Error(iaMotivoVacio(j.done_reason));
-      return t2;
+      return iaAvisoCorte(t2,j.done_reason);
     }
     throw new Error('Proveedor no reconocido');
   }catch(e){
@@ -3029,7 +3036,9 @@ ${JSON.stringify(iaCompactar(ctx,45000),null,1)}
 
 PREGUNTA: ${pregunta}`}];
       const t0=Date.now();
-      const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,1200);
+      // 4000: una cotización real ("3 pendones, 25 DTF, 10 camisetas, 50 vasos…") no cabe
+      // en menos. Es un TECHO, no un gasto: solo se paga lo que la respuesta ocupe.
+      const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,4000);
       // Se devuelve QUÉ se consultó: el usuario debe poder auditar de dónde salió la respuesta.
       res.json({respuesta:texto,ms:Date.now()-t0,
         consultado:Object.keys(ctx).filter(k=>k!=='_recortado'),
