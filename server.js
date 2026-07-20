@@ -272,6 +272,9 @@ try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_tarifa TEXT D
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_tarifa_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_minimo TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN costo_medida_minimo_calc TEXT"); } catch(e){}
+// FASE E · CONDICIONES en el producto simple por medidas (mismo modelo que en las variantes).
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_cond TEXT DEFAULT '[]'"); } catch(e){}
+try { db.exec("ALTER TABLE fichas_producto ADD COLUMN medida_cond_eje TEXT DEFAULT 'cantidad'"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN piezas_por_pliego INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN precio_pliego TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN precio_pliego_calc TEXT"); } catch(e){}
@@ -353,6 +356,11 @@ try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_tarifa TEXT DEFAULT
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_tarifa_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_minimo TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_minimo_calc TEXT"); } catch(e){}
+// FASE E · CONDICIONES — la tarifa por medida deja de ser una constante: puede cambiar por tramos.
+// medida_cond = [{desde,hasta,tarifa}] (números ya normalizados) · medida_cond_eje = 'cantidad' | 'area'.
+// Ej. cantidad: 1-20 prendas a $10, de 21 en adelante a $8. Ej. área: hasta 2 m² a $9, más grande a $7.
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_cond TEXT DEFAULT '[]'"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_cond_eje TEXT DEFAULT 'cantidad'"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -883,6 +891,19 @@ function detectarPrecioEscalonado(rangos,cantidad){
   if(ultimo.hasta!=null&&cantidad>ultimo.hasta)return ultimo.precio;
   return null;
 }
+// FASE E · CONDICIONES — validación. Una fila sin tarifa se descartaría en silencio al guardar,
+// y el usuario creería que quedó guardada: por eso se avisa en vez de dejarla caer.
+function erroresCond(arr,etiq){
+  const pre=etiq?`${etiq}: `:'';
+  const out=[];
+  (arr||[]).forEach((c,i)=>{
+    const vacia=!definido(c.desde)&&!definido(c.hasta)&&!definido(c.tarifa);
+    if(vacia)return; // fila en blanco recién agregada: no estorba
+    if(!(toFloatCO(c.tarifa)>0))out.push(`${pre}la condición #${i+1} necesita una tarifa mayor que 0`);
+    if(definido(c.hasta)&&toFloatCO(c.hasta)<toFloatCO(c.desde))out.push(`${pre}en la condición #${i+1} el "hasta" es menor que el "desde"`);
+  });
+  return out;
+}
 // Precio de UNA unidad de una hoja/parte de variante (A3). El precio suele vivir en los TRAMOS,
 // no en precio_calc: si hay tramo que cubre la cantidad 1 se usa ese; si los tramos arrancan por
 // encima de 1, se usa el primer tramo (evita devolver 0 y mostrar "desde $0").
@@ -935,6 +956,8 @@ function fichaCompleta(f){
   try{f.costos_fijos=JSON.parse(f.costos_fijos||'[]')}catch(e){f.costos_fijos=[]}
   try{f.pliego_superficies=JSON.parse(f.pliego_superficies||'[]')}catch(e){f.pliego_superficies=[]}
   try{f.pliego_extras=JSON.parse(f.pliego_extras||'[]')}catch(e){f.pliego_extras=[]}
+  try{f.medida_cond=JSON.parse(f.medida_cond||'[]')}catch(e){f.medida_cond=[]}
+  f.medida_cond_eje=condEje(f.medida_cond_eje);
   if(f.tipo_precio==='pliego'&&!f.pliego_superficies.length&&parseInt(f.piezas_por_pliego,10)>0){
     f.pliego_superficies=[{nombre:'Hoja',piezas:parseInt(f.piezas_por_pliego,10),precio:f.precio_pliego||'',precio_calc:f.precio_pliego_calc}];
   }
@@ -988,6 +1011,7 @@ function validarFicha(b,wsId,fid){
     });
   }
   if(b.tipo_precio==='medidas'){
+    erroresCond(b.medida_cond,'').forEach(e=>errores.push(e));
     if(b.medida_unidad!==undefined&&!MEDIDA_UNIDADES_VALIDAS.includes(b.medida_unidad))errores.push('Unidad de medida no válida');
     if(!definido(b.medida_tarifa)||!(toFloatCO(b.medida_tarifa)>0))errores.push('La tarifa por unidad de medida es obligatoria (acepta decimales, ej: 8,5)');
     if(definido(b.costo_medida_tarifa)&&!(toFloatCO(b.costo_medida_tarifa)>0))errores.push('El costo por medida debe ser un número válido (acepta decimales)');
@@ -1025,6 +1049,7 @@ function validarFicha(b,wsId,fid){
         v.hijos.forEach((h,j)=>validarNodo(h,etiq+'.'+(j+1)));
       }else if(v.modo==='medidas'){
         if(!definido(v.medida_tarifa)||!(toFloatCO(v.medida_tarifa)>0))errores.push(`Variante ${etiq}: la tarifa por medida es obligatoria (acepta decimales, ej: 8,5)`);
+        erroresCond(v.medida_cond,`Variante ${etiq}`).forEach(e=>errores.push(e));
       }else if(v.modo==='hoja'){
         if(!Number.isInteger(v.piezas)&&!(parseInt(v.piezas,10)>0))errores.push(`Variante ${etiq}: piezas por hoja debe ser un número mayor a 0`);
         if(!definido(v.precio)||evalExpr(v.precio)===null)errores.push(`Variante ${etiq}: el precio por hoja no es válido`);
@@ -2453,6 +2478,18 @@ function guardarComposicion(fichaId,componentes,wsId){
   });
 }
 
+// FASE E · CONDICIONES. Normaliza los tramos de tarifa por medida. Se guardan ya en número
+// (desde/hasta/tarifa admiten decimales porque el eje 'area' se mide en m²: 0,5 · 2,25 …).
+// Se descartan las filas sin tarifa: una condición sin tarifa no condiciona nada.
+const EJES_COND=['cantidad','area'];
+function condEje(v){ return EJES_COND.includes(v)?v:'cantidad'; }
+function condJSON(arr){
+  return JSON.stringify((arr||[]).map(c=>({
+    desde:toFloatCO(c.desde)||0,
+    hasta:definido(c.hasta)?toFloatCO(c.hasta):null,
+    tarifa:toFloatCO(c.tarifa)||0
+  })).filter(c=>c.tarifa>0));
+}
 function cfJSON(b){
   return JSON.stringify((b.costos_fijos||[]).map(c=>({nombre:String(c.nombre||'').trim(),valor:c.valor||'',valor_calc:normCalc(c.valor)})));
 }
@@ -2470,8 +2507,8 @@ function guardarVariantes(fichaId,variantes,wsId){
     // A4 · 'fijo' = precio fijo directo (ningún modo marcado): la tarjeta queda compacta, sin
     // tramos. Para el cálculo se comporta igual que 'precio' (cae al mismo else en todas partes).
     const modoV=(v.modo==='hoja'||v.modo==='medidas'||v.modo==='fijo')?v.modo:'precio';
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo));
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc,medida_cond,medida_cond_eje)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo),condJSON(v.medida_cond),condEje(v.medida_cond_eje));
     (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));
   };
   (variantes||[]).forEach((v,i)=>insertarNodo(v,'',i));
@@ -2480,6 +2517,8 @@ function arbolVariantes(filas){
   filas.forEach(v=>{
     try{v.costos=JSON.parse(v.costos||'[]')}catch(e){v.costos=[]}
     try{v.tramos=JSON.parse(v.tramos||'[]')}catch(e){v.tramos=[]}
+    try{v.medida_cond=JSON.parse(v.medida_cond||'[]')}catch(e){v.medida_cond=[]}
+    v.medida_cond_eje=condEje(v.medida_cond_eje);
     v.multi=!!v.multi;
     v.informativa=!!v.informativa;
     v.hijos=[];
@@ -2508,9 +2547,9 @@ app.post('/api/productos',requiere('gestionar_productos'),(req,res)=>{
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid();
     if(!String(b.codigo||'').trim()){const n=db.prepare('SELECT COUNT(*) c FROM fichas_producto WHERE workspace_id=?').get(req.wsId).c;b.codigo='P'+String(n+1).padStart(4,'0');}
-    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,codigo,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo,medida_unidad,medida_tarifa,medida_tarifa_calc,costos_fijos,cobro_minimo,cobro_minimo_calc,costo_medida_tarifa,costo_medida_tarifa_calc,costo_medida_minimo,costo_medida_minimo_calc,piezas_por_pliego,precio_pliego,precio_pliego_calc,pliego_superficies,pliego_extras)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(id,req.wsId,b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normDecimal(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),normVF(b.costo_medida_tarifa),normDecimal(b.costo_medida_tarifa),normVF(b.costo_medida_minimo),normCalc(b.costo_medida_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b));
+    db.prepare(`INSERT INTO fichas_producto(id,workspace_id,nombre,codigo,categoria_id,tipo_precio,margen_tipo,margen_valor,precio_base,precio_base_calc,rangos,fecha_inicio,fecha_fin,cantidad_minima,descripcion,activo,stock_actual,stock_minimo,regla_lleva,regla_paga,combo_precio_modo,medida_unidad,medida_tarifa,medida_tarifa_calc,costos_fijos,cobro_minimo,cobro_minimo_calc,costo_medida_tarifa,costo_medida_tarifa_calc,costo_medida_minimo,costo_medida_minimo_calc,piezas_por_pliego,precio_pliego,precio_pliego_calc,pliego_superficies,pliego_extras,medida_cond,medida_cond_eje)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id,req.wsId,b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normDecimal(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),normVF(b.costo_medida_tarifa),normDecimal(b.costo_medida_tarifa),normVF(b.costo_medida_minimo),normCalc(b.costo_medida_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b),condJSON(b.medida_cond),condEje(b.medida_cond_eje));
     guardarInsumos(id,b.insumos,req.wsId);
     guardarComposicion(id,b.componentes,req.wsId);
     guardarVariantes(id,b.variantes,req.wsId);
@@ -2526,8 +2565,8 @@ app.put('/api/productos/:id',requiere('gestionar_productos'),(req,res)=>{
     if(!f)return res.status(404).json({error:'No encontrado'});
     const errores=validarFicha(b,req.wsId,fid);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
-    db.prepare(`UPDATE fichas_producto SET nombre=?,codigo=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=?,medida_unidad=?,medida_tarifa=?,medida_tarifa_calc=?,costos_fijos=?,cobro_minimo=?,cobro_minimo_calc=?,costo_medida_tarifa=?,costo_medida_tarifa_calc=?,costo_medida_minimo=?,costo_medida_minimo_calc=?,piezas_por_pliego=?,precio_pliego=?,precio_pliego_calc=?,pliego_superficies=?,pliego_extras=? WHERE id=? AND workspace_id=?`)
-      .run(b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normDecimal(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),normVF(b.costo_medida_tarifa),normDecimal(b.costo_medida_tarifa),normVF(b.costo_medida_minimo),normCalc(b.costo_medida_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b),fid,req.wsId);
+    db.prepare(`UPDATE fichas_producto SET nombre=?,codigo=?,categoria_id=?,tipo_precio=?,margen_tipo=?,margen_valor=?,precio_base=?,precio_base_calc=?,rangos=?,fecha_inicio=?,fecha_fin=?,cantidad_minima=?,descripcion=?,activo=?,stock_actual=?,stock_minimo=?,regla_lleva=?,regla_paga=?,combo_precio_modo=?,medida_unidad=?,medida_tarifa=?,medida_tarifa_calc=?,costos_fijos=?,cobro_minimo=?,cobro_minimo_calc=?,costo_medida_tarifa=?,costo_medida_tarifa_calc=?,costo_medida_minimo=?,costo_medida_minimo_calc=?,piezas_por_pliego=?,precio_pliego=?,precio_pliego_calc=?,pliego_superficies=?,pliego_extras=?,medida_cond=?,medida_cond_eje=? WHERE id=? AND workspace_id=?`)
+      .run(b.nombre.trim(),String(b.codigo||'').trim(),b.categoria_id||'',b.tipo_precio||'unitario',b.margen_tipo||'fijo',b.margen_valor||'',normVF(b.precio_base),normCalc(b.precio_base),JSON.stringify(b.rangos||[]),b.fecha_inicio||'',b.fecha_fin||'',b.cantidad_minima||'',b.descripcion||'',b.activo===false?0:1,Number.isInteger(b.stock_actual)?b.stock_actual:null,Number.isInteger(b.stock_minimo)?b.stock_minimo:null,Number.isInteger(b.regla_lleva)?b.regla_lleva:null,Number.isInteger(b.regla_paga)?b.regla_paga:null,b.combo_precio_modo||'global',b.medida_unidad||'m2',normVF(b.medida_tarifa),normDecimal(b.medida_tarifa),cfJSON(b),normVF(b.cobro_minimo),normCalc(b.cobro_minimo),normVF(b.costo_medida_tarifa),normDecimal(b.costo_medida_tarifa),normVF(b.costo_medida_minimo),normCalc(b.costo_medida_minimo),Number.isInteger(b.piezas_por_pliego)?b.piezas_por_pliego:null,normVF(b.precio_pliego),normCalc(b.precio_pliego),supJSON(b),extrasJSON(b),condJSON(b.medida_cond),condEje(b.medida_cond_eje),fid,req.wsId);
     if(b.insumos!==undefined)guardarInsumos(fid,b.insumos,req.wsId);
     if(b.componentes!==undefined)guardarComposicion(fid,b.componentes,req.wsId);
     if(b.variantes!==undefined)guardarVariantes(fid,b.variantes,req.wsId);
