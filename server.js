@@ -367,6 +367,12 @@ try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_cond_eje TEXT DEFAU
    decía "(m)" siempre: quien cobra $20 el cm² escribía 10×10 y veía "metros". Por defecto
    'm2' para no mover ni un precio de los que ya existen. */
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_unidad TEXT DEFAULT 'm2'"); } catch(e){}
+/* Costo POR MEDIDA de una parte. El producto simple ya lo tenía (costo_medida_tarifa); una
+   parte dentro de variantes no, y por eso el asistente contestó — con razón — que el costo
+   de "$8 el cm² del transfer" no tenía dónde guardarse. `costos` solo admite importes fijos,
+   y un costo que depende del tamaño no es un importe fijo. */
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN costo_medida_tarifa TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN costo_medida_tarifa_calc TEXT"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -3175,7 +3181,8 @@ EL COSTO SÍ SE PUEDE GUARDAR — nunca digas que la ficha no tiene dónde:
 - Cada parte y cada opción lleva su propio costo: "costos":[{"nombre":"Camiseta algodón","valor":"12000"}]. Ahí van los costos que te den por opción.
 - El producto entero puede llevar costos que no dependen de la opción: "costos_fijos":[{"nombre":"...","valor":"..."}].
 - Un producto por medidas lleva además su costo por medida: "costo_medida_tarifa" (y "costo_medida_minimo" si aplica).
-- ÚNICA limitación real, y dila así de concreta si aparece: el costo POR MEDIDA solo existe en el producto completo, no en una parte suelta. Si te dan un costo por cm² de una PARTE (no del producto), avisa que eso se registra al cargar el costo en el pedido, y propón el resto igual — no dejes la ficha sin crear por eso.
+- Una parte que se cobra por medidas puede llevar su COSTO por medida: "costo_medida_tarifa". Va en la misma unidad que su tarifa. Ej: el transfer se cobra a $20 el cm² y cuesta $8 el cm² → "medida_tarifa":"20","costo_medida_tarifa":"8","medida_unidad":"cm2". Ese costo se convierte solo en una línea de costo del pedido (área × tarifa × cantidad).
+- Si te dan un costo y de verdad no encaja en ninguno de estos sitios, dilo concreto y propón el resto igual — no dejes la ficha sin crear por un costo.
 - Antes de proponer, MIRA EL CATÁLOGO. Si ya existe algo con ese nombre o muy parecido, dilo y pregunta si quiere crearlo igual o editar el que hay. No dupliques productos en silencio.
 - Si te falta un dato para que el precio quede bien (la tarifa, el tamaño, desde qué cantidad baja), PREGUNTA en vez de inventarlo. Es preferible una pregunta corta a una ficha con precios que no son.
 - Precios en números, sin puntos de miles y sin el signo $ dentro del JSON.`;
@@ -3233,6 +3240,7 @@ function iaNormVariante(v,prof,rec){
     if(definido(v.medida_tarifa))o.medida_tarifa=String(v.medida_tarifa).trim();
     if(definido(v.medida_minimo))o.medida_minimo=String(v.medida_minimo).trim();
     o.medida_unidad=v.medida_unidad==='cm2'?'cm2':'m2';
+    if(definido(v.costo_medida_tarifa))o.costo_medida_tarifa=String(v.costo_medida_tarifa).trim();
     o.medida_cond=iaNormCond(v.medida_cond);
     o.medida_cond_eje=v.medida_cond_eje==='area'?'area':'cantidad';
   }
@@ -3323,6 +3331,7 @@ function iaResumenPropuesta(b){
           +(n.medida_unidad==='cm2'?'centímetros':'metros')+')';
         (n.medida_cond||[]).forEach(c=>{ s+=' · desde '+c.desde
           +(n.medida_cond_eje==='area'?(' '+um):' und')+': '+pesos(c.tarifa)+'/'+um; });
+        if(toFloatCO(n.costo_medida_tarifa)>0)s+=' · costo '+pesos(toFloatCO(n.costo_medida_tarifa))+'/'+um;
         return s+costoDe(n);
       }
       return (toFloatCO(n.precio)>0?pesos(toFloatCO(n.precio)):'sin precio')+costoDe(n);
@@ -3676,8 +3685,9 @@ function guardarVariantes(fichaId,variantes,wsId){
     // A4 · 'fijo' = precio fijo directo (ningún modo marcado): la tarjeta queda compacta, sin
     // tramos. Para el cálculo se comporta igual que 'precio' (cae al mismo else en todas partes).
     const modoV=(v.modo==='hoja'||v.modo==='medidas'||v.modo==='fijo')?v.modo:'precio';
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc,medida_cond,medida_cond_eje,medida_unidad)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo),condJSON(v.medida_cond),condEje(v.medida_cond_eje),v.medida_unidad==='cm2'?'cm2':'m2');
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc,medida_cond,medida_cond_eje,medida_unidad,costo_medida_tarifa,costo_medida_tarifa_calc)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo),condJSON(v.medida_cond),condEje(v.medida_cond_eje),v.medida_unidad==='cm2'?'cm2':'m2',
+           String(v.costo_medida_tarifa||''),normDecimal(v.costo_medida_tarifa));
     (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));
   };
   (variantes||[]).forEach((v,i)=>insertarNodo(v,'',i));

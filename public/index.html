@@ -5891,7 +5891,8 @@ function pintarHintMedidaVar(it){
   const area=toFloatCO(it._ancho)*toFloatCO(it._alto);
   if(!(area>0)){hv.textContent='';return;}
   const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
-  let txt=String(Math.round(area*100)/100).replace('.',',')+' m²';
+  // El "m²" estaba fijo: en un estampado de 10 × 100 cm el resumen decía "1000 m²".
+  let txt=String(Math.round(area*100)/100).replace('.',',')+' '+(varUnidadItem(it)==='cm2'?'cm²':'m²');
   try{
     for(const s of partesSeleccionadasVar(it)){
       const n=s.opcion||s.parte;
@@ -6749,6 +6750,7 @@ function htmlNodoVariante(v,nivel){
         </div>
         <div class="fr2 fg">
           <div><label class="var-hd-lbl">Cobro mínimo (opcional)</label><input class="item-inp" type="text" value="${esc(v.medida_minimo)}" placeholder="$ 0" oninput="setVariante('${v.id}','medida_minimo',this.value)"></div>
+          <div><label class="var-hd-lbl">Costo por ${v.medida_unidad==='cm2'?'cm²':'m²'} (opcional)</label><input class="item-inp" type="text" value="${esc(v.costo_medida_tarifa)}" placeholder="Lo que te cuesta a ti" oninput="setVariante('${v.id}','costo_medida_tarifa',this.value)"></div>
         </div>
         <div class="var-hint">Al cotizar se pide ancho × alto <b>en ${v.medida_unidad==='cm2'?'centímetros':'metros'}</b> y se cobra máx(mínimo, ancho × alto × tarifa). La unidad no convierte nada: solo dice en qué escribir las medidas. Un estampado a $20 el cm² de 10 × 10 cobra $2.000. Acepta decimales con coma (ej. 8,5).</div>
         ${htmlCondVar(v)}`:(v.modo==='fijo'?`
@@ -7106,6 +7108,7 @@ function cargarNodoVar(v){
     medida_cond:(v.medida_cond||[]).map(c=>({id:uid(),desde:c.desde==null?'':String(c.desde).replace('.',','),hasta:c.hasta==null?'':String(c.hasta).replace('.',','),tarifa:c.tarifa==null?'':String(c.tarifa).replace('.',',')})),
     medida_cond_eje:v.medida_cond_eje==='area'?'area':'cantidad',
     medida_unidad:v.medida_unidad==='cm2'?'cm2':'m2',
+    costo_medida_tarifa:v.costo_medida_tarifa||'',costo_medida_tarifa_calc:v.costo_medida_tarifa_calc||'',
     costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||'',lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
     tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:String(t.precio)})),
     hijos:(v.hijos||[]).map(cargarNodoVar)};
@@ -7117,6 +7120,7 @@ function serializarNodoVar(v){
     medida_tarifa:(v.medida_tarifa||'').toString().trim(),medida_minimo:(v.medida_minimo||'').toString().trim(),
     medida_cond:condSerializar(v.medida_cond),medida_cond_eje:v.medida_cond_eje==='area'?'area':'cantidad',
     medida_unidad:v.medida_unidad==='cm2'?'cm2':'m2',
+    costo_medida_tarifa:(v.costo_medida_tarifa||'').toString().trim(),
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim(),lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
     tramos:(v.tramos||[]).map(t=>({desde:parseInt(t.desde,10)||0,hasta:(t.hasta===''||t.hasta==null)?null:parseInt(t.hasta,10),precio:evalExpr(t.precio)||0})),
     hijos:(v.hijos||[]).map(serializarNodoVar)};
@@ -7839,14 +7843,27 @@ function recalcularCostosAutomaticos(){
         const ins=costoTotalInsumosFicha(f.insumos);
         if(ins>0)push('Insumos: '+f.nombre, ins);
         const partesUsadas=new Set();
+        // Costo POR MEDIDA de una parte: área × tarifa, igual que su precio pero con el
+        // costo. Sin esto había que meter a mano lo que cuesta cada estampado, y nadie lo
+        // hace — por eso media rentabilidad por producto salía "sin costo cargado".
+        const areaIt=toFloatCO(it._ancho)*toFloatCO(it._alto);
+        const costoMedida=(n,q)=>{
+          if(n.modo!=='medidas')return;
+          const ct=toFloatCO(n.costo_medida_tarifa_calc||n.costo_medida_tarifa);
+          if(!(ct>0)||!(areaIt>0))return;
+          const um=n.medida_unidad==='cm2'?'cm²':'m²';
+          push(f.nombre+' — '+n.nombre+' (costo por '+um+')', Math.round(areaIt*ct)*(q||1));
+        };
         sel.forEach(s=>{
           if(!partesUsadas.has(s.parte.id)){
             partesUsadas.add(s.parte.id);
             push(f.nombre+' — '+s.parte.nombre, costoTotalCostosArr(s.parte.costos));
+            if(!s.opcion)costoMedida(s.parte,1);
           }
           if(s.opcion){
             const q=s.qty||1;
             push(f.nombre+' — '+s.parte.nombre+': '+s.opcion.nombre+(q>1?(' ×'+q):''), costoTotalCostosArr(s.opcion.costos)*q);
+            costoMedida(s.opcion,q);
           }
         });
       }else{
