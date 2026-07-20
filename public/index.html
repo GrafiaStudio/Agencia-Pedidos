@@ -494,6 +494,10 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .ia-prop-fila:last-of-type{border-bottom:none}
 .ia-prop-fila span{color:var(--muted);white-space:pre}
 .ia-prop-fila b{text-align:right;color:var(--navy);font-weight:600}
+.ia-prop-fila b s{color:var(--muted);font-weight:500;text-decoration-thickness:1px}
+.ia-prop-cab{border-bottom:1px solid var(--line);margin-bottom:2px}
+.ia-prop-cab span{color:var(--navy);font-weight:600}
+.ia-prop-cab b{color:var(--muted);font-weight:500;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em}
 .ia-prop-ojo{display:flex;gap:6px;font-size:11px;margin-top:8px;padding:7px 9px;border-radius:9px;
   background:rgba(210,150,20,.13);color:var(--navy);line-height:1.45}
 .ia-prop-acts{display:flex;gap:7px;justify-content:flex-end;margin-top:11px}
@@ -2226,7 +2230,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
       <div class="msec"><span class="tri"></span>Precio por medidas</div>
       <div class="fr2 fg">
         <div><label>Unidad de medida</label>
-          <select id="prod-medida-unidad">
+          <select id="prod-medida-unidad" onchange="renderCondProd()">
             <option value="m2">Metro cuadrado (ancho × alto)</option>
             <option value="m">Metro lineal (solo una medida)</option>
             <option value="cm2">Centímetro cuadrado (ancho × alto)</option>
@@ -4173,23 +4177,43 @@ function renderIaChat(){
    crea llamando a POST /productos, la MISMA ruta del formulario, con el token de quien
    aprieta. Si no tiene permiso, recibe el mismo 403 que recibiría en la interfaz.
    Nunca se muestra el JSON: si lo que se lee no es lo que se quería, no se aprieta.      */
+const IA_PROP_TXT={
+  crear_producto:{ico:'ti-file-plus',hd:'Propuesta de producto',tag:'sin crear',
+    btn:'Crear producto',hecho:'Producto creado',
+    pie:'Nada se guarda hasta que aprietes. Se crea con tus permisos, igual que si lo hicieras a mano.'},
+  editar_producto:{ico:'ti-pencil',hd:'Cambios sobre un producto',tag:'sin aplicar',
+    btn:'Aplicar cambios',hecho:'Producto actualizado',
+    pie:'Solo cambia lo que ves arriba; el resto de la ficha queda igual. Nada se guarda hasta que aprietes.'},
+  archivar_producto:{ico:'ti-archive',hd:'Archivar un producto',tag:'sin archivar',
+    btn:'Archivar',hecho:'Producto archivado',
+    pie:'Archivar no borra: el producto queda en Archivados y se puede recuperar cuando quieras.'}
+};
 function iaPropuestaHTML(p,idx){
   const esc=s=>String(s||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]));
+  const T=IA_PROP_TXT[p.tipo]||IA_PROP_TXT.crear_producto;
+  const nombre=p.titulo||(p.payload&&p.payload.nombre)||'';
   if(p._creado)return `<div class="ia-prop hecha">
-      <div class="ia-prop-hd"><i class="ti ti-circle-check"></i> Producto creado: <b>${esc(p.payload.nombre)}</b></div>
-      <div class="ia-prop-pie">Lo propuso el asistente y lo confirmaste tú. Ya está en Productos.</div>
+      <div class="ia-prop-hd"><i class="ti ti-circle-check"></i> ${T.hecho}: <b>${esc(nombre)}</b></div>
+      <div class="ia-prop-pie">Lo propuso el asistente y lo confirmaste tú.</div>
     </div>`;
-  const filas=(p.resumen||[]).map(r=>`<div class="ia-prop-fila">
-      <span>${esc(r.campo)}</span><b>${esc(r.valor)}</b></div>`).join('');
+  /* En una edición se muestra ANTES → DESPUÉS, no el estado final: si solo se ve cómo
+     queda, hay que compararlo de memoria contra lo que hay, y así nadie revisa de verdad. */
+  const filas=p.diff&&p.diff.length
+    ? `<div class="ia-prop-fila ia-prop-cab"><span>${esc(nombre)}</span><b>antes → después</b></div>`
+      +p.diff.map(d=>`<div class="ia-prop-fila">
+        <span>${esc(d.campo)}</span>
+        <b><s>${esc(d.antes)}</s> → ${esc(d.despues)}</b></div>`).join('')
+    : (p.resumen||[]).map(r=>`<div class="ia-prop-fila">
+        <span>${esc(r.campo)}</span><b>${esc(r.valor)}</b></div>`).join('');
   return `<div class="ia-prop" id="ia-prop-${idx}">
-    <div class="ia-prop-hd"><i class="ti ti-file-plus"></i> Propuesta de producto <span class="ia-prop-tag">sin crear</span></div>
+    <div class="ia-prop-hd"><i class="ti ${T.ico}"></i> ${T.hd} <span class="ia-prop-tag">${T.tag}</span></div>
     ${filas}
     ${p.ya_existe?`<div class="ia-prop-ojo"><i class="ti ti-alert-triangle"></i> Ya tienes un producto llamado <b>${esc(p.ya_existe)}</b>. Si lo creas, quedarán los dos.</div>`:''}
     <div class="ia-prop-acts">
       <button class="ia-prop-no" onclick="iaDescartarPropuesta(${idx})">Descartar</button>
-      <button class="ia-prop-si" onclick="iaCrearPropuesta(${idx})"><i class="ti ti-check"></i> Crear producto</button>
+      <button class="ia-prop-si" onclick="iaCrearPropuesta(${idx})"><i class="ti ti-check"></i> ${T.btn}</button>
     </div>
-    <div class="ia-prop-pie">Nada se guarda hasta que aprietes. Se crea con tus permisos, igual que si lo hicieras a mano.</div>
+    <div class="ia-prop-pie">${T.pie}</div>
   </div>`;
 }
 function iaDescartarPropuesta(idx){
@@ -4203,14 +4227,18 @@ async function iaCrearPropuesta(idx){
   const btn=document.querySelector(`#ia-prop-${idx} .ia-prop-si`);
   if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
   try{
-    // La puerta de siempre. Si el usuario no tiene 'gestionar_productos', esto responde 403.
-    const ficha=await api('POST','/productos',p.payload);
+    /* Cada acción por SU puerta de siempre — las mismas tres que usa una persona desde la
+       interfaz. Si al usuario le falta 'gestionar_productos', crear y editar responden 403. */
+    let ficha=null;
+    if(p.tipo==='editar_producto')      ficha=await api('PUT','/productos/'+p.ficha_id,p.payload);
+    else if(p.tipo==='archivar_producto'){ await api('POST','/archivar',{tipo:'producto',id:p.ficha_id}); ficha={id:p.ficha_id}; }
+    else                                 ficha=await api('POST','/productos',p.payload);
     p._creado=true;
     // El rastro se cierra aparte: si fallara, el producto YA está creado y eso es lo que
     // importa — no se deshace nada por no poder anotarlo.
     try{ await api('POST','/ia/acciones/'+p.id+'/confirmada',{ficha_id:ficha&&ficha.id}); }catch(e){}
     if(typeof cargarProductos==='function')cargarProductos();
-    toast('Producto creado: '+p.payload.nombre);
+    toast((IA_PROP_TXT[p.tipo]||IA_PROP_TXT.crear_producto).hecho+': '+(p.titulo||p.payload.nombre));
   }catch(e){
     p._creando=false;
     toast(String(e.message||e).toLowerCase().includes('permiso')
@@ -6601,16 +6629,19 @@ function htmlTramosVar(v){
 }
 /* FASE E · CONDICIONES — bloque del editor. Es opcional y arranca plegado: si nadie lo abre,
    el modo medidas se sigue comportando como siempre (una sola tarifa). */
-function htmlCondiciones(cond,eje,f,abierto){
+function htmlCondiciones(cond,eje,f,abierto,unidad){
   const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
   // f = constructores del onclick, para que este bloque sirva igual en la variante y en el
   // producto simple sin concatenar cadenas a medias (eso ya se rompió una vez).
   const fns={toggle:f.toggle(),add:f.add(),rem:id=>f.rem(id),set:(id,k)=>f.set(id,k),eje:e=>f.eje(e)};
   const arr=cond||[];
   const esArea=eje==='area';
-  const uCant=esArea?'m²':'u';
+  // El "m²" estaba fijo: un pendón por cm² mostraba "De 20.000 a + m² → 7", que se lee como
+  // veinte mil metros cuadrados. El número era correcto; el rótulo no.
+  const um=unidad==='cm2'?'cm²':'m²';
+  const uCant=esArea?um:'u';
   const ejemplo=esArea
-    ? 'Ej: hasta 2 m² a $9 · de 2 m² en adelante a $7. La tarifa cambia según el <b>tamaño de la pieza</b>.'
+    ? ('Ej: hasta 2 '+um+' a $9 · de 2 '+um+' en adelante a $7. La tarifa cambia según el <b>tamaño de la pieza</b>.')
     : 'Ej: de 1 a 20 prendas a $10 · de 21 en adelante a $8. La tarifa cambia según <b>cuántas unidades</b> lleve el pedido.';
   return `<div class="cond-box${abierto?' open':''}">
     <div class="cond-hd" onclick="${fns.toggle}">
@@ -6671,7 +6702,7 @@ function htmlCondVar(v){
     rem:cid=>`remCondVar('${v.id}','${cid}')`,
     set:(cid,k)=>`setCondVar('${v.id}','${cid}','${k}',this.value)`,
     eje:e=>`setCondEjeVar('${v.id}','${e}')`
-  },varCondAbiertas.has(v.id));
+  },varCondAbiertas.has(v.id),v.medida_unidad);
 }
 // B1.5 (CORR 002) — variable INFORMATIVA (sin costo): solo nombre + lista simple de opciones
 function htmlNodoInformativa(v){
@@ -7144,7 +7175,7 @@ function renderCondProd(){
     rem:cid=>`remCondProd('${cid}')`,
     set:(cid,k)=>`setCondProd('${cid}','${k}',this.value)`,
     eje:e=>`setCondEjeProd('${e}')`
-  },prodCondAbierta);
+  },prodCondAbierta,(document.getElementById('prod-medida-unidad')||{}).value);
 }
 function toggleCondProd(){prodCondAbierta=!prodCondAbierta;renderCondProd()}
 function addCondProd(){fProdMedidaCond.push({id:uid(),desde:'',hasta:'',tarifa:''});prodCondAbierta=true;renderCondProd()}

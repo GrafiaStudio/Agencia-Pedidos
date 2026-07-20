@@ -3160,8 +3160,15 @@ MODO INFORME (cuando el contexto trae "te_piden_un_informe", o te piden un infor
 - Usa tablas o listas con viñetas y negrilla en los totales. Cada cifra debe poder rastrearse al dato que te dieron.
 - Si un dato del informe no está en el contexto, di en una línea qué falta y qué habría que cargar en la app para tenerlo la próxima vez. No dejes el hueco en silencio ni lo rellenes con supuestos.
 
-CREAR UN PRODUCTO (lo único que puedes proponer; todo lo demás sigue siendo solo consulta):
-- Cuando te pidan CREAR/DAR DE ALTA/REGISTRAR un producto, tú NO lo creas: propones la ficha y una persona aprieta el botón. Explica en 2 o 3 líneas qué vas a proponer y AL FINAL del mensaje añades el bloque, exactamente así:
+PRODUCTOS · PUEDES PROPONER TRES COSAS (todo lo demás sigue siendo solo consulta):
+- **Crear** una ficha nueva · **Editar** una que exista · **Archivar** una que sobre. Tú NUNCA ejecutas: propones y una persona aprieta el botón. Una sola propuesta por mensaje.
+- EDITAR: identifica el producto por su CÓDIGO del catálogo y manda SOLO lo que cambia. Lo que no nombres se queda como está.
+  {"accion":"editar_producto","codigo":"P0010","cambios":{"medida_tarifa":"8"}}
+- ⚠️ Hay productos ANTIGUOS que no tienen código (en el catálogo aparecen sin él). Para esos usa "nombre" con el nombre EXACTO tal como está escrito en el catálogo, tildes incluidas: {"accion":"editar_producto","nombre":"Pendón lona","cambios":{...}}. Nunca te inventes un código que no viste.
+- ARCHIVAR: {"accion":"archivar_producto","codigo":"P0010"} (o "nombre" si no tiene código). Archivar NO borra: el producto sale del catálogo y se puede recuperar desde Archivados. Dilo así cuando lo propongas.
+- UNIFICAR DOS PRODUCTOS es editar uno y archivar el otro, y son DOS propuestas: haz primero la edición, y cuando esté confirmada ofrece archivar el que sobra. No prometas hacer las dos de una.
+- Si te piden editar o archivar algo que no encuentras en el catálogo, dilo y pide el código. No adivines cuál es.
+- Cuando te pidan CREAR/DAR DE ALTA/REGISTRAR un producto, explica en 2 o 3 líneas qué vas a proponer y AL FINAL del mensaje añades el bloque, exactamente así:
 \`\`\`propuesta
 {"accion":"crear_producto","nombre":"...","tipo_precio":"..."}
 \`\`\`
@@ -3351,6 +3358,56 @@ function iaResumenPropuesta(b){
    bloque viene roto o no pasa la validación, no se muestra botón: se dice qué falló. Nunca
    se deja a medias — un botón que crea algo distinto a lo que se leyó sería lo peor. */
 const IA_RX_PROPUESTA=/```\s*propuesta\s*\n([\s\S]*?)```/i;
+const IA_ACCIONES=['crear_producto','editar_producto','archivar_producto'];
+// Se identifica por CÓDIGO (P0010), que el modelo ya recibe en el catálogo y el usuario ve
+// en pantalla. Un id interno no lo puede teclear nadie y no se puede verificar de un vistazo.
+function iaResolverFicha(wsId,ref){
+  const cod=String((ref&&ref.codigo)||'').trim();
+  if(cod){
+    const f=db.prepare(`SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0
+      AND lower(codigo)=lower(?) LIMIT 1`).get(wsId,cod);
+    if(f)return f;
+  }
+  const nom=String((ref&&ref.nombre)||'').trim();
+  if(nom){
+    const f=db.prepare(`SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0
+      AND lower(nombre)=lower(?) LIMIT 1`).get(wsId,nom);
+    if(f)return f;
+  }
+  return null;
+}
+/* Solo se cambia lo que el modelo NOMBRÓ. Sin este filtro, normalizar una ficha completa
+   devolvería nombre:'' y descripcion:'' y una edición de la tarifa borraría el nombre. */
+function iaNormCambios(c,base,rec){
+  const tipo=TIPOS_PRECIO_VALIDOS.includes(c.tipo_precio)?c.tipo_precio:base.tipo_precio;
+  const full=iaNormPropuesta(Object.assign({},c,{tipo_precio:tipo}),rec);
+  const out={};
+  Object.keys(full).forEach(k=>{ if(Object.prototype.hasOwnProperty.call(c,k))out[k]=full[k]; });
+  return out;
+}
+const IA_ETIQ={nombre:'Nombre',descripcion:'Descripción',tipo_precio:'Cómo se cobra',
+  precio_base:'Precio base',medida_unidad:'Unidad de medida',medida_tarifa:'Tarifa por medida',
+  cobro_minimo:'Cobro mínimo',costo_medida_tarifa:'Costo por medida',medida_cond_eje:'Las condiciones van por'};
+// En una edición lo que importa no es cómo queda, sino QUÉ CAMBIA. Un resumen del estado
+// final obliga a comparar de memoria contra lo que hay, y así nadie revisa de verdad.
+function iaDiffFicha(antes,despues){
+  const pesos=n=>'$'+Number(n||0).toLocaleString('es-CO');
+  const d=[];
+  Object.keys(IA_ETIQ).forEach(k=>{
+    if(!Object.prototype.hasOwnProperty.call(despues,k))return;
+    const a=String(antes[k]==null?'':antes[k]).trim(), b=String(despues[k]==null?'':despues[k]).trim();
+    if(a===b)return;
+    d.push({campo:IA_ETIQ[k],antes:a||'(vacío)',despues:b||'(vacío)'});
+  });
+  const cnt=(o,k)=>Array.isArray(o[k])?o[k].length:0;
+  [['medida_cond','Condiciones de tarifa'],['rangos','Tramos por cantidad'],
+   ['variantes','Variantes'],['costos_fijos','Costos fijos']].forEach(([k,lbl])=>{
+    if(!Object.prototype.hasOwnProperty.call(despues,k))return;
+    if(cnt(antes,k)===cnt(despues,k)&&JSON.stringify(antes[k])===JSON.stringify(despues[k]))return;
+    d.push({campo:lbl,antes:cnt(antes,k)+'',despues:cnt(despues,k)+''});
+  });
+  return d;
+}
 function iaExtraerPropuesta(texto,wsId){
   const m=IA_RX_PROPUESTA.exec(String(texto||''));
   if(!m)return {texto,propuesta:null};
@@ -3359,7 +3416,40 @@ function iaExtraerPropuesta(texto,wsId){
   try{ crudo=JSON.parse(m[1]); }
   catch(e){ return {texto:limpio,propuesta:null,
     aviso:'Preparé una ficha pero me salió mal escrita y no me fío de mostrarte un botón con ella. Pídemela otra vez.'}; }
-  if(!crudo||crudo.accion!=='crear_producto')return {texto:limpio,propuesta:null};
+  if(!crudo||!IA_ACCIONES.includes(crudo.accion))return {texto:limpio,propuesta:null};
+  const no=aviso=>({texto:limpio,propuesta:null,aviso});
+
+  // ── ARCHIVAR ──────────────────────────────────────────────────────────────────────
+  if(crudo.accion==='archivar_producto'){
+    const f=iaResolverFicha(wsId,crudo);
+    if(!f)return no('Quise archivar un producto pero no encuentro cuál: dime su código (por ejemplo P0010).');
+    return {texto:limpio,propuesta:{tipo:'archivar_producto',ficha_id:f.id,
+      payload:{nombre:f.nombre},
+      resumen:[{campo:'Producto',valor:f.nombre+(f.codigo?(' ('+f.codigo+')'):'')},
+               {campo:'Qué pasa',valor:'deja de salir en el catálogo y al cotizar'},
+               {campo:'Se puede deshacer',valor:'sí — queda en Archivados, no se borra'}]}};
+  }
+
+  // ── EDITAR ────────────────────────────────────────────────────────────────────────
+  if(crudo.accion==='editar_producto'){
+    const f=iaResolverFicha(wsId,crudo);
+    if(!f)return no('Quise editar un producto pero no encuentro cuál: dime su código (por ejemplo P0010).');
+    // fichaCompleta() devuelve exactamente la forma que acepta el PUT: está comprobado que
+    // re-guardar lo que entrega deja la ficha idéntica. Por eso se puede usar de base.
+    const base=fichaCompleta(f);
+    const rec={};
+    const cambios=iaNormCambios(crudo.cambios||{},base,rec);
+    if(!Object.keys(cambios).length)return no('Preparé una edición pero no traía ningún cambio concreto.');
+    const payload=Object.assign({},base,cambios);
+    const errores=validarFicha(payload,wsId,f.id);
+    if(errores.length)return no('La edición no pasa las validaciones del sistema ('+errores.join('. ')+'), así que no te muestro el botón.');
+    const diff=iaDiffFicha(base,payload);
+    if(!diff.length)return no('Preparé una edición pero quedaría exactamente igual que ahora.');
+    return {texto:limpio,propuesta:{tipo:'editar_producto',ficha_id:f.id,payload,
+      titulo:f.nombre+(f.codigo?(' ('+f.codigo+')'):''),diff}};
+  }
+
+  // ── CREAR ─────────────────────────────────────────────────────────────────────────
   const rec={};
   const payload=iaNormPropuesta(crudo,rec);
   const errores=validarFicha(payload,wsId);
@@ -3370,16 +3460,15 @@ function iaExtraerPropuesta(texto,wsId){
     const corte=[rec.hondo?'venía con variantes anidadas más de 3 niveles y las corté':null,
                  rec.ancho?'traía demasiadas variantes y me quedé con las primeras':null]
                  .filter(Boolean).join(' y ');
-    return {texto:limpio,propuesta:null,
-      aviso:'Preparé una ficha pero no pasa las validaciones del sistema ('+errores.join('. ')+')'
+    return no('Preparé una ficha pero no pasa las validaciones del sistema ('+errores.join('. ')+')'
         +(corte?('. Ojo: la ficha '+corte+', así que el fallo puede venir de ahí'):'')
-        +', así que no te muestro el botón.'};
+        +', así que no te muestro el botón.');
   }
   // Aviso, no bloqueo: puede querer dos productos con el mismo nombre a propósito.
   const dup=db.prepare(`SELECT nombre FROM fichas_producto WHERE workspace_id=? AND archivado=0
     AND lower(nombre)=lower(?) LIMIT 1`).get(wsId,payload.nombre);
-  return {texto:limpio,propuesta:{payload,resumen:iaResumenPropuesta(payload),
-    ya_existe:dup?dup.nombre:null}};
+  return {texto:limpio,propuesta:{tipo:'crear_producto',payload,
+    resumen:iaResumenPropuesta(payload),ya_existe:dup?dup.nombre:null}};
 }
 /* Una respuesta cortada a media palabra ("Sin datos en el catál") parece un error del
    sistema y deja sin saber qué faltaba. Si el proveedor avisa que la cortó, se dice. */
@@ -3600,9 +3689,10 @@ PREGUNTA: ${pregunta}`}];
       if(ex.propuesta){
         const accId=uid();
         db.prepare(`INSERT INTO ia_acciones(id,workspace_id,tipo,resumen,payload,estado,propuesto_por)
-          VALUES(?,?,'crear_producto',?,?,'propuesta',?)`)
-          .run(accId,ws,ex.propuesta.payload.nombre,JSON.stringify(ex.propuesta.payload),
-               actorDe(req).nombre);
+          VALUES(?,?,?,?,?,'propuesta',?)`)
+          .run(accId,ws,ex.propuesta.tipo||'crear_producto',
+               (ex.propuesta.titulo||(ex.propuesta.payload&&ex.propuesta.payload.nombre)||''),
+               JSON.stringify(ex.propuesta.payload||{}),actorDe(req).nombre);
         propuesta={id:accId,...ex.propuesta};
       }
       // Se devuelve QUÉ se consultó: el usuario debe poder auditar de dónde salió la respuesta.
