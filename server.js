@@ -2799,20 +2799,40 @@ function iaPeriodo(wsId,q){
   if(/desde el inicio|hist[óo]ric|siempre|en total/.test(t))return {clave:'desde siempre', desde:'0000-01-01'};
   return {clave:'este mes', desde:d('start of month')};     // lo más pedido por defecto
 }
-// Ganancias del período. Mismo cálculo que el Dashboard: ingresos = pagos recibidos;
-// costos = los registrados en pedidos de ese período. Solo para quien puede ver dinero.
+// Ganancias de UN rango. Mismo cálculo que el Dashboard: ingresos = pagos recibidos;
+// costos = los registrados en pedidos de ese rango.
+function finCorte(wsId,desde,hasta,etiqueta){
+  const ingresos=db.prepare(`SELECT COALESCE(SUM(CAST(pg.monto_calc AS INTEGER)),0) s FROM pagos pg JOIN pedidos p ON p.id=pg.pedido_id
+    WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND pg.fecha>=? AND pg.fecha<=?`).get(wsId,desde,hasta).s;
+  const costos=db.prepare(`SELECT COALESCE(SUM(CAST(c.monto_calc AS INTEGER)),0) s FROM costos c JOIN pedidos p ON p.id=c.pedido_id
+    WHERE c.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.fecha_pedido>=? AND p.fecha_pedido<=?`).get(wsId,desde,hasta).s;
+  const utilidad=ingresos-costos;
+  return {periodo:etiqueta, desde:iaFecha(desde), hasta:iaFecha(hasta),
+    ingresos_cobrados:ingresos, costos, utilidad,
+    margen_pct:ingresos>0?Math.round(utilidad*100/ingresos):0};
+}
+/* ⭐ VARIOS CORTES DE UNA VEZ, no uno solo.
+   Falla real: preguntaron "ventas desde el inicio … en total … y las ganancias de este
+   último mes" — tres marcos de tiempo en UNA frase. iaPeriodo elige UNO, ganó
+   "desde siempre", y el asistente contestó (con razón) que no tenía el corte del mes.
+   El dato existía. Como calcular un corte cuesta dos SUM, se mandan todos: mes actual,
+   mes pasado, año y desde siempre. Así ninguna pregunta mixta se queda sin su número,
+   y de paso se puede comparar un mes contra el anterior, que es lo que pide un informe. */
 function svcFinanzas(wsId,q,perm){
   if(!iaVeDinero(perm))return null;
-  const per=iaPeriodo(wsId,q), hoyStr=hoy(wsId);
-  const ingresos=db.prepare(`SELECT COALESCE(SUM(CAST(pg.monto_calc AS INTEGER)),0) s FROM pagos pg JOIN pedidos p ON p.id=pg.pedido_id
-    WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND pg.fecha>=? AND pg.fecha<=?`).get(wsId,per.desde,hoyStr).s;
-  const costos=db.prepare(`SELECT COALESCE(SUM(CAST(c.monto_calc AS INTEGER)),0) s FROM costos c JOIN pedidos p ON p.id=c.pedido_id
-    WHERE c.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.fecha_pedido>=? AND p.fecha_pedido<=?`).get(wsId,per.desde,hoyStr).s;
-  const utilidad=ingresos-costos;
-  return {periodo:per.clave, desde:iaFecha(per.desde), hasta:iaFecha(hoyStr),
-    ingresos_cobrados:ingresos, costos:costos, utilidad,
-    margen_pct:ingresos>0?Math.round(utilidad*100/ingresos):0,
-    ojo:'"ingresos_cobrados" es plata que YA entró (pagos recibidos), no lo facturado.'};
+  const hoyStr=hoy(wsId), per=iaPeriodo(wsId,q);
+  const d=(base,expr)=>db.prepare('SELECT date(?, ?) x').get(base,expr).x;
+  const iniMes=d(hoyStr,'start of month');
+  const cortes=[
+    finCorte(wsId,iniMes,hoyStr,'este mes'),
+    finCorte(wsId,d(iniMes,'-1 month'),d(iniMes,'-1 day'),'el mes pasado'),
+    finCorte(wsId,d(hoyStr,'start of year'),hoyStr,'este año'),
+    finCorte(wsId,'0000-01-01',hoyStr,'desde siempre')
+  ];
+  // Si preguntaron por "hoy" o "esta semana", ese corte no está en la lista fija: se añade.
+  if(!cortes.some(c=>c.periodo===per.clave))cortes.unshift(finCorte(wsId,per.desde,hoyStr,per.clave));
+  return {preguntaste_por:per.clave, cortes,
+    ojo:'Cada corte es independiente y ya está calculado: usa el que te pidan, NO sumes ni restes cortes entre sí. "ingresos_cobrados" es plata que YA entró (pagos recibidos), no lo facturado.'};
 }
 // Cuántos insumos se han consumido (los vasos que ya se gastaron en pedidos).
 function svcConsumoInsumos(wsId,q){
@@ -2827,26 +2847,85 @@ function svcConsumoInsumos(wsId,q){
     consumido:filas.map(f=>({insumo:f.nombre, cantidad:f.total, unidad:f.unidad||'unidad', en_pedidos:f.pedidos})),
     ojo:filas.length?undefined:'Consultado: no hay consumos de insumos registrados en ese período. El dato SÍ se lleva, simplemente no hay movimientos.'};
 }
-// Qué se ha vendido, por producto. Sale de los ítems de los pedidos, no de una tabla aparte.
+/* Qué se ha vendido, por producto — CON SU COSTO. Sale de los ítems de los pedidos.
+   Falla real: contestó "no puedo darte la rentabilidad, el sistema no trae costo por
+   producto, solo utilidad global". El costo SÍ está; lo que no hay es una columna que lo
+   ate al producto: `costos.encargo_id` existe en el esquema pero la app nunca lo llena
+   (los costos automáticos se generan sueltos en el pedido). Y atarlo por el nombre que
+   viene en la descripción sería adivinar — justo lo que ya se descartó en B1b.
+   Así que se reparte a PRORRATA DEL VALOR: el costo del pedido se divide entre sus ítems
+   según lo que pesa cada uno. Si el pedido tiene un solo producto el reparto es exacto;
+   si tiene varios es una aproximación, y se dice que lo es. Si algún día se llena
+   encargo_id, ese costo se reparte dentro de su encargo, que afina más. */
 function svcVentasProductos(wsId,q,perm){
   const per=iaPeriodo(wsId,q), hoyStr=hoy(wsId);
   // El alias no puede llamarse "nombre": esa columna existe en pedidos y en fichas_producto,
   // y SQLite lo rechaza por ambiguo al agrupar. Se agrupa por la expresión completa.
-  const filas=db.prepare(`SELECT COALESCE(NULLIF(f.nombre,''), i.detalle) AS producto,
-      SUM(CAST(COALESCE(NULLIF(i.cantidad,''),'0') AS INTEGER)) AS unidades,
-      SUM(CAST(COALESCE(NULLIF(i.cantidad,''),'0') AS INTEGER)*CAST(COALESCE(NULLIF(i.valor_unitario_calc,''),'0') AS INTEGER)) AS valor,
-      COUNT(DISTINCT p.id) AS pedidos
-    FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
-    LEFT JOIN fichas_producto f ON f.id=i.ficha_id
-    WHERE e.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0
-      AND p.fecha_pedido>=? AND p.fecha_pedido<=?
-    GROUP BY COALESCE(NULLIF(f.nombre,''), i.detalle) ORDER BY unidades DESC LIMIT 25`).all(wsId,per.desde,hoyStr);
+  const filas=db.prepare(`WITH item AS (
+      SELECT i.encargo_id AS eid, p.id AS pid,
+        COALESCE(NULLIF(f.nombre,''), i.detalle) AS producto,
+        CAST(COALESCE(NULLIF(i.cantidad,''),'0') AS INTEGER) AS uds,
+        CAST(COALESCE(NULLIF(i.cantidad,''),'0') AS INTEGER)*CAST(COALESCE(NULLIF(i.valor_unitario_calc,''),'0') AS INTEGER) AS valor
+      FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+      LEFT JOIN fichas_producto f ON f.id=i.ficha_id
+      WHERE e.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0
+        AND p.fecha_pedido>=? AND p.fecha_pedido<=?
+    ), enc AS (SELECT eid, SUM(valor) AS tot FROM item GROUP BY eid
+    ), ped AS (SELECT pid, SUM(valor) AS tot FROM item GROUP BY pid
+    ), c_enc AS (SELECT encargo_id AS k, SUM(CAST(COALESCE(NULLIF(monto_calc,''),'0') AS INTEGER)) AS c
+        FROM costos WHERE workspace_id=? AND COALESCE(encargo_id,'')<>'' GROUP BY encargo_id
+    ), c_ped AS (SELECT pedido_id AS k, SUM(CAST(COALESCE(NULLIF(monto_calc,''),'0') AS INTEGER)) AS c
+        FROM costos WHERE workspace_id=? AND COALESCE(encargo_id,'')='' GROUP BY pedido_id)
+    SELECT item.producto AS producto, SUM(item.uds) AS unidades, SUM(item.valor) AS valor,
+      SUM(CASE WHEN enc.tot>0 THEN COALESCE(c_enc.c,0)*1.0*item.valor/enc.tot ELSE 0 END
+        + CASE WHEN ped.tot>0 THEN COALESCE(c_ped.c,0)*1.0*item.valor/ped.tot ELSE 0 END) AS costo,
+      COUNT(DISTINCT item.pid) AS pedidos
+    FROM item LEFT JOIN enc ON enc.eid=item.eid LEFT JOIN ped ON ped.pid=item.pid
+      LEFT JOIN c_enc ON c_enc.k=item.eid LEFT JOIN c_ped ON c_ped.k=item.pid
+    GROUP BY item.producto ORDER BY unidades DESC LIMIT 25`).all(wsId,per.desde,hoyStr,wsId,wsId);
   const dinero=iaVeDinero(perm);
-  return {periodo:per.clave, desde:iaFecha(per.desde),
-    vendido:filas.map(f=>{ const o={producto:f.producto||'(sin nombre)', unidades:f.unidades||0, en_pedidos:f.pedidos};
-      if(dinero)o.valor=f.valor||0; return o; }),
-    ojo:(filas.length?'':'Consultado: no hay ventas registradas en ese período. ')
-      +'Sale de los ítems de pedidos reales (sin cotizaciones ni cancelados). Si un ítem se escribió a mano sin elegir producto, aparece por su descripción.'};
+  let conCosto=0;
+  const vendido=filas.map(f=>{
+    const o={producto:f.producto||'(sin nombre)', unidades:f.unidades||0, en_pedidos:f.pedidos};
+    if(dinero){
+      const val=f.valor||0, cos=Math.round(f.costo||0);
+      o.valor=val;
+      // Costo 0 = nadie cargó el costo, NO "salió gratis". Se distinguen los dos casos:
+      // sin esto el asistente calcula 100% de margen y presenta un número falso.
+      if(cos>0){ conCosto++; o.costo=cos; o.utilidad=val-cos; o.margen_pct=val>0?Math.round((val-cos)*100/val):0; }
+      else o.costo='sin costo cargado — no se puede calcular su margen';
+    }
+    return o;
+  });
+  const notas=[];
+  if(!filas.length)notas.push('Consultado: no hay ventas registradas en ese período.');
+  notas.push('Sale de los ítems de pedidos reales (sin cotizaciones ni cancelados). Si un ítem se escribió a mano sin elegir producto, aparece por su descripción.');
+  if(dinero){
+    notas.push('El costo NO viene marcado por producto: es el costo del pedido repartido entre sus ítems a prorrata del valor de cada uno. Exacto cuando el pedido lleva un solo producto, aproximado cuando lleva varios. Dilo una vez si presentas márgenes.');
+    if(filas.length&&!conCosto)notas.push('OJO: ningún producto de este período tiene costo cargado, así que NO hay rentabilidad por producto que calcular. Para tenerla hay que registrar los costos en cada pedido (pestaña Costos) o enlazarlos desde un listado de proveedor.');
+    else if(conCosto<filas.length)notas.push('Solo '+conCosto+' de '+filas.length+' productos tienen costo cargado: el ranking de rentabilidad solo vale para esos.');
+  }
+  return {periodo:per.clave, desde:iaFecha(per.desde), vendido, ojo:notas.join(' ')};
+}
+// A quién le vendemos. Un informe sin esto responde "qué" pero nunca "a quién".
+function svcVentasClientes(wsId,q,perm){
+  if(!iaVeDinero(perm))return null;
+  const per=iaPeriodo(wsId,q), hoyStr=hoy(wsId);
+  // Se pasa por pedidoCompleto en vez de sumar valor_total en SQL: esa columna es TEXTO
+  // con formato colombiano, y el resto del sistema confía en el valor ya calculado.
+  const filas=db.prepare(`SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cancelado=0
+    AND es_cotizacion=0 AND fecha_pedido>=? AND fecha_pedido<=?`).all(wsId,per.desde,hoyStr).map(pedidoCompleto);
+  const m=new Map();
+  filas.forEach(p=>{
+    const k=p.nombre||'(sin nombre)';
+    const a=m.get(k)||{cliente:k, pedidos:0, facturado:0, pagado:0};
+    a.pedidos++; a.facturado+=(p.valor_total||0); a.pagado+=iaPagado(p); m.set(k,a);
+  });
+  const lista=[...m.values()].sort((a,b)=>b.facturado-a.facturado).slice(0,15)
+    .map(c=>({...c, saldo:Math.max(0,c.facturado-c.pagado)}));
+  return {periodo:per.clave, desde:iaFecha(per.desde), clientes:lista,
+    ojo:(lista.length?'':'Consultado: no hay pedidos de ningún cliente en ese período. ')
+      +'"facturado" es el valor de los pedidos; "pagado" es lo que ya entró. Ordenado de mayor a menor facturación.'};
 }
 // Qué se entrega en los próximos N días — la pregunta más frecuente de un taller.
 function svcAgenda(wsId,dias,perm){
@@ -2985,15 +3064,26 @@ function iaContexto(wsId,pregunta,permisos){
   if(inv.length)ctx.inventario=inv;
   if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7,permisos);
   // Preguntas de negocio: solo se consultan si se preguntan, para no engordar cada consulta.
-  if(/ganancia|utilidad|margen|rentab|ingreso|factur|vend|ventas|cobrad|balance|finanz|como vamos|cómo vamos/i.test(q)){
+  /* Salvo que pidan un INFORME. Ahí se traen todas: un informe que solo responde la palabra
+     que se coló en el regex no es un informe. Pidieron ventas + rentabilidad + ganancias del
+     mes en una frase y llegó media respuesta porque cada servicio tenía su propio disparador. */
+  const informe=/informe|reporte|an[áa]lisis|balance|estad[íi]stic|resumen (del|de mi|de el)? ?negocio|c[óo]mo (va|vamos|estamos)|panorama general|rentab/i.test(q);
+  if(informe||/ganancia|utilidad|margen|ingreso|factur|vend|ventas|cobrad|finanz/i.test(q)){
     const fin=svcFinanzas(wsId,q,permisos); if(fin)ctx.finanzas=fin;
   }
-  if(/vend|ventas|cuant[oa]s?|cuánt[oa]s?|mas vendido|más vendido|salido/i.test(q)){
+  /* "cuant[oa]s" a secas disparaba esto en "¿cuánto vale un pendón de 2x1?" — la pregunta
+     más común del taller — y le colgaba el ranking de ventas a cada cotización. Se quita:
+     era redundante, porque "cuántas camisetas hemos VENDIDO" ya cae en /vend/. */
+  if(informe||/vend|ventas|salido|se mueve|rotaci[óo]n|mas vendido|más vendido/i.test(q)){
     ctx.ventas_por_producto=svcVentasProductos(wsId,q,permisos);
   }
-  if(/consum|gastad|gasta|usado|se han ido|salida/i.test(q)){
+  if(informe||/mejores? clientes?|qui[eé]n(es)? (me )?(compra|compran|paga)|client.* que m[áa]s|top .*client/i.test(q)){
+    const cli=svcVentasClientes(wsId,q,permisos); if(cli)ctx.ventas_por_cliente=cli;
+  }
+  if(informe||/consum|gastad|gasta|usado|se han ido|salida/i.test(q)){
     ctx.consumo_de_insumos=svcConsumoInsumos(wsId,q);
   }
+  if(informe)ctx.te_piden_un_informe=true;
   return ctx;
 }
 const IA_SISTEMA=`Eres el asistente de un taller de artes gráficas. Hablas español de Colombia, con voz serena, breve y con datos.
@@ -3003,7 +3093,7 @@ REGLAS QUE NO SE ROMPEN:
 - Los valores van en pesos colombianos con separador de miles (ej: $1.250.000).
 - Las fechas del contexto YA vienen en día/mes/año (ej: 03/08/2026). Escríbelas tal cual; nunca las conviertas a otro formato ni las recalcules.
 - Si te piden algo que implique cambiar datos (crear, editar, borrar), explicas cómo hacerlo en la app: tú no ejecutas cambios.
-- Prefieres 3 líneas útiles a 10 de relleno. Sin saludos de cortesía ni "¡claro que sí!".
+- Prefieres 3 líneas útiles a 10 de relleno. Sin saludos de cortesía ni "¡claro que sí!". (Excepción: el MODO INFORME de más abajo.)
 - Si la pregunta es ambigua, respondes con lo más probable y ofreces la alternativa en una línea.
 - COTIZACIONES DE VARIOS ÍTEMS: da primero TODOS los ítems con su precio, una línea corta por ítem, y al final el total. Las aclaraciones y las dudas van al final, en dos líneas máximo. Es preferible cotizar los 7 ítems escuetamente que explicar largo los 2 primeros y dejar el resto sin responder.
 
@@ -3012,7 +3102,19 @@ CÓMO LEER LO QUE TE PIDEN (esto es un taller, la gente habla rápido y en desor
 - Si lo que piden encaja con VARIOS productos, no elijas en silencio: di cuáles son y pregunta. Ej: "¿DTF textil o DTF UV?". Y si el producto no se cobra como lo están pidiendo (piden "25 unidades" pero se cobra por medidas o por listado), dilo así: "eso no se cobra por unidad sino por medida — dime el tamaño".
 - Si de verdad no hay nada parecido, dilo claro y di qué habría que crear.
 - POSICIÓN DEL ESTAMPADO (pecho, espalda, manga, frente): salvo que el catálogo cobre distinto por eso, NO cambia el precio. Es una anotación del pedido. Lo que sí cambia el precio es el TAMAÑO del estampado (carta, media carta, tabloide, o las medidas) y la CANTIDAD. No pidas aclaración por la posición.
-- Ignora lo que no venga al caso. Si te preguntan algo ajeno al taller, una línea y sigues con lo que importa.`;
+- Ignora lo que no venga al caso. Si te preguntan algo ajeno al taller, una línea y sigues con lo que importa.
+
+CIFRAS DEL NEGOCIO (cómo leer lo que te llega):
+- FINANZAS no trae un solo número: trae varios CORTES ya calculados ("este mes", "el mes pasado", "este año", "desde siempre"). Usa el corte que te pidieron y NÓMBRALO. Nunca digas que no tienes el corte del mes: está ahí. No sumes ni restes cortes entre sí.
+- Si en una misma frase te piden cosas con tiempos distintos ("las ventas desde el inicio y las ganancias de este mes"), responde cada una con su corte. No apliques un solo período a todo.
+- COSTO POR PRODUCTO: viene repartido entre los ítems de cada encargo a prorrata del valor. Es una aproximación — cuando presentes márgenes por producto, dilo en una línea, una sola vez.
+- Si un producto dice "sin costo cargado", NO tiene margen 0% ni 100%: no se sabe. Sepáralo del ranking y di cuántos productos están en esa situación. Nunca inventes un costo ni supongas que algo salió gratis.
+
+MODO INFORME (cuando el contexto trae "te_piden_un_informe", o te piden un informe/reporte/análisis):
+- Aquí SÍ te extiendes. Un informe corto es un informe inútil.
+- Estructura: (1) título con el período y la fecha de corte; (2) una sección por tema pedido, con sus cifras y su TOTAL; (3) comparación contra el período anterior cuando tengas los dos cortes, diciendo la variación; (4) cierre con 2 o 3 observaciones accionables, concretas, basadas solo en las cifras que mostraste.
+- Usa tablas o listas con viñetas y negrilla en los totales. Cada cifra debe poder rastrearse al dato que te dieron.
+- Si un dato del informe no está en el contexto, di en una línea qué falta y qué habría que cargar en la app para tenerlo la próxima vez. No dejes el hueco en silencio ni lo rellenes con supuestos.`;
 
 /* Una respuesta cortada a media palabra ("Sin datos en el catál") parece un error del
    sistema y deja sin saber qué faltaba. Si el proveedor avisa que la cortó, se dice. */
@@ -3063,8 +3165,15 @@ function iaCompactar(ctx,limite){
   // en orden inverso de importancia. Nunca se corta el JSON a la mitad.
   // El catálogo se sacrifica de ÚLTIMO: sin él el asistente vuelve a decir "no existe".
   // Finanzas, ventas y consumo tampoco se tocan pronto: si se preguntaron, son LA respuesta.
-  const sacrificables=['agenda','clientes','pedidos','productos','inventario',
-    'consumo_de_insumos','ventas_por_producto','finanzas','catalogo'];
+  /* El orden se invierte en un informe. Fuera de él, el catálogo es lo último que se suelta
+     (sin él el asistente vuelve a decir "no existe"); pero en un informe el catálogo no
+     pinta nada y las cifras son TODA la respuesta — sacrificarlas primero, como hacía esta
+     lista, dejaría un informe sin números y con la lista de precios intacta. */
+  const sacrificables=ctx.te_piden_un_informe
+    ? ['catalogo','inventario','agenda','productos','clientes','pedidos',
+       'consumo_de_insumos','ventas_por_cliente','ventas_por_producto','finanzas']
+    : ['agenda','clientes','pedidos','productos','inventario',
+       'consumo_de_insumos','ventas_por_cliente','ventas_por_producto','finanzas','catalogo'];
   for(const k of sacrificables){ if(tam()<=limite)break; if(ctx[k]){ delete ctx[k]; recortes.push('sección "'+k+'" completa (demasiado grande)'); } }
   if(tam()>limite&&ctx.panorama){
     ['entregan_hoy','entregan_esta_semana','atrasados','pedidos_con_saldo'].forEach(k=>{ if(tam()>limite&&ctx.panorama[k]){ ctx.panorama[k]=ctx.panorama[k].slice(0,2); } });
@@ -3197,7 +3306,9 @@ PREGUNTA: ${pregunta}`}];
       const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,8000);
       // Se devuelve QUÉ se consultó: el usuario debe poder auditar de dónde salió la respuesta.
       res.json({respuesta:texto,ms:Date.now()-t0,
-        consultado:Object.keys(ctx).filter(k=>k!=='_recortado'),
+        // Solo fuentes de DATOS. "te_piden_un_informe" es una bandera interna y aparecía
+        // en el pie como si fuera algo que se hubiera consultado.
+        consultado:Object.keys(ctx).filter(k=>k!=='_recortado'&&k!=='te_piden_un_informe'),
         proveedor:cfg.proveedor,modelo:cfg.modelo});
     }finally{ _iaOcupado.delete(ws); }
   }catch(e){ logError('POST /api/ia/preguntar',e); res.status(400).json({error:e.message}); }

@@ -463,6 +463,24 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .ia-burbuja{padding:9px 13px;border-radius:16px;font-size:12px;line-height:1.55;white-space:normal;word-break:break-word}
 .ia-msg.usuario .ia-burbuja{background:var(--brand);color:var(--brand-txt);border-bottom-right-radius:5px}
 .ia-msg.asistente .ia-burbuja{background:var(--bg);color:var(--navy);border:1px solid var(--line);border-bottom-left-radius:5px}
+/* Un informe llega con títulos y tablas. Sin esto se veían las almohadillas y las barras
+   en crudo, que es peor que no tener informe. Los fondos van en gris translúcido, NO en un
+   color fijo: así valen igual en modo día y en modo noche sin tocar la paleta. */
+.ia-burbuja .ia-h1{font-size:13px;font-weight:600;margin:10px 0 5px;color:var(--navy)}
+.ia-burbuja .ia-h1:first-child,.ia-burbuja .ia-h2:first-child{margin-top:0}
+.ia-burbuja .ia-h2{font-size:12px;font-weight:600;margin:9px 0 4px;color:var(--navy);opacity:.82}
+.ia-burbuja .ia-li{margin:2px 0}
+.ia-burbuja .ia-hr{border:none;border-top:1px solid var(--line);margin:9px 0}
+.ia-burbuja code{background:rgba(127,127,127,.14);padding:1px 4px;border-radius:4px;font-size:11px}
+.ia-tabla-wrap{overflow-x:auto;margin:7px 0;-webkit-overflow-scrolling:touch}
+.ia-tabla{border-collapse:collapse;font-size:11px;min-width:100%}
+/* Relleno justo: con 8px una tabla de 5 columnas se salía del panel por 13px y había que
+   arrastrarla para ver el margen, que es el número que se va a mirar. Con 6px entra. */
+.ia-tabla th,.ia-tabla td{border:1px solid var(--line);padding:4px 6px;text-align:left;white-space:nowrap}
+.ia-tabla th{background:rgba(127,127,127,.12);font-weight:600}
+.ia-tabla th:not(:first-child),.ia-tabla td:not(:first-child){text-align:right}
+/* Una tabla ahogada en el 88% se lee mal: el mensaje que la lleva puede ocupar casi todo. */
+.ia-msg.asistente:has(.ia-tabla){max-width:97%}
 .ia-fuente{display:flex;align-items:center;gap:4px;font-size:8.5px;color:var(--muted);margin:3px 0 0 5px;text-transform:uppercase;letter-spacing:.05em}
 .ia-pensando{display:flex;gap:4px;align-items:center;padding:13px}
 .ia-pensando span{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:iaLat 1.1s infinite}
@@ -4128,11 +4146,39 @@ function renderIaChat(){
   c.scrollTop=c.scrollHeight;
 }
 // Formato mínimo: negritas, saltos y viñetas. Nada de HTML del modelo (se escapa primero).
+/* Antes solo entendía negrilla y viñetas. Un informe trae títulos y tablas, y salían con
+   las almohadillas y las barras a la vista. Se recorre por LÍNEAS y se arma el bloque que
+   toca. El escapado va primero y en todas las ramas: aquí entra texto de un modelo. */
 function iaFormato(t){
-  return String(t||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]))
-    .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
-    .replace(/^[-•]\s+/gm,'· ')
-    .replace(/\n/g,'<br>');
+  const esc=s=>String(s).replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]));
+  const linea=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+  const esFila=s=>/^\s*\|.*\|\s*$/.test(s);
+  const celdas=s=>s.trim().replace(/^\||\|$/g,'').split('|').map(x=>x.trim());
+  if(!String(t||'').trim())return '';
+  // Sin quitar el salto final, la última línea vacía metía un <br> de más al cerrar.
+  const L=String(t).replace(/\s+$/,'').split('\n'), out=[];
+  let i=0;
+  while(i<L.length){
+    // Tabla: una fila de encabezado seguida de la fila de guiones. Sin la segunda no es tabla.
+    if(esFila(L[i])&&i+1<L.length&&/^\s*\|[\s:|-]+\|\s*$/.test(L[i+1])){
+      const enc=celdas(L[i]); i+=2;
+      const filas=[];
+      while(i<L.length&&esFila(L[i])){ filas.push(celdas(L[i])); i++; }
+      out.push('<div class="ia-tabla-wrap"><table class="ia-tabla"><thead><tr>'
+        +enc.map(c=>'<th>'+linea(c)+'</th>').join('')+'</tr></thead><tbody>'
+        +filas.map(f=>'<tr>'+f.map(c=>'<td>'+linea(c)+'</td>').join('')+'</tr>').join('')
+        +'</tbody></table></div>');
+      continue;
+    }
+    // La raya va ANTES que la viñeta: "---" también empieza por guion.
+    if(/^\s*([-*_])\1{2,}\s*$/.test(L[i])){ out.push('<hr class="ia-hr">'); i++; continue; }
+    const h=L[i].match(/^\s*(#{1,4})\s+(.*)$/);
+    if(h){ out.push('<div class="ia-h'+(h[1].length<=2?'1':'2')+'">'+linea(h[2])+'</div>'); i++; continue; }
+    const b=L[i].match(/^\s*[-•*]\s+(.*)$/);
+    if(b){ out.push('<div class="ia-li">· '+linea(b[1])+'</div>'); i++; continue; }
+    out.push(linea(L[i])+'<br>'); i++;
+  }
+  return out.join('');
 }
 async function iaPreguntar(txt){
   const inp=document.getElementById('ia-pregunta');
