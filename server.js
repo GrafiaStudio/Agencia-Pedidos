@@ -2872,6 +2872,53 @@ REGLAS QUE NO SE ROMPEN:
 - Prefieres 3 líneas útiles a 10 de relleno. Sin saludos de cortesía ni "¡claro que sí!".
 - Si la pregunta es ambigua, respondes con lo más probable y ofreces la alternativa en una línea.`;
 
+function iaMotivoVacio(razon){
+  if(razon==='max_tokens')return 'La respuesta se cortó por longitud antes de escribir nada. Pregunta por partes (primero el pendón, luego las camisetas).';
+  if(razon==='refusal')return 'El modelo se negó a responder esa pregunta.';
+  return 'El proveedor devolvió una respuesta vacía'+(razon?(' ('+razon+')'):'')+'. Vuelve a intentarlo.';
+}
+/* El contexto se recortaba con .slice() sobre el JSON YA convertido a texto: si pasaba del
+   tope, al modelo le llegaba un JSON partido por la mitad — basura. Ahora se recortan los
+   DATOS, en orden de menor a mayor importancia, y siempre se envía un JSON válido.
+   Lo que se haya recortado se le dice, para que no crea que eso es todo lo que hay. */
+function iaCompactar(ctx,limite){
+  const tam=()=>JSON.stringify(ctx).length;
+  const recortes=[];
+  const podar=(obj,clave,deja,etiq)=>{
+    const a=obj&&obj[clave];
+    if(Array.isArray(a)&&a.length>deja){ obj[clave]=a.slice(0,deja); recortes.push(`${etiq}: se muestran ${deja} de ${a.length}`); }
+  };
+  const pasos=[
+    ()=>{ if(ctx.coincidencias){ delete ctx.coincidencias; recortes.push('lista de coincidencias (los detalles ya van aparte)'); } },
+    ()=>podar(ctx.panorama,'pedidos_con_saldo',8,'pedidos con saldo'),
+    ()=>podar(ctx.panorama,'atrasados',8,'pedidos atrasados'),
+    ()=>podar(ctx.panorama,'entregan_esta_semana',8,'entregas de la semana'),
+    ()=>podar(ctx.panorama,'entregan_hoy',8,'entregas de hoy'),
+    ()=>podar(ctx,'agenda',10,'agenda'),
+    // El historial de cada cliente puede traer 8 pedidos completos: se acorta antes de
+    // sacrificar productos, que en una cotización son lo que de verdad hace falta.
+    ()=>{ (ctx.clientes||[]).forEach(c=>podar(c,'ultimos_pedidos',3,'historial del cliente')); },
+    ()=>{ (ctx.pedidos||[]).forEach(p=>podar(p,'encargos',4,'encargos del pedido')); },
+    ()=>podar(ctx,'inventario',10,'inventario'),
+    ()=>podar(ctx,'productos',4,'productos'),
+    ()=>podar(ctx,'clientes',2,'clientes'),
+    ()=>podar(ctx,'productos',2,'productos'),
+    ()=>podar(ctx.panorama,'atrasados',3,'pedidos atrasados'),
+    ()=>podar(ctx.panorama,'entregan_esta_semana',3,'entregas de la semana'),
+    ()=>podar(ctx.panorama,'pedidos_con_saldo',3,'pedidos con saldo')
+  ];
+  for(const paso of pasos){ if(tam()<=limite)break; paso(); }
+  // Red de seguridad: si con todo lo anterior sigue pasado, se sueltan secciones enteras
+  // en orden inverso de importancia. Nunca se corta el JSON a la mitad.
+  const sacrificables=['agenda','clientes','pedidos','inventario','productos'];
+  for(const k of sacrificables){ if(tam()<=limite)break; if(ctx[k]){ delete ctx[k]; recortes.push('sección "'+k+'" completa (demasiado grande)'); } }
+  if(tam()>limite&&ctx.panorama){
+    ['entregan_hoy','entregan_esta_semana','atrasados','pedidos_con_saldo'].forEach(k=>{ if(tam()>limite&&ctx.panorama[k]){ ctx.panorama[k]=ctx.panorama[k].slice(0,2); } });
+    recortes.push('el panorama se dejó al mínimo');
+  }
+  if(recortes.length)ctx._recortado='Por tamaño se recortó: '+recortes.join(' · ')+'. Si el usuario necesita el resto, dile que lo pida más específico.';
+  return ctx;
+}
 // ── Adaptadores. Cada uno recibe lo mismo y devuelve texto; las diferencias mueren aquí.
 async function iaLlamar(cfg,sistema,mensajes,maxTokens){
   const ctrl=new AbortController();
@@ -2880,19 +2927,25 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
     if(cfg.proveedor==='claude'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
         headers:{'content-type':'application/json','x-api-key':cfg.clave,'anthropic-version':'2023-06-01'},
-        body:JSON.stringify({model:cfg.modelo,max_tokens:maxTokens||1200,system:sistema,messages:mensajes})});
+        body:JSON.stringify({model:cfg.modelo,max_tokens:maxTokens||2000,system:sistema,messages:mensajes})});
       const j=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error((j.error&&j.error.message)||('El proveedor respondió '+r.status));
-      return (j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+      const txt=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+      // Devolver '' en silencio dejaba un "(sin respuesta)" sin explicación. Si no hay texto,
+      // se dice POR QUÉ: casi siempre es que se agotó el cupo de respuesta.
+      if(!txt)throw new Error(iaMotivoVacio(j.stop_reason));
+      return txt;
     }
     if(cfg.proveedor==='openai'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
         headers:{'content-type':'application/json','authorization':'Bearer '+cfg.clave},
-        body:JSON.stringify({model:cfg.modelo,max_tokens:maxTokens||1200,
+        body:JSON.stringify({model:cfg.modelo,max_tokens:maxTokens||2000,
           messages:[{role:'system',content:sistema},...mensajes]})});
       const j=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error((j.error&&j.error.message)||('El proveedor respondió '+r.status));
-      return ((j.choices||[])[0]?.message?.content||'').trim();
+      const t1=((j.choices||[])[0]?.message?.content||'').trim();
+      if(!t1)throw new Error(iaMotivoVacio((j.choices||[])[0]?.finish_reason));
+      return t1;
     }
     if(cfg.proveedor==='ollama'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
@@ -2901,7 +2954,9 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
           messages:[{role:'system',content:sistema},...mensajes]})});
       const j=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(j.error||('El modelo local respondió '+r.status));
-      return String(j.message?.content||'').trim();
+      const t2=String(j.message?.content||'').trim();
+      if(!t2)throw new Error(iaMotivoVacio(j.done_reason));
+      return t2;
     }
     throw new Error('Proveedor no reconocido');
   }catch(e){
@@ -2970,14 +3025,14 @@ app.post('/api/ia/preguntar',async(req,res)=>{
 `Hoy es ${hoyTxt}. El negocio es ${neg}.
 
 CONTEXTO (datos reales del sistema, en JSON):
-${JSON.stringify(ctx,null,1).slice(0,60000)}
+${JSON.stringify(iaCompactar(ctx,45000),null,1)}
 
 PREGUNTA: ${pregunta}`}];
       const t0=Date.now();
       const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,1200);
       // Se devuelve QUÉ se consultó: el usuario debe poder auditar de dónde salió la respuesta.
       res.json({respuesta:texto,ms:Date.now()-t0,
-        consultado:Object.keys(ctx),
+        consultado:Object.keys(ctx).filter(k=>k!=='_recortado'),
         proveedor:cfg.proveedor,modelo:cfg.modelo});
     }finally{ _iaOcupado.delete(ws); }
   }catch(e){ logError('POST /api/ia/preguntar',e); res.status(400).json({error:e.message}); }
