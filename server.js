@@ -2936,9 +2936,12 @@ CÓMO LEER LO QUE TE PIDEN (esto es un taller, la gente habla rápido y en desor
 
 /* Una respuesta cortada a media palabra ("Sin datos en el catál") parece un error del
    sistema y deja sin saber qué faltaba. Si el proveedor avisa que la cortó, se dice. */
-function iaAvisoCorte(txt,razon){
+function iaAvisoCorte(txt,razon,diag){
   if(razon!=='max_tokens'&&razon!=='length')return txt;
-  return txt+'\n\n⚠️ Aquí se me acabó el espacio de respuesta y quedó cortada. Pídeme lo que falta por partes (por ejemplo: primero los pendones, luego las camisetas).';
+  // Se muestran los números: si se gastaron 4.000 tokens para dos líneas de texto, el
+  // problema no es que la respuesta sea larga, y hay que verlo, no suponerlo.
+  const nums=(diag&&diag.tokens)?` (gasté ${diag.tokens} de ${diag.tope} tokens${(diag.bloques||[]).some(b=>b!=='text')?', parte en razonamiento interno':''})`:'';
+  return txt+'\n\n⚠️ Aquí se me acabó el espacio de respuesta y quedó cortada'+nums+'. Pídeme lo que falta por partes (por ejemplo: primero los pendones, luego las camisetas).';
 }
 function iaMotivoVacio(razon){
   if(razon==='max_tokens')return 'La respuesta se cortó por longitud antes de escribir nada. Pregunta por partes (primero el pendón, luego las camisetas).';
@@ -3000,10 +3003,15 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
       const j=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error((j.error&&j.error.message)||('El proveedor respondió '+r.status));
       const txt=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
-      // Devolver '' en silencio dejaba un "(sin respuesta)" sin explicación. Si no hay texto,
-      // se dice POR QUÉ: casi siempre es que se agotó el cupo de respuesta.
-      if(!txt)throw new Error(iaMotivoVacio(j.stop_reason));
-      return iaAvisoCorte(txt,j.stop_reason);
+      /* DIAGNÓSTICO. La respuesta se cortaba tras dos líneas aunque el cupo era de 4.000:
+         algo consumía el presupuesto sin aparecer en pantalla. Sin medir no se puede saber,
+         así que se anota qué tipos de bloque vinieron y cuántos tokens se gastaron de
+         verdad — si hay bloques que no son 'text' (razonamiento), ahí se fue el cupo. */
+      const diag={tokens:(j.usage&&j.usage.output_tokens)||0, tope:maxTokens||2000,
+        bloques:[...new Set((j.content||[]).map(b=>b.type))], stop:j.stop_reason||''};
+      if(!txt){ logError('IA respuesta vacía',new Error(JSON.stringify(diag))); throw new Error(iaMotivoVacio(j.stop_reason)); }
+      if(diag.stop==='max_tokens')logError('IA respuesta cortada',new Error(JSON.stringify(diag)));
+      return iaAvisoCorte(txt,j.stop_reason,diag);
     }
     if(cfg.proveedor==='openai'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
@@ -3014,7 +3022,7 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
       if(!r.ok)throw new Error((j.error&&j.error.message)||('El proveedor respondió '+r.status));
       const t1=((j.choices||[])[0]?.message?.content||'').trim();
       if(!t1)throw new Error(iaMotivoVacio((j.choices||[])[0]?.finish_reason));
-      return iaAvisoCorte(t1,(j.choices||[])[0]?.finish_reason);
+      return iaAvisoCorte(t1,(j.choices||[])[0]?.finish_reason,{tokens:(j.usage&&j.usage.completion_tokens)||0,tope:maxTokens||2000,bloques:['text']});
     }
     if(cfg.proveedor==='ollama'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
@@ -3025,7 +3033,7 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
       if(!r.ok)throw new Error(j.error||('El modelo local respondió '+r.status));
       const t2=String(j.message?.content||'').trim();
       if(!t2)throw new Error(iaMotivoVacio(j.done_reason));
-      return iaAvisoCorte(t2,j.done_reason);
+      return iaAvisoCorte(t2,j.done_reason,{tokens:j.eval_count||0,tope:maxTokens||2000,bloques:['text']});
     }
     throw new Error('Proveedor no reconocido');
   }catch(e){
@@ -3098,9 +3106,10 @@ ${JSON.stringify(iaCompactar(ctx,45000),null,1)}
 
 PREGUNTA: ${pregunta}`}];
       const t0=Date.now();
-      // 4000: una cotización real ("3 pendones, 25 DTF, 10 camisetas, 50 vasos…") no cabe
-      // en menos. Es un TECHO, no un gasto: solo se paga lo que la respuesta ocupe.
-      const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,4000);
+      // 8000: con 4000 una cotización de 7 ítems se cortaba tras dos líneas — parte del
+      // cupo se va en razonamiento interno del modelo, que no se ve pero sí se cuenta.
+      // Es un TECHO, no un gasto: solo se paga lo que la respuesta ocupe de verdad.
+      const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,8000);
       // Se devuelve QUÉ se consultó: el usuario debe poder auditar de dónde salió la respuesta.
       res.json({respuesta:texto,ms:Date.now()-t0,
         consultado:Object.keys(ctx).filter(k=>k!=='_recortado'),
