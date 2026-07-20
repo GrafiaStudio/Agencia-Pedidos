@@ -760,6 +760,15 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pcx-trasp-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
 .pcx-trasp-a .btn-add-row{padding:5px 10px;font-size:10.5px}
 
+/* D3 · reportes de daños */
+.dano-lista{display:flex;flex-direction:column;gap:8px;max-width:760px}
+.dano-item{display:flex;gap:11px;align-items:flex-start;background:var(--white);border:1px solid var(--line);
+  border-radius:var(--r);padding:13px 15px;box-shadow:var(--sh)}
+.dano-ico{width:30px;height:30px;border-radius:50%;background:var(--red-lt);color:var(--red);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dano-txt{font-size:12px;color:var(--navy);line-height:1.5}
+.dano-meta{font-size:10px;color:var(--muted);margin-top:4px}
+
 /* D2 · sello de calidad en la tarjeta */
 .pcx-cal{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:5px 11px;border-radius:20px;
   border:1.5px solid var(--line);background:var(--white);color:var(--muted);font-size:10px;font-weight:700;
@@ -1442,6 +1451,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
         <button class="pv-tab" data-pv="calendario" onclick="prodSetVista('calendario')"><i class="ti ti-calendar-month"></i>Calendario</button>
         <button class="pv-tab" data-pv="cronograma" onclick="prodSetVista('cronograma')"><i class="ti ti-timeline"></i>Cronograma</button>
         <button class="pv-tab" data-pv="agenda" onclick="prodSetVista('agenda')"><i class="ti ti-checkup-list"></i>Agenda</button>
+        <button class="pv-tab" data-pv="danos" onclick="prodSetVista('danos')"><i class="ti ti-alert-triangle"></i>Daños</button>
       </div>
       <div class="prod-bar">
         <div class="search-b" style="flex:1;min-width:180px;max-width:280px"><i class="ti ti-search"></i>
@@ -1458,6 +1468,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
       <div id="prod-cal" style="display:none"></div>
       <div id="prod-crono" style="display:none"></div>
       <div id="prod-agenda" style="display:none"></div>
+      <div id="prod-danos" style="display:none"></div>
       <div class="empty" id="prod-empty" style="display:none"><i class="ti ti-tools-off"></i><p>No hay trabajos en producción ahora mismo</p></div>
     </div>
 
@@ -4147,7 +4158,7 @@ function evFormHTML(){
 function pesc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 async function cargarProduccion(){
   try{
-    const [cards,equipo,inv]=await Promise.all([api('GET','/produccion'),api('GET','/produccion/equipo'),api('GET','/inventario-items').catch(()=>[]),cargarEventos()]);
+    const [cards,equipo,inv]=await Promise.all([api('GET','/produccion'),api('GET','/produccion/equipo'),api('GET','/inventario-items').catch(()=>[]),cargarEventos(),cargarDanos()]);
     PROD_CARDS=cards||[]; PROD_EQUIPO=equipo||[]; PROD_INV=inv||[];
   }catch(e){ PROD_CARDS=[];PROD_EQUIPO=[];PROD_INV=[]; toast('Error cargando producción: '+e.message,false); }
   const rs=document.getElementById('prod-f-resp');
@@ -4173,7 +4184,7 @@ function prodCardsFiltradas(){
     return true;
   });
 }
-const PROD_VISTAS={kanban:'prod-board',lista:'prod-lista',calendario:'prod-cal',cronograma:'prod-crono',agenda:'prod-agenda'};
+const PROD_VISTAS={kanban:'prod-board',lista:'prod-lista',calendario:'prod-cal',cronograma:'prod-crono',agenda:'prod-agenda',danos:'prod-danos'};
 function prodSetVista(v){
   if(!PROD_VISTAS[v])return;
   prodVista=v;
@@ -4203,6 +4214,7 @@ function renderProduccion(){
   else if(prodVista==='lista')renderProdLista(el,cards,editable);
   else if(prodVista==='calendario')renderProdCal(el,cards,editable);
   else if(prodVista==='cronograma')renderProdCrono(el,cards);
+  else if(prodVista==='danos')el.innerHTML=renderDanosHTML(); // D3
   else renderProdAgenda(el,cards,editable);
 }
 function renderProdKanban(board,cards,editable){
@@ -4526,6 +4538,62 @@ function prodTraspasoPanelHTML(c){
     </div>
   </div>`;
 }
+/* D3 · REPORTES DE DAÑOS — anónimos EN PANTALLA: el sistema guarda quién reportó (nada
+   queda sin rastro) pero no lo muestra; solo el administrador lo ve. La idea es que la
+   gente reporte sin miedo a quedar señalada. */
+let PROD_DANOS=[], danoForm=false;
+const DANO_ORIGEN_LBL={proveedor:'Llegó dañado del proveedor',interno:'Se dañó aquí',otro:'Otro'};
+async function cargarDanos(){
+  try{ PROD_DANOS=await api('GET','/produccion/eventos?tipo=dano'); }
+  catch(e){ PROD_DANOS=[]; }
+}
+function danoAbrirForm(){ danoForm=!danoForm; renderProduccion();
+  if(danoForm)requestAnimationFrame(()=>document.getElementById('dano-desc')?.focus()); }
+async function danoGuardar(){
+  const desc=(document.getElementById('dano-desc')||{}).value||'';
+  if(!desc.trim()){ toast('Cuenta qué pasó',false); return; }
+  const cantidad=(document.getElementById('dano-cant')||{}).value||'';
+  const origen=(document.getElementById('dano-origen')||{}).value||'otro';
+  const pedido_id=(document.getElementById('dano-pedido')||{}).value||'';
+  try{
+    await api('POST','/produccion/danos',{descripcion:desc.trim(),cantidad,origen,pedido_id});
+    danoForm=false; await cargarDanos(); renderProduccion();
+    toast('Reporte registrado — gracias por avisar');
+  }catch(e){ toast('Error: '+e.message,false); }
+}
+function renderDanosHTML(){
+  const opciones=Object.entries(DANO_ORIGEN_LBL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  const peds=(window._rPeds||[]).filter(p=>!p.entregado&&!p.cancelado).slice(0,60)
+    .map(p=>`<option value="${p.id}">#${p.ref} · ${pesc(p.nombre)}</option>`).join('');
+  const form=danoForm?`<div class="pcx-trasp" style="max-width:560px;margin-bottom:14px">
+      <div class="pcx-trasp-h"><i class="ti ti-alert-triangle"></i> Reportar un daño</div>
+      <textarea id="dano-desc" class="item-inp" placeholder="¿Qué pasó? Ej: 2 camisetas llegaron con un hueco"></textarea>
+      <div class="dl-form" style="margin-top:8px">
+        <div><label class="var-hd-lbl">Cantidad</label><input id="dano-cant" class="item-inp" type="text" placeholder="Ej: 2"></div>
+        <div><label class="var-hd-lbl">¿De dónde viene?</label><select id="dano-origen" class="item-inp">${opciones}</select></div>
+        <div><label class="var-hd-lbl">Pedido (opcional)</label><select id="dano-pedido" class="item-inp"><option value="">— Sin pedido —</option>${peds}</select></div>
+      </div>
+      <div class="pcx-trasp-a">
+        <button class="btn-add-row" onclick="danoForm=false;renderProduccion()">Cancelar</button>
+        <button class="btn-add-row" style="background:var(--brand);color:var(--brand-txt);border-color:var(--brand)" onclick="danoGuardar()"><i class="ti ti-check"></i>Registrar</button>
+      </div>
+    </div>`:'';
+  const lista=PROD_DANOS.length?PROD_DANOS.map(d=>{
+    const quien=d.usuario_nombre?pesc(d.usuario_nombre):'anónimo';
+    return `<div class="dano-item">
+      <div class="dano-ico"><i class="ti ti-alert-triangle"></i></div>
+      <div style="flex:1;min-width:0">
+        <div class="dano-txt">${pesc(d.nota||'')}</div>
+        <div class="dano-meta">${fd((d.creado||'').slice(0,10))}${d.cantidad?` · ${pesc(d.cantidad)} unidad(es)`:''} · ${pesc(DANO_ORIGEN_LBL[d.origen]||'Otro')} · reportado por ${quien}</div>
+      </div>
+    </div>`;
+  }).join(''):`<div class="hint" style="padding:14px 0">Todavía no hay reportes. Ojalá siga así 🙂</div>`;
+  return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn-add-row" onclick="danoAbrirForm()"><i class="ti ti-plus"></i>Reportar un daño</button>
+      <span class="hint">Los reportes son <b>anónimos</b>: se registra el hecho, no quién lo reportó.</span>
+    </div>${form}<div class="dano-lista">${lista}</div>`;
+}
+
 /* D2 · CONTROL DE CALIDAD — sello en cualquier etapa, sin tocar el tablero.
    Marcar "con problema" exige decir qué pasó: un problema sin explicación no sirve a nadie. */
 let prodCalidad=null; // key de la tarjeta con el panel abierto

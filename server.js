@@ -1492,6 +1492,30 @@ app.post('/api/produccion/calidad',requiere('gestionar_produccion'),(req,res)=>{
   addHist(it.p_id,`Calidad · Encargo #${it.numero} · "${det}": ${b.resultado==='ok'?'visto bueno':'CON PROBLEMA'}`+(nota?` · ${nota.slice(0,120)}`:''),req.wsId,actorDe(req));
   res.json({ok:true});
 });
+/* D3 · REPORTES DE DAÑOS — "se dañó una camiseta", "la prenda del proveedor llegó rota".
+   ANÓNIMO EN PANTALLA: se guarda quién reportó (nada queda sin trazabilidad) pero no se
+   muestra; solo el administrador puede verlo. Así se reporta sin miedo a quedar señalado. */
+const DANO_ORIGENES=['proveedor','interno','otro'];
+app.post('/api/produccion/danos',requiere('ver_produccion'),(req,res)=>{
+  const b=req.body||{};
+  const desc=String(b.descripcion||'').trim();
+  if(!desc)return res.status(400).json({error:'Cuenta qué pasó'});
+  const origen=DANO_ORIGENES.includes(b.origen)?b.origen:'otro';
+  // El pedido es opcional: a veces el daño es de material de bodega, sin pedido asociado.
+  let pedido_id='',encargo_id='',item_id='';
+  if(b.item_id){
+    const it=db.prepare(`SELECT i.id,i.encargo_id,p.id AS p_id FROM enc_items i
+      JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+      WHERE i.id=? AND e.workspace_id=?`).get(b.item_id,req.wsId);
+    if(it){ item_id=it.id; encargo_id=it.encargo_id; pedido_id=it.p_id; }
+  }else if(b.pedido_id){
+    const p=db.prepare('SELECT id FROM pedidos WHERE id=? AND workspace_id=?').get(b.pedido_id,req.wsId);
+    if(p)pedido_id=p.id;
+  }
+  registrarEventoProd(req,{tipo:'dano',pedido_id,encargo_id,item_id,nota:desc,
+    cantidad:String(b.cantidad||''),origen,anonimo:1});
+  res.json({ok:true});
+});
 // Cambiar el estado de UN ÍTEM desde Producción (cada ítem fluye por separado).
 app.put('/api/produccion/item/:id',requiere('gestionar_produccion'),(req,res)=>{
   const it=db.prepare(`SELECT i.id,i.estado,i.detalle,i.cantidad,i.encargo_id,e.numero,e.responsable_id,e.notas_tec,p.cerrado AS p_cerrado,p.id AS p_id
