@@ -3156,6 +3156,18 @@ CREAR UN PRODUCTO (lo único que puedes proponer; todo lo demás sigue siendo so
   · escalonado → el precio baja por cantidad. Campo: "rangos": [{"desde":1,"hasta":20,"precio":10000},{"desde":21,"hasta":null,"precio":8000}].
   · medidas → se cobra por tamaño. Campos: "medida_unidad" (m2 · cm2 · m), "medida_tarifa", opcional "cobro_minimo", y si la tarifa cambia por tramos: "medida_cond":[{"desde":2,"hasta":null,"tarifa":7000}] con "medida_cond_eje":"area" o "cantidad".
   · variantes → el precio se arma sumando partes. "variantes":[{"nombre":"Tamaño","hijos":[{"nombre":"Carta","precio":"3000"}]}]. Una parte que solo describe y no cobra lleva "informativa":true.
+- ⭐ UNA PARTE PUEDE COBRARSE POR MEDIDAS, no solo por precio fijo. Si dentro de un producto por variantes hay algo que se cobra por tamaño (un estampado a $20 el cm²), esa parte lleva "modo":"medidas" con su propia "medida_tarifa", y si la tarifa baja por cantidad o por área, sus propias "medida_cond" y "medida_cond_eje". NO uses "tramos" para eso: los tramos son el precio de la parte entera según cuántas unidades del PEDIDO, no una tarifa por medida.
+- ⚠️⚠️ UNIDADES · UNA PARTE POR MEDIDAS SIEMPRE SE COBRA POR m², no por cm². Las partes no tienen unidad propia (solo la tiene el producto simple, con "medida_unidad"). Si te dictan un precio por CENTÍMETRO cuadrado, tienes que MULTIPLICARLO POR 10.000 antes de ponerlo, y decírselo al usuario en una línea. Ejemplo: "$20 el cm²" son $200.000 el m². Si pones 20 a secas, un estampado de 10×10 cm costaría 20 centavos en vez de $2.000, y nadie lo notaría hasta cobrarlo mal.
+  Ejemplo completo: estampado a $20/cm² que baja a $18 desde 7 unidades y a $16 desde 13 → se convierte todo a m²:
+  {"nombre":"Estampado","modo":"medidas","medida_tarifa":"200000","medida_cond_eje":"cantidad","medida_cond":[{"desde":7,"hasta":12,"tarifa":180000},{"desde":13,"hasta":null,"tarifa":160000}]}
+  Y avisas: "lo guardé como $200.000/m², que es lo mismo que $20/cm²".
+- Si usas "tramos" en una parte, el PRIMERO tiene que empezar en 1: si no, no hay precio para 1 unidad y el sistema lo rechaza.
+
+EL COSTO SÍ SE PUEDE GUARDAR — nunca digas que la ficha no tiene dónde:
+- Cada parte y cada opción lleva su propio costo: "costos":[{"nombre":"Camiseta algodón","valor":"12000"}]. Ahí van los costos que te den por opción.
+- El producto entero puede llevar costos que no dependen de la opción: "costos_fijos":[{"nombre":"...","valor":"..."}].
+- Un producto por medidas lleva además su costo por medida: "costo_medida_tarifa" (y "costo_medida_minimo" si aplica).
+- ÚNICA limitación real, y dila así de concreta si aparece: el costo POR MEDIDA solo existe en el producto completo, no en una parte suelta. Si te dan un costo por cm² de una PARTE (no del producto), avisa que eso se registra al cargar el costo en el pedido, y propón el resto igual — no dejes la ficha sin crear por eso.
 - Antes de proponer, MIRA EL CATÁLOGO. Si ya existe algo con ese nombre o muy parecido, dilo y pregunta si quiere crearlo igual o editar el que hay. No dupliques productos en silencio.
 - Si te falta un dato para que el precio quede bien (la tarifa, el tamaño, desde qué cantidad baja), PREGUNTA en vez de inventarlo. Es preferible una pregunta corta a una ficha con precios que no son.
 - Precios en números, sin puntos de miles y sin el signo $ dentro del JSON.`;
@@ -3188,6 +3200,16 @@ function iaNormCond(arr){
 }
 // Se copian SOLO los campos conocidos, y el árbol se limita en hondura y en anchura: una
 // propuesta no puede convertirse en un árbol de miles de nodos que tumbe el guardado.
+/* El costo SÍ existe en la ficha desde B1/B2 (cada variante lleva su `costos`, el producto
+   lleva `costos_fijos` y `costo_medida_tarifa`). No estaban en esta lista blanca, así que el
+   modelo no tenía dónde ponerlos y acabó diciéndole al usuario que la app no los soporta.
+   Falso, y encima le hizo dudar de su propio sistema. */
+function iaNormCostos(arr){
+  return (Array.isArray(arr)?arr:[]).slice(0,10).map(c=>({
+    nombre:String((c&&c.nombre)||'').trim().slice(0,80),
+    valor:definido(c&&c.valor)?String(c.valor).trim():''
+  })).filter(c=>c.nombre&&toFloatCO(c.valor)>0);
+}
 function iaNormVariante(v,prof,rec){
   if(!v||typeof v!=='object')return null;
   // Recortar en silencio y después culpar a la variante que quedó coja engaña: se anota.
@@ -3206,6 +3228,7 @@ function iaNormVariante(v,prof,rec){
     o.medida_cond_eje=v.medida_cond_eje==='area'?'area':'cantidad';
   }
   if(modo==='hoja')o.piezas=iaEnteroONulo(v.piezas);
+  const cs=iaNormCostos(v.costos); if(cs.length)o.costos=cs;
   const tr=iaNormTramos(v.tramos); if(tr.length)o.tramos=tr;
   const brutos=Array.isArray(v.hijos)?v.hijos:[];
   if(brutos.length>40&&rec)rec.ancho=true;
@@ -3237,7 +3260,11 @@ function iaNormPropuesta(p,rec){
     if(definido(p.cobro_minimo))b.cobro_minimo=String(p.cobro_minimo).trim();
     b.medida_cond=iaNormCond(p.medida_cond);
     b.medida_cond_eje=p.medida_cond_eje==='area'?'area':'cantidad';
+    // Costo por medida: solo existe A NIVEL DE PRODUCTO, no por sub-variante.
+    if(definido(p.costo_medida_tarifa))b.costo_medida_tarifa=String(p.costo_medida_tarifa).trim();
+    if(definido(p.costo_medida_minimo))b.costo_medida_minimo=String(p.costo_medida_minimo).trim();
   }
+  const cf=iaNormCostos(p.costos_fijos); if(cf.length)b.costos_fijos=cf;
   if(tipo==='variantes'){
     const raiz=Array.isArray(p.variantes)?p.variantes:[];
     if(raiz.length>20&&rec)rec.ancho=true;
@@ -3272,11 +3299,32 @@ function iaResumenPropuesta(b){
       valor:pesos(c.tarifa)+' por '+u}));
   }else if(b.tipo_precio==='variantes'){
     L.push({campo:'Se cobra',valor:'por variantes (se suman las partes elegidas)'});
+    // El costo va en la MISMA línea que el precio: es lo que hay que poder comparar de un
+    // vistazo antes de apretar. Un costo escondido en otra sección no se revisa.
+    const costoDe=n=>{ const c=(n.costos||[]).reduce((s,x)=>s+(toFloatCO(x.valor)||0),0);
+      return c>0?(' · costo '+pesos(c)):''; };
+    const linea=n=>{
+      if(n.modo==='medidas'){
+        /* ⚠️ Una PARTE por medidas siempre se calcula en m² (ancho×alto en metros): no
+           tiene unidad propia, solo el producto simple la tiene. Decir "por unidad de
+           medida" escondía justo el dato que hay que revisar: si alguien dicta "$20 el
+           cm²" y se guarda 20, un estampado de 10×10 cm cobraría $0,20 en vez de $2.000. */
+        let s='por medidas: '+pesos(toFloatCO(n.medida_tarifa))+' por m²';
+        (n.medida_cond||[]).forEach(c=>{ s+=' · desde '+c.desde
+          +(n.medida_cond_eje==='area'?' m²':' und')+': '+pesos(c.tarifa)+'/m²'; });
+        return s+costoDe(n);
+      }
+      return (toFloatCO(n.precio)>0?pesos(toFloatCO(n.precio)):'sin precio')+costoDe(n);
+    };
     (b.variantes||[]).forEach(v=>{
-      const ops=(v.hijos||[]).map(h=>h.nombre+(toFloatCO(h.precio)>0?(' '+pesos(toFloatCO(h.precio))):'')).join(' · ');
-      L.push({campo:'  '+v.nombre+(v.informativa?' (solo describe)':''),valor:ops||(toFloatCO(v.precio)>0?pesos(toFloatCO(v.precio)):'sin precio')});
+      L.push({campo:'  '+v.nombre+(v.informativa?' (solo describe)':''),
+        valor:(v.hijos||[]).length?'':linea(v)});
+      (v.hijos||[]).forEach(h=>L.push({campo:'    '+h.nombre,valor:linea(h)}));
     });
   }else L.push({campo:'Se cobra',valor:b.tipo_precio});
+  if(b.tipo_precio==='medidas'&&toFloatCO(b.costo_medida_tarifa)>0)
+    L.push({campo:'Costo por medida',valor:pesos(toFloatCO(b.costo_medida_tarifa))});
+  (b.costos_fijos||[]).forEach(c=>L.push({campo:'  costo: '+c.nombre,valor:pesos(toFloatCO(c.valor))}));
   return L;
 }
 /* Saca el bloque ```propuesta del texto, lo valida, y devuelve el texto ya LIMPIO. Si el
