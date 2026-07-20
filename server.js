@@ -2602,7 +2602,10 @@ function iaPedidoResumen(p,perm){
     ref:p.ref, cliente:p.nombre, estado:iaEstadoPedido(p),
     urgente:!!p.urgente, fecha_pedido:iaFecha(p.fecha_pedido), entrega:iaFecha(p.fecha_entrega),
     etapas:[...new Set((p.encargos||[]).map(e=>e.estado).filter(Boolean))],
-    anotaciones:String(p.notas||'').slice(0,300)
+    // 1500, no 300: aquí es donde vive el acuerdo con el cliente ("4 pagos de
+    // $200.000: 1) inicio, 2) estructura…"). Con 300 se cortaba justo en lo que se
+    // estaba preguntando, y el asistente tenía que decir que el texto venía cortado.
+    anotaciones:String(p.notas||'').slice(0,1500)
   };
   // perm undefined = llamada interna sin contexto de usuario: se asume lo más restrictivo.
   if(iaVeDinero(perm))Object.assign(base,{valor:total,pagado:pag,saldo:Math.max(0,total-pag)});
@@ -2783,6 +2786,68 @@ function svcInventario(wsId,terminos){
       estado: hay<=0 ? 'AGOTADO' : (min>0&&hay<=min ? 'por debajo del mínimo ('+min+')' : 'disponible')};
   });
 }
+/* ── PREGUNTAS DE NEGOCIO ──────────────────────────────────────────────────────────────
+   Tres cosas que el asistente contestó con "ese dato no está en el sistema", y sí estaban:
+   las ganancias del período, cuántos insumos se han consumido, y qué se ha vendido.
+   Los datos existían; lo que faltaba era el servicio que se los entregara.               */
+function iaPeriodo(wsId,q){
+  const hoyStr=hoy(wsId), t=String(q||'').toLowerCase();
+  const d=(expr)=>db.prepare('SELECT date(?, ?) x').get(hoyStr,expr).x;
+  if(/\bhoy\b/.test(t))                                    return {clave:'hoy',           desde:hoyStr};
+  if(/semana/.test(t))                                     return {clave:'esta semana',   desde:d('-6 days')};
+  if(/(este )?a[ñn]o|anual/.test(t))                       return {clave:'este año',      desde:d('start of year')};
+  if(/desde el inicio|hist[óo]ric|siempre|en total/.test(t))return {clave:'desde siempre', desde:'0000-01-01'};
+  return {clave:'este mes', desde:d('start of month')};     // lo más pedido por defecto
+}
+// Ganancias del período. Mismo cálculo que el Dashboard: ingresos = pagos recibidos;
+// costos = los registrados en pedidos de ese período. Solo para quien puede ver dinero.
+function svcFinanzas(wsId,q,perm){
+  if(!iaVeDinero(perm))return null;
+  const per=iaPeriodo(wsId,q), hoyStr=hoy(wsId);
+  const ingresos=db.prepare(`SELECT COALESCE(SUM(CAST(pg.monto_calc AS INTEGER)),0) s FROM pagos pg JOIN pedidos p ON p.id=pg.pedido_id
+    WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND pg.fecha>=? AND pg.fecha<=?`).get(wsId,per.desde,hoyStr).s;
+  const costos=db.prepare(`SELECT COALESCE(SUM(CAST(c.monto_calc AS INTEGER)),0) s FROM costos c JOIN pedidos p ON p.id=c.pedido_id
+    WHERE c.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND p.fecha_pedido>=? AND p.fecha_pedido<=?`).get(wsId,per.desde,hoyStr).s;
+  const utilidad=ingresos-costos;
+  return {periodo:per.clave, desde:iaFecha(per.desde), hasta:iaFecha(hoyStr),
+    ingresos_cobrados:ingresos, costos:costos, utilidad,
+    margen_pct:ingresos>0?Math.round(utilidad*100/ingresos):0,
+    ojo:'"ingresos_cobrados" es plata que YA entró (pagos recibidos), no lo facturado.'};
+}
+// Cuántos insumos se han consumido (los vasos que ya se gastaron en pedidos).
+function svcConsumoInsumos(wsId,q){
+  const per=iaPeriodo(wsId,q), hoyStr=hoy(wsId);
+  const filas=db.prepare(`SELECT c.item_nombre nombre, c.unidad, SUM(c.cantidad) total, COUNT(DISTINCT c.pedido_id) pedidos
+    FROM consumo_inventario c JOIN pedidos p ON p.id=c.pedido_id
+    WHERE c.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND date(c.creado)>=? AND date(c.creado)<=?
+    GROUP BY c.item_nombre, c.unidad ORDER BY total DESC LIMIT 25`).all(wsId,per.desde,hoyStr);
+  // Devolver null haría que el asistente dijera "no tengo ese dato". Consultado-y-vacío
+  // NO es lo mismo que no-puedo-consultarlo: se responde la estructura con la lista vacía.
+  return {periodo:per.clave, desde:iaFecha(per.desde),
+    consumido:filas.map(f=>({insumo:f.nombre, cantidad:f.total, unidad:f.unidad||'unidad', en_pedidos:f.pedidos})),
+    ojo:filas.length?undefined:'Consultado: no hay consumos de insumos registrados en ese período. El dato SÍ se lleva, simplemente no hay movimientos.'};
+}
+// Qué se ha vendido, por producto. Sale de los ítems de los pedidos, no de una tabla aparte.
+function svcVentasProductos(wsId,q,perm){
+  const per=iaPeriodo(wsId,q), hoyStr=hoy(wsId);
+  // El alias no puede llamarse "nombre": esa columna existe en pedidos y en fichas_producto,
+  // y SQLite lo rechaza por ambiguo al agrupar. Se agrupa por la expresión completa.
+  const filas=db.prepare(`SELECT COALESCE(NULLIF(f.nombre,''), i.detalle) AS producto,
+      SUM(CAST(COALESCE(NULLIF(i.cantidad,''),'0') AS INTEGER)) AS unidades,
+      SUM(CAST(COALESCE(NULLIF(i.cantidad,''),'0') AS INTEGER)*CAST(COALESCE(NULLIF(i.valor_unitario_calc,''),'0') AS INTEGER)) AS valor,
+      COUNT(DISTINCT p.id) AS pedidos
+    FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+    LEFT JOIN fichas_producto f ON f.id=i.ficha_id
+    WHERE e.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0
+      AND p.fecha_pedido>=? AND p.fecha_pedido<=?
+    GROUP BY COALESCE(NULLIF(f.nombre,''), i.detalle) ORDER BY unidades DESC LIMIT 25`).all(wsId,per.desde,hoyStr);
+  const dinero=iaVeDinero(perm);
+  return {periodo:per.clave, desde:iaFecha(per.desde),
+    vendido:filas.map(f=>{ const o={producto:f.producto||'(sin nombre)', unidades:f.unidades||0, en_pedidos:f.pedidos};
+      if(dinero)o.valor=f.valor||0; return o; }),
+    ojo:(filas.length?'':'Consultado: no hay ventas registradas en ese período. ')
+      +'Sale de los ítems de pedidos reales (sin cotizaciones ni cancelados). Si un ítem se escribió a mano sin elegir producto, aparece por su descripción.'};
+}
 // Qué se entrega en los próximos N días — la pregunta más frecuente de un taller.
 function svcAgenda(wsId,dias,perm){
   const n=Math.min(60,Math.max(1,parseInt(dias,10)||7)), hoyStr=hoy(wsId);
@@ -2884,7 +2949,8 @@ function iaContexto(wsId,pregunta,permisos){
   const q=String(pregunta||'').trim();
   const ctx={panorama:svcPanorama(wsId,permisos)};
   const refs=[...q.matchAll(/#?\b(\d{3,5})\b/g)].map(m=>m[1]).slice(0,3);
-  refs.forEach(r=>{ const p=svcPedido(wsId,r,permisos); if(p){ (ctx.pedidos=ctx.pedidos||[]).push(p); } });
+  const clientesDePedido=[];
+  refs.forEach(r=>{ const p=svcPedido(wsId,r,permisos); if(p){ (ctx.pedidos=ctx.pedidos||[]).push(p); if(p.cliente)clientesDePedido.push(p.cliente); } });
   const porTermino=iaTerminos(q).map(t=>svcBuscar(wsId,t,permisos,5));
   const enc={pedidos:[],clientes:[],productos:[],notas:[],total:0};
   porTermino.forEach(r=>['pedidos','clientes','productos','notas'].forEach(k=>iaUnir(enc,r,k)));
@@ -2905,7 +2971,11 @@ function iaContexto(wsId,pregunta,permisos){
     }
     return out;
   };
-  porRondas('clientes',3).forEach(c=>{ const d=svcCliente(wsId,c.titulo,permisos); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
+  // El cliente del pedido del que se está hablando entra sí o sí: preguntas como
+  // "¿le compro el material o espero a que pague?" necesitan su historial de pagos.
+  const yaCli=new Set();
+  clientesDePedido.forEach(n=>{ const d=svcCliente(wsId,n,permisos); if(d&&!yaCli.has(d.nombre)){ yaCli.add(d.nombre); (ctx.clientes=ctx.clientes||[]).push(d); } });
+  porRondas('clientes',3).forEach(c=>{ const d=svcCliente(wsId,c.titulo,permisos); if(d&&!yaCli.has(d.nombre)){ yaCli.add(d.nombre); (ctx.clientes=ctx.clientes||[]).push(d); } });
   porRondas('productos',6).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
   // El catálogo y el inventario van SIEMPRE completos: son la única forma de que el
   // asistente no diga "no existe" sobre algo que sí está, solo porque se llama distinto.
@@ -2914,6 +2984,16 @@ function iaContexto(wsId,pregunta,permisos){
   const inv=svcInventario(wsId);
   if(inv.length)ctx.inventario=inv;
   if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7,permisos);
+  // Preguntas de negocio: solo se consultan si se preguntan, para no engordar cada consulta.
+  if(/ganancia|utilidad|margen|rentab|ingreso|factur|vend|ventas|cobrad|balance|finanz|como vamos|cómo vamos/i.test(q)){
+    const fin=svcFinanzas(wsId,q,permisos); if(fin)ctx.finanzas=fin;
+  }
+  if(/vend|ventas|cuant[oa]s?|cuánt[oa]s?|mas vendido|más vendido|salido/i.test(q)){
+    ctx.ventas_por_producto=svcVentasProductos(wsId,q,permisos);
+  }
+  if(/consum|gastad|gasta|usado|se han ido|salida/i.test(q)){
+    ctx.consumo_de_insumos=svcConsumoInsumos(wsId,q);
+  }
   return ctx;
 }
 const IA_SISTEMA=`Eres el asistente de un taller de artes gráficas. Hablas español de Colombia, con voz serena, breve y con datos.
@@ -2982,7 +3062,9 @@ function iaCompactar(ctx,limite){
   // Red de seguridad: si con todo lo anterior sigue pasado, se sueltan secciones enteras
   // en orden inverso de importancia. Nunca se corta el JSON a la mitad.
   // El catálogo se sacrifica de ÚLTIMO: sin él el asistente vuelve a decir "no existe".
-  const sacrificables=['agenda','clientes','pedidos','productos','inventario','catalogo'];
+  // Finanzas, ventas y consumo tampoco se tocan pronto: si se preguntaron, son LA respuesta.
+  const sacrificables=['agenda','clientes','pedidos','productos','inventario',
+    'consumo_de_insumos','ventas_por_producto','finanzas','catalogo'];
   for(const k of sacrificables){ if(tam()<=limite)break; if(ctx[k]){ delete ctx[k]; recortes.push('sección "'+k+'" completa (demasiado grande)'); } }
   if(tam()>limite&&ctx.panorama){
     ['entregan_hoy','entregan_esta_semana','atrasados','pedidos_con_saldo'].forEach(k=>{ if(tam()>limite&&ctx.panorama[k]){ ctx.panorama[k]=ctx.panorama[k].slice(0,2); } });
