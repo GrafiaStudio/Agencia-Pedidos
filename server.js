@@ -2726,17 +2726,57 @@ function iaVarNodo(v){
   }
   return o;
 }
+/* ⭐ CATÁLOGO COMPLETO · la pieza que faltaba.
+   Antes se adivinaba qué palabra de la pregunta era un producto y se buscaba por LIKE.
+   Eso fallaba siempre: en "25 unidades de DTF" la palabra clave tiene 3 letras; en
+   "hay vasos blancos?" el producto se llama "mug"; y las muletillas se comían los cupos.
+   Ningún LIKE entiende que "vasos", "tazas" y "mugs" son lo mismo — un modelo de lenguaje
+   sí. Así que se le entrega el catálogo ENTERO, en una línea por producto, y él empareja.
+   Con esto el asistente ya no puede decir "no existe" cuando sí existe. */
+function iaCobroResumen(f){
+  const p=f.precio_oficial||0;
+  if(f.tipo_precio==='medidas'){
+    const u=f.medida_unidad==='m'?'m lineal':(f.medida_unidad==='cm2'?'cm²':'m²');
+    let s='por medidas: $'+toFloatCO(f.medida_tarifa_calc)+' por '+u;
+    if(toNum(f.cobro_minimo_calc)>0)s+=', cobro mínimo $'+toNum(f.cobro_minimo_calc);
+    if((f.medida_cond||[]).length)s+=', con condiciones por '+(f.medida_cond_eje==='area'?'área':'cantidad');
+    return s;
+  }
+  if(f.tipo_precio==='variantes')return 'por variantes (el precio se arma sumando las partes elegidas), desde $'+p;
+  if(f.tipo_precio==='pliego')return 'por hoja/pliego, aprox $'+p+' c/u';
+  if(f.tipo_precio==='escalonado')return 'por cantidad, con tramos, desde $'+p;
+  if(f.tipo_precio==='regla')return 'promoción por cantidad, desde $'+p;
+  return 'precio fijo $'+p;
+}
+function svcCatalogo(wsId){
+  const cats={};
+  try{ db.prepare('SELECT id,label FROM etiquetas_negocio WHERE workspace_id=?').all(wsId).forEach(c=>cats[c.id]=c.label); }catch(e){}
+  const filas=db.prepare('SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0 AND activo=1 ORDER BY nombre LIMIT 120').all(wsId);
+  return filas.map(f=>{
+    const ficha=fichaCompleta(f);
+    const o={producto:ficha.nombre, cobro:iaCobroResumen(ficha)};
+    if(ficha.codigo)o.codigo=ficha.codigo;
+    if(cats[ficha.categoria_id])o.categoria=cats[ficha.categoria_id];
+    // De los productos por variantes se anuncian las partes: así se sabe que "camiseta"
+    // tiene estampados de varios tamaños sin tener que pedir la ficha completa.
+    if(ficha.tipo_precio==='variantes'){
+      const partes=(ficha.variantes||[]).filter(v=>!v.informativa).map(v=>{
+        const ops=(v.hijos||[]).map(h=>h.nombre).filter(Boolean);
+        return v.nombre+(ops.length?(' ['+ops.slice(0,8).join(', ')+']'):'');
+      });
+      if(partes.length)o.partes=partes.slice(0,6);
+    }
+    return o;
+  });
+}
 /* Existencias. Faltaba: preguntaron "necesito saber si tengo inventario de ello" y el
    asistente no tenía forma de saberlo, así que decía que no había. Ahora consulta el
    mismo inventario del módulo, y avisa cuando algo está por debajo de su mínimo. */
 function svcInventario(wsId,terminos){
-  // Se usan TODOS los términos: el insumo que interesa suele nombrarse al final de la
-  // frase ("…además 150 vasos blancos"), y con un tope corto nunca se llegaba a buscarlo.
-  const ts=(terminos||[]).filter(t=>String(t).length>=4).slice(0,12);
-  if(!ts.length)return [];
-  const cond=ts.map(()=>`nombre LIKE ? ESCAPE '\\'`).join(' OR ');
+  // Igual que el catálogo: se entrega TODO el inventario, no lo que adivine un LIKE.
+  // Preguntaron "¿hay vasos blancos?" y el insumo podía llamarse "mug" o estar en inglés.
   const filas=db.prepare(`SELECT nombre,unidad_medida,stock_actual,stock_minimo FROM items_inventario
-    WHERE workspace_id=? AND activo=1 AND (${cond}) ORDER BY nombre LIMIT 10`).all(wsId,...ts.map(bLike));
+    WHERE workspace_id=? AND activo=1 ORDER BY nombre LIMIT 80`).all(wsId);
   return filas.map(i=>{
     const hay=Number(i.stock_actual)||0, min=Number(i.stock_minimo)||0;
     return {insumo:i.nombre, existencias:hay, unidad:i.unidad_medida||'unidad',
@@ -2801,7 +2841,16 @@ const IA_VACIAS=new Set(['que','qué','como','cómo','cual','cuál','cuanto','cu
   'pidio','pidió','pide','piden','cotizacion','cotización','cotizar','ayudame','ayúdame','ayuda',
   'necesito','necesita','saber','ademas','además','cuales','cuáles','tienen','tiene','otras','otros',
   'ultimas','últimas','ultimos','últimos','esas','esos','estos','estas','dame','darle','decir','sale',
-  'total','cuanto','cuánta','cuantas','cuántas','hacer','tamaño','tamano','frente','espalda']);
+  'total','cuanto','cuánta','cuantas','cuántas','hacer','tamaño','tamano','frente','espalda',
+  // Más muletillas reales: en una cotización de verdad se comieron 6 de los 8 cupos.
+  'exigente','rapido','rápido','varias','varios','cotizaciones','unidad','unidades','litro','litros',
+  'cierto','tambien','también','tmbien','digas','decirme','pidio','manda','manga','pecho','sabes','como',
+  'milimetro','milimetros','milímetro','milímetros','centimetro','centimetros','metro','metros',
+  'con','sin','del','por','los','las','una','uno','que','the','and','for',
+  // Palabras de 3 letras: al bajar el mínimo (para que 'DTF' y 'mug' fueran visibles)
+  // entraron estas, que no nombran nada.
+  'son','sus','mis','tus','nos','les','ese','esa','eso','ahi','ahí','aca','acá','ala','muy','ver','dar',
+  'voy','fue','han','has','hay','era','ser','sea','dos','tre','mil','asi','así','pero','esta','este']);
 /* El producto se llama "Camiseta" y el usuario escribe "camisetas": buscar '%camisetas%'
    NO encuentra "Camiseta" (la consulta es más larga que el nombre guardado). Por eso cada
    término aporta también su singular — en español se pregunta en plural casi siempre. */
@@ -2812,7 +2861,8 @@ function iaSingular(w){
 }
 // "300x250" y "20x30" son MEDIDAS, no nombres de nada: buscarlas gasta cupo y no encuentra.
 // Un código como "P0010" sí se conserva, porque sí identifica un producto.
-const IA_MEDIDA=/^[\d.,]+(?:[x×][\d.,]+)*$/;
+// Con unidad pegada ('300x250cm', '9x5cm', '10x15') seguía pareciendo un nombre.
+const IA_MEDIDA=/^[\d.,]+(?:\s*[x×*]\s*[\d.,]+)*\s*(?:cm|mm|mts?|m|cm2|m2|pulg|in|lt|lts|litros?|und|uds?|unidades?)?$/i;
 function iaTerminos(q){
   // El tope se aplica a las palabras BASE, y el singular se añade DESPUÉS: antes el corte
   // separaba "camisetas" de su singular "camiseta" — se buscaba el plural, que no existe
@@ -2820,7 +2870,8 @@ function iaTerminos(q){
   const base=[...new Set(String(q||'').toLowerCase().split(/[^0-9a-záéíóúñü]+/i)
     // 8 palabras: una cotización real nombra varios productos ("1 pendón… 10 camisetas…
     // 150 vasos"). Con un tope corto, lo último que pedía el cliente nunca se buscaba.
-    .filter(w=>w.length>=4&&!IA_VACIAS.has(w)&&!IA_MEDIDA.test(w)))].slice(0,8);
+    // Mínimo 3 letras: 'DTF' y 'mug' son productos reales y con 4 quedaban invisibles.
+    .filter(w=>w.length>=3&&!IA_VACIAS.has(w)&&!IA_MEDIDA.test(w)))].slice(0,8);
   const out=[];
   base.forEach(w=>{ out.push(w); const s=iaSingular(w); if(s&&!IA_VACIAS.has(s))out.push(s); });
   return [...new Set(out)];
@@ -2856,8 +2907,11 @@ function iaContexto(wsId,pregunta,permisos){
   };
   porRondas('clientes',3).forEach(c=>{ const d=svcCliente(wsId,c.titulo,permisos); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
   porRondas('productos',6).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
-  // Inventario: se pidió explícitamente ("necesito saber si tengo inventario de ello").
-  const inv=svcInventario(wsId,iaTerminos(q));
+  // El catálogo y el inventario van SIEMPRE completos: son la única forma de que el
+  // asistente no diga "no existe" sobre algo que sí está, solo porque se llama distinto.
+  const cat=svcCatalogo(wsId);
+  if(cat.length)ctx.catalogo=cat;
+  const inv=svcInventario(wsId);
   if(inv.length)ctx.inventario=inv;
   if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7,permisos);
   return ctx;
@@ -2871,7 +2925,14 @@ REGLAS QUE NO SE ROMPEN:
 - Si te piden algo que implique cambiar datos (crear, editar, borrar), explicas cómo hacerlo en la app: tú no ejecutas cambios.
 - Prefieres 3 líneas útiles a 10 de relleno. Sin saludos de cortesía ni "¡claro que sí!".
 - Si la pregunta es ambigua, respondes con lo más probable y ofreces la alternativa en una línea.
-- COTIZACIONES DE VARIOS ÍTEMS: da primero TODOS los ítems con su precio, una línea corta por ítem, y al final el total. Las aclaraciones y las dudas van al final, en dos líneas máximo. Es preferible cotizar los 7 ítems escuetamente que explicar largo los 2 primeros y dejar el resto sin responder.`;
+- COTIZACIONES DE VARIOS ÍTEMS: da primero TODOS los ítems con su precio, una línea corta por ítem, y al final el total. Las aclaraciones y las dudas van al final, en dos líneas máximo. Es preferible cotizar los 7 ítems escuetamente que explicar largo los 2 primeros y dejar el resto sin responder.
+
+CÓMO LEER LO QUE TE PIDEN (esto es un taller, la gente habla rápido y en desorden):
+- El CATÁLOGO que recibes está COMPLETO: son todos los productos activos. Por eso NUNCA digas "no existe ese producto" sin haberlo buscado ahí. Si no hay coincidencia exacta, busca el parecido y NÓMBRALO: el cliente dice "vasos" y el catálogo dice "mug"; dice "tazas", "mugs" o lo dice en inglés. Son la misma cosa. Empareja tú por significado.
+- Si lo que piden encaja con VARIOS productos, no elijas en silencio: di cuáles son y pregunta. Ej: "¿DTF textil o DTF UV?". Y si el producto no se cobra como lo están pidiendo (piden "25 unidades" pero se cobra por medidas o por listado), dilo así: "eso no se cobra por unidad sino por medida — dime el tamaño".
+- Si de verdad no hay nada parecido, dilo claro y di qué habría que crear.
+- POSICIÓN DEL ESTAMPADO (pecho, espalda, manga, frente): salvo que el catálogo cobre distinto por eso, NO cambia el precio. Es una anotación del pedido. Lo que sí cambia el precio es el TAMAÑO del estampado (carta, media carta, tabloide, o las medidas) y la CANTIDAD. No pidas aclaración por la posición.
+- Ignora lo que no venga al caso. Si te preguntan algo ajeno al taller, una línea y sigues con lo que importa.`;
 
 /* Una respuesta cortada a media palabra ("Sin datos en el catál") parece un error del
    sistema y deja sin saber qué faltaba. Si el proveedor avisa que la cortó, se dice. */
@@ -2917,7 +2978,8 @@ function iaCompactar(ctx,limite){
   for(const paso of pasos){ if(tam()<=limite)break; paso(); }
   // Red de seguridad: si con todo lo anterior sigue pasado, se sueltan secciones enteras
   // en orden inverso de importancia. Nunca se corta el JSON a la mitad.
-  const sacrificables=['agenda','clientes','pedidos','inventario','productos'];
+  // El catálogo se sacrifica de ÚLTIMO: sin él el asistente vuelve a decir "no existe".
+  const sacrificables=['agenda','clientes','pedidos','productos','inventario','catalogo'];
   for(const k of sacrificables){ if(tam()<=limite)break; if(ctx[k]){ delete ctx[k]; recortes.push('sección "'+k+'" completa (demasiado grande)'); } }
   if(tam()>limite&&ctx.panorama){
     ['entregan_hoy','entregan_esta_semana','atrasados','pedidos_con_saldo'].forEach(k=>{ if(tam()>limite&&ctx.panorama[k]){ ctx.panorama[k]=ctx.panorama[k].slice(0,2); } });
