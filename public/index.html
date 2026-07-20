@@ -4098,7 +4098,7 @@ async function iaProbar(){
 
 /* ── EL ASISTENTE ── Panel lateral, no pantalla completa: se consulta sin perder de vista
    en qué se estaba trabajando (asistencia discreta, no un chatbot que secuestra la app). */
-let IA_HIST=[], iaPensando=false;
+let IA_HIST=[], iaPensando=false, iaEspera='';
 function iaPanel(){ return document.getElementById('ovIA'); }
 function iaAbrir(){
   iaPanel().classList.add('open');
@@ -4123,7 +4123,8 @@ function renderIaChat(){
       <div class="ia-burbuja">${m.rol==='asistente'?iaFormato(m.texto):esc(m.texto)}</div>
       ${m.consultado?`<div class="ia-fuente" title="De dónde salieron los datos de esta respuesta"><i class="ti ti-database"></i>${m.consultado.map(esc).join(' · ')}</div>`:''}
     </div>`).join('')
-    +(iaPensando?'<div class="ia-msg asistente"><div class="ia-burbuja ia-pensando"><span></span><span></span><span></span></div></div>':'');
+    +(iaPensando?('<div class="ia-msg asistente"><div class="ia-burbuja ia-pensando"><span></span><span></span><span></span></div>'
+      +(iaEspera?('<div class="ia-fuente"><i class="ti ti-clock"></i>'+esc(iaEspera)+'</div>'):'')+'</div>'):'');
   c.scrollTop=c.scrollHeight;
 }
 // Formato mínimo: negritas, saltos y viñetas. Nada de HTML del modelo (se escapa primero).
@@ -4139,13 +4140,16 @@ async function iaPreguntar(txt){
   if(!pregunta||iaPensando)return;
   if(inp)inp.value='';
   IA_HIST.push({rol:'usuario',texto:pregunta});
-  iaPensando=true; renderIaChat();
+  iaPensando=true; iaEspera=''; renderIaChat();
+  // Una cotización larga puede tardar un minuto. Sin decir nada, la espera parece que se colgó.
+  const t1=setTimeout(()=>{ if(iaPensando){ iaEspera='Está pensando una cotización larga…'; renderIaChat(); } },12000);
+  const t2=setTimeout(()=>{ if(iaPensando){ iaEspera='Sigue trabajando. Si tarda mucho, pídeselo por partes.'; renderIaChat(); } },35000);
   try{
     const r=await api('POST','/ia/preguntar',{pregunta,historial:IA_HIST.slice(0,-1).slice(-6)});
     IA_HIST.push({rol:'asistente',texto:r.respuesta||'(sin respuesta)',consultado:r.consultado});
   }catch(e){
     IA_HIST.push({rol:'asistente',texto:'No pude responder: '+e.message});
-  }finally{ iaPensando=false; renderIaChat(); }
+  }finally{ clearTimeout(t1); clearTimeout(t2); iaPensando=false; iaEspera=''; renderIaChat(); }
 }
 function iaTeclaChat(ev){ if(ev.key==='Enter'&&!ev.shiftKey){ ev.preventDefault(); iaPreguntar(); } }
 

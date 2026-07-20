@@ -2994,7 +2994,10 @@ function iaCompactar(ctx,limite){
 // ── Adaptadores. Cada uno recibe lo mismo y devuelve texto; las diferencias mueren aquí.
 async function iaLlamar(cfg,sistema,mensajes,maxTokens){
   const ctrl=new AbortController();
-  const reloj=setTimeout(()=>ctrl.abort(),45000); // que una IA colgada no cuelgue la app
+  // 45 s se quedaban cortos: una cotización de 7 ítems, con el catálogo entero y el
+  // razonamiento del modelo, pasa de eso. El primer intento moría y el segundo funcionaba.
+  const IA_ESPERA=120000;
+  const reloj=setTimeout(()=>ctrl.abort(),IA_ESPERA); // que una IA colgada no cuelgue la app
   try{
     if(cfg.proveedor==='claude'){
       const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
@@ -3037,7 +3040,7 @@ async function iaLlamar(cfg,sistema,mensajes,maxTokens){
     }
     throw new Error('Proveedor no reconocido');
   }catch(e){
-    if(e.name==='AbortError')throw new Error('El proveedor tardó demasiado en responder (45 s).');
+    if(e.name==='AbortError')throw new Error('El proveedor tardó más de '+Math.round(IA_ESPERA/1000)+' s en responder. Si la cotización es muy larga, pídemela por partes.');
     if(/fetch failed|ECONNREFUSED/i.test(e.message))throw new Error('No se pudo conectar con el proveedor. Revisa la conexión'+(cfg.proveedor==='ollama'?' o que Ollama esté corriendo.':' o la URL.'));
     throw e;
   }finally{ clearTimeout(reloj); }
