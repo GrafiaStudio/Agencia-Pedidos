@@ -20,7 +20,7 @@
   --purple:#7B6EF6;--purple-lt:#EEEAFF;
   --orange:#F07140;--orange-lt:#FEF0E8;
   --sb-grad:linear-gradient(180deg,#3D4C7A 0%,#232C4C 52%,#161B2E 100%);
-  --brand:#222B46;--brand-txt:#FFFFFF;--brand-txt-dim:rgba(255,255,255,.35);--acento-txt:#FFFFFF;
+  --brand:#222B46;--brand-txt:#FFFFFF;--brand-txt-dim:rgba(255,255,255,.35);--acento-txt:#FFFFFF;--acento-ink:#41618A;
   --sb-txt:rgba(255,255,255,.85);--sb-txt-2:rgba(255,255,255,.45);--sb-txt-3:rgba(255,255,255,.2);--sb-line:rgba(255,255,255,.07);
   --sb-activo-bg:linear-gradient(90deg,rgba(124,160,200,.30),rgba(124,160,200,.09));--sb-activo-barra:#7CA0C8;
   --body-bg:linear-gradient(170deg,#EBF1F8 0%,#E3EBF5 50%,#E7EDF6 100%);
@@ -438,6 +438,45 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .bit-rel-item:last-child{margin-bottom:0}
 .bit-rel-item-t{font-size:12px;font-weight:700;color:var(--navy);line-height:1.3}
 .bit-rel-item-b{font-size:11px;color:var(--slate);line-height:1.45;margin-top:3px;white-space:pre-wrap}
+/* ══ AI GATEWAY · el asistente ══ Panel lateral: se consulta sin perder de vista el trabajo. */
+.ia-btn i{color:var(--acento-ink)}
+.ia-ov{position:fixed;inset:0;background:rgba(20,26,41,.28);backdrop-filter:blur(2px);z-index:200;display:none}
+.ia-ov.open{display:block}
+.ia-panel{position:absolute;top:0;right:0;height:100%;width:min(430px,100vw);background:var(--white);
+  border-left:1px solid var(--line);box-shadow:-14px 0 46px rgba(20,26,41,.13);display:flex;flex-direction:column;
+  animation:iaEntra .22s cubic-bezier(.22,.9,.3,1)}
+@keyframes iaEntra{from{transform:translateX(26px);opacity:.4}to{transform:none;opacity:1}}
+.ia-head{display:flex;align-items:center;gap:6px;padding:15px 14px 12px;border-bottom:1px solid var(--line)}
+.ia-head-t{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--navy);flex:1}
+.ia-head-t i{color:var(--acento-ink);font-size:17px}
+.ia-chat{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:11px}
+.ia-vacio{margin:auto;text-align:center;padding:20px 6px;color:var(--muted)}
+.ia-vacio>i{font-size:32px;color:var(--acento-ink);opacity:.55}
+.ia-vacio p{font-size:11px;line-height:1.6;margin:11px 0 16px}
+.ia-sugs{display:flex;flex-direction:column;gap:6px}
+.ia-sug{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:11px;
+  color:var(--navy);cursor:pointer;font-family:inherit;transition:background .14s}
+.ia-sug:hover{background:var(--white);border-color:var(--acento-ink)}
+.ia-msg{display:flex;flex-direction:column;max-width:88%}
+.ia-msg.usuario{align-self:flex-end;align-items:flex-end}
+.ia-msg.asistente{align-self:flex-start}
+.ia-burbuja{padding:9px 13px;border-radius:16px;font-size:12px;line-height:1.55;white-space:normal;word-break:break-word}
+.ia-msg.usuario .ia-burbuja{background:var(--brand);color:var(--brand-txt);border-bottom-right-radius:5px}
+.ia-msg.asistente .ia-burbuja{background:var(--bg);color:var(--navy);border:1px solid var(--line);border-bottom-left-radius:5px}
+.ia-fuente{display:flex;align-items:center;gap:4px;font-size:8.5px;color:var(--muted);margin:3px 0 0 5px;text-transform:uppercase;letter-spacing:.05em}
+.ia-pensando{display:flex;gap:4px;align-items:center;padding:13px}
+.ia-pensando span{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:iaLat 1.1s infinite}
+.ia-pensando span:nth-child(2){animation-delay:.16s}
+.ia-pensando span:nth-child(3){animation-delay:.32s}
+@keyframes iaLat{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:.9;transform:translateY(-3px)}}
+.ia-input{display:flex;gap:7px;align-items:flex-end;padding:11px 12px;border-top:1px solid var(--line)}
+.ia-input textarea{flex:1;resize:none;max-height:120px;border:1px solid var(--line);border-radius:14px;padding:9px 12px;
+  font-size:12px;font-family:inherit;background:var(--bg);color:var(--navy);line-height:1.5}
+.ia-input textarea:focus{outline:none;border-color:var(--acento-ink);background:var(--white)}
+.ia-enviar{width:34px;height:34px;border-radius:50%;border:none;background:var(--brand);color:var(--brand-txt);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ia-enviar:hover{opacity:.9}
+@media(max-width:600px){.ia-panel{width:100vw}}
 /* F4 · panel de resultados de la búsqueda global */
 .gb-panel{display:none;position:absolute;top:calc(100% + 7px);right:0;width:min(430px,86vw);max-height:min(64vh,470px);overflow-y:auto;
   background:var(--white);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-lg);z-index:120;padding:6px}
@@ -1385,6 +1424,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
       <button class="icon-btn" data-perm="gestionar_productos" onclick="showView('productos')"><i class="ti ti-box"></i></button>
       <button class="icon-btn" data-perm="configurar_sistema" onclick="showView('configuracion')"><i class="ti ti-settings"></i></button>
       <button class="icon-btn" data-perm="ver_registros" onclick="abrirExp()"><i class="ti ti-download"></i></button>
+      <button class="icon-btn ia-btn" onclick="iaAbrir()" title="Preguntarle al asistente"><i class="ti ti-sparkles"></i></button>
       <button class="icon-btn" id="btnTema" onclick="alternarModoTema()" title="Cambiar a modo noche"><i class="ti ti-moon"></i></button>
       <button class="btn-new" data-perm="crear_pedidos" onclick="abrirNuevo()"><span class="tri"></span> Nuevo pedido</button>
     </div>
@@ -1583,7 +1623,18 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
         <button class="cfgtab" onclick="showCfgTab('impuestos')">Impuestos</button>
         <button class="cfgtab" onclick="showCfgTab('etiquetas')">Etiquetas</button>
         <button class="cfgtab" onclick="showCfgTab('estados')">Producción</button>
+        <button class="cfgtab" data-perm="configurar_sistema" onclick="showCfgTab('ia')">Asistente IA</button>
         <button class="cfgtab" data-perm="administrar_usuarios" onclick="showCfgTab('usuarios')">Usuarios y Roles</button>
+      </div>
+
+      <!-- AI GATEWAY · el motor se elige aquí; la clave se guarda en el servidor y no vuelve nunca. -->
+      <div id="cfg-ia" class="cfg-panel">
+        <div class="msec"><span class="tri"></span>Asistente IA</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.55">
+          El asistente responde <b>solo con los datos de tu sistema</b>: pedidos, clientes, productos y Bitácora.
+          No inventa cifras y no cambia nada por su cuenta. Tu clave se guarda en el servidor y <b>nunca vuelve al navegador</b>.
+        </div>
+        <div id="ia-cfg-body"></div>
       </div>
 
       <div id="cfg-perfil" class="cfg-panel active">
@@ -2002,6 +2053,22 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
   <div class="mhead"><div class="mhead-l"><div class="mtitle" id="cli-nom"></div></div><div class="mhead-actions"><button class="btn-danger" onclick="archivarCli()"><i class="ti ti-archive"></i>Archivar</button><button class="mclose" onclick="cerrarCli()"><i class="ti ti-x"></i></button></div></div>
   <div class="mbody" id="cli-body"></div>
 </div>
+</div>
+
+<!-- AI GATEWAY · panel lateral del asistente -->
+<div class="ia-ov" id="ovIA" onclick="if(event.target===this)iaCerrar()">
+  <div class="ia-panel">
+    <div class="ia-head">
+      <div class="ia-head-t"><i class="ti ti-sparkles"></i>Asistente</div>
+      <button class="mclose" title="Empezar de nuevo" onclick="iaLimpiar()"><i class="ti ti-refresh"></i></button>
+      <button class="mclose" onclick="iaCerrar()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="ia-chat" id="ia-chat"></div>
+    <div class="ia-input">
+      <textarea id="ia-pregunta" rows="1" placeholder="Pregunta algo sobre tu negocio…" onkeydown="iaTeclaChat(event)" oninput="autoTA(this)"></textarea>
+      <button class="ia-enviar" onclick="iaPreguntar()" title="Preguntar"><i class="ti ti-arrow-up"></i></button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL MI PERFIL -->
@@ -2478,6 +2545,9 @@ function aplicarTemaColor(){
   s.setProperty('--brand-txt',tintaSobre(p));                       // tinta legible SOBRE la marca
   s.setProperty('--brand-txt-dim',mezcla(tintaSobre(p),p,.42));
   s.setProperty('--acento-txt',tintaSobre(a));
+  // Acento usado como TINTA sobre superficie clara (iconos, detalles): si el acento elegido
+  // es muy claro se perdería sobre el blanco — se oscurece hasta ser legible (regla de C2).
+  s.setProperty('--acento-ink',noche?a:inkSeguro(a));
   s.setProperty('--teal',a);
   s.setProperty('--teal-dk',mezcla(a,'#000000',.22));
   s.setProperty('--magenta',a);
@@ -2605,10 +2675,12 @@ function showCfgTab(tab){
   document.querySelectorAll('.cfg-panel').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.cfgtab').forEach(x=>x.classList.remove('active'));
   document.getElementById('cfg-'+tab).classList.add('active');
-  ['perfil','preferencias','pedidos','notificaciones','impuestos','etiquetas','estados','usuarios'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.cfgtab')[i].classList.add('active')});
-  document.getElementById('btn-guardar-config').style.display=(tab==='etiquetas'||tab==='estados'||tab==='usuarios')?'none':'inline-flex';
+  ['perfil','preferencias','pedidos','notificaciones','impuestos','etiquetas','estados','ia','usuarios'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.cfgtab')[i].classList.add('active')});
+  // La pestaña de IA se guarda con su propio botón (la clave no pasa por el guardado general).
+  document.getElementById('btn-guardar-config').style.display=(tab==='etiquetas'||tab==='estados'||tab==='usuarios'||tab==='ia')?'none':'inline-flex';
   if(tab==='etiquetas')renderEtiquetas();
   if(tab==='estados')renderEstadosProduccion();
+  if(tab==='ia')cargarIaConfig();
   if(tab==='usuarios')renderUsuariosRoles();
 }
 /* ══ USUARIOS Y ROLES (v3.0 Fase 1) ══ */
@@ -3951,6 +4023,129 @@ function renderFiltros(){
 }
 async function setFiltro(id){filtroAct=id;busq='';document.getElementById('s-inp').value='';renderFiltros();await cargarPedidos();showView('pedidos')}
 async function filtroRapido(id){filtroAct=id;busq='';renderFiltros();await cargarPedidos();showView('pedidos')}
+/* ══ AI GATEWAY (frontend) ════════════════════════════════════════════════════════════
+   Configuración del motor + el asistente. La clave NUNCA se recibe del servidor: solo se
+   sabe si hay una puesta. Por eso el campo va vacío y solo se manda si el usuario escribe. */
+let IA_CFG=null;
+async function cargarIaConfig(){
+  const cont=document.getElementById('ia-cfg-body'); if(!cont)return;
+  cont.innerHTML='<div style="font-size:11px;color:var(--muted)">Cargando…</div>';
+  try{ IA_CFG=await api('GET','/ia/config'); renderIaConfig(); }
+  catch(e){ cont.innerHTML='<div style="font-size:11px;color:var(--red)">No se pudo cargar: '+e.message+'</div>'; }
+}
+function renderIaConfig(){
+  const c=IA_CFG, cont=document.getElementById('ia-cfg-body'); if(!c||!cont)return;
+  const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  const prov=c.proveedores.find(p=>p.id===c.proveedor)||{};
+  cont.innerHTML=`
+    <div class="fr2 fg">
+      <div><label>Motor</label>
+        <select id="ia-prov" onchange="iaCambiarProv(this.value)">
+          ${c.proveedores.map(p=>`<option value="${p.id}"${p.id===c.proveedor?' selected':''}>${p.nombre}</option>`).join('')}
+        </select>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">Puedes cambiar de motor cuando quieras; el resto del sistema no se entera.</div>
+      </div>
+      <div><label>Modelo</label><input type="text" id="ia-modelo" value="${esc(c.modelo)}" placeholder="${esc(prov.modelo||'')}">
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">Vacío = ${esc(prov.modelo||'el de fábrica')}.</div>
+      </div>
+    </div>
+    ${c.requiere_clave?`
+    <div class="fg" style="margin-top:12px"><label>Clave del proveedor</label>
+      <input type="password" id="ia-clave" autocomplete="new-password" placeholder="${c.clave_puesta?'•••••••••  (ya hay una guardada)':'Pega aquí tu clave'}">
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">
+        ${c.clave_puesta?'Déjalo vacío para conservar la que ya está. Escribe algo solo si la vas a reemplazar.':'Se guarda en el servidor; no vuelve al navegador ni queda en el código.'}
+      </div>
+    </div>`:`
+    <div class="fg" style="margin-top:12px"><label>Dirección del servidor local</label>
+      <input type="text" id="ia-url" value="${esc(c.url_base)}" placeholder="http://localhost:11434/api/chat">
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">Con Ollama nada sale de tu computador: no hay clave ni costo por consulta.</div>
+    </div>`}
+    <label class="ck-box" style="display:inline-flex;gap:7px;margin-top:14px">
+      <input type="checkbox" id="ia-activo" ${c.activo?'checked':''}>
+      <span style="font-size:11px">Asistente encendido</span>
+    </label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;align-items:center">
+      <button class="btn-add-row" style="background:var(--navy);color:var(--brand-txt,#fff);border-color:var(--navy)" onclick="iaGuardarConfig()"><i class="ti ti-check"></i>Guardar</button>
+      <button class="btn-add-row" onclick="iaProbar()"><i class="ti ti-plug"></i>Probar conexión</button>
+      <span id="ia-estado" style="font-size:11px"></span>
+    </div>`;
+}
+function iaCambiarProv(p){ if(IA_CFG){ const d=IA_CFG.proveedores.find(x=>x.id===p); IA_CFG.proveedor=p; IA_CFG.modelo=(d&&d.modelo)||''; IA_CFG.requiere_clave=(p!=='ollama'); renderIaConfig(); } }
+async function iaGuardarConfig(){
+  const cuerpo={
+    proveedor:document.getElementById('ia-prov').value,
+    modelo:document.getElementById('ia-modelo').value.trim(),
+    activo:document.getElementById('ia-activo').checked?1:0
+  };
+  const cl=document.getElementById('ia-clave');
+  if(cl&&cl.value.trim())cuerpo.clave=cl.value.trim();   // vacío = conservar la que había
+  const url=document.getElementById('ia-url');
+  if(url)cuerpo.url_base=url.value.trim();
+  try{ IA_CFG=await api('PUT','/ia/config',cuerpo); renderIaConfig(); toast('Asistente configurado ✓'); }
+  catch(e){ toast('Error: '+e.message,false); }
+}
+async function iaProbar(){
+  const el=document.getElementById('ia-estado');
+  el.innerHTML='<span style="color:var(--muted)">Probando…</span>';
+  try{
+    const r=await api('POST','/ia/probar',{});
+    el.innerHTML=`<span style="color:var(--teal-dk);font-weight:700"><i class="ti ti-circle-check"></i> Conectado · ${r.modelo} · ${r.ms} ms</span>`;
+  }catch(e){ el.innerHTML=`<span style="color:var(--red);font-weight:700"><i class="ti ti-alert-circle"></i> ${String(e.message).replace(/</g,'&lt;')}</span>`; }
+}
+
+/* ── EL ASISTENTE ── Panel lateral, no pantalla completa: se consulta sin perder de vista
+   en qué se estaba trabajando (asistencia discreta, no un chatbot que secuestra la app). */
+let IA_HIST=[], iaPensando=false;
+function iaPanel(){ return document.getElementById('ovIA'); }
+function iaAbrir(){
+  iaPanel().classList.add('open');
+  renderIaChat();
+  setTimeout(()=>{const i=document.getElementById('ia-pregunta');if(i)i.focus()},120);
+}
+function iaCerrar(){ iaPanel().classList.remove('open'); }
+function iaLimpiar(){ IA_HIST=[]; renderIaChat(); }
+const IA_SUGERENCIAS=['¿Qué entrego esta semana?','¿Quién me debe plata?','¿Qué pedidos están atrasados?','¿Cómo va el pedido #0021?'];
+function renderIaChat(){
+  const c=document.getElementById('ia-chat'); if(!c)return;
+  const esc=s=>String(s||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]));
+  if(!IA_HIST.length&&!iaPensando){
+    c.innerHTML=`<div class="ia-vacio">
+      <i class="ti ti-sparkles"></i>
+      <p>Pregúntame sobre tus pedidos, clientes, productos o lo que tengas en la Bitácora.<br><b>Solo respondo con datos reales de tu sistema.</b></p>
+      <div class="ia-sugs">${IA_SUGERENCIAS.map(s=>`<button class="ia-sug" onclick="iaPreguntar('${s.replace(/'/g,"\\'")}')">${esc(s)}</button>`).join('')}</div>
+    </div>`;
+    return;
+  }
+  c.innerHTML=IA_HIST.map(m=>`<div class="ia-msg ${m.rol}">
+      <div class="ia-burbuja">${m.rol==='asistente'?iaFormato(m.texto):esc(m.texto)}</div>
+      ${m.consultado?`<div class="ia-fuente" title="De dónde salieron los datos de esta respuesta"><i class="ti ti-database"></i>${m.consultado.map(esc).join(' · ')}</div>`:''}
+    </div>`).join('')
+    +(iaPensando?'<div class="ia-msg asistente"><div class="ia-burbuja ia-pensando"><span></span><span></span><span></span></div></div>':'');
+  c.scrollTop=c.scrollHeight;
+}
+// Formato mínimo: negritas, saltos y viñetas. Nada de HTML del modelo (se escapa primero).
+function iaFormato(t){
+  return String(t||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]))
+    .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+    .replace(/^[-•]\s+/gm,'· ')
+    .replace(/\n/g,'<br>');
+}
+async function iaPreguntar(txt){
+  const inp=document.getElementById('ia-pregunta');
+  const pregunta=String(txt!==undefined?txt:(inp?inp.value:'')).trim();
+  if(!pregunta||iaPensando)return;
+  if(inp)inp.value='';
+  IA_HIST.push({rol:'usuario',texto:pregunta});
+  iaPensando=true; renderIaChat();
+  try{
+    const r=await api('POST','/ia/preguntar',{pregunta,historial:IA_HIST.slice(0,-1).slice(-6)});
+    IA_HIST.push({rol:'asistente',texto:r.respuesta||'(sin respuesta)',consultado:r.consultado});
+  }catch(e){
+    IA_HIST.push({rol:'asistente',texto:'No pude responder: '+e.message});
+  }finally{ iaPensando=false; renderIaChat(); }
+}
+function iaTeclaChat(ev){ if(ev.key==='Enter'&&!ev.shiftKey){ ev.preventDefault(); iaPreguntar(); } }
+
 /* ── F4 · BÚSQUEDA GLOBAL (frontend) ─────────────────────────────────────────────────
    El buscador de arriba seguía filtrando SOLO la lista de pedidos. Ahora, además de eso
    (que ya es costumbre y no se toca), despliega resultados de pedidos, clientes,

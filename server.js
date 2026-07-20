@@ -468,6 +468,19 @@ db.exec(`CREATE TABLE IF NOT EXISTS bitacora_adjuntos(
 )`);
 try { db.exec("CREATE INDEX IF NOT EXISTS idx_bit_adj_nota ON bitacora_adjuntos(nota_id)"); } catch(e){}
 
+/* AI GATEWAY · configuración del asistente. Tabla APARTE de configuracion_negocio a
+   propósito: esa se devuelve entera al navegador, y la clave del proveedor NUNCA puede
+   salir del servidor. Aquí solo se dice si hay clave puesta, jamás cuál es. */
+db.exec(`CREATE TABLE IF NOT EXISTS ia_config(
+  workspace_id TEXT PRIMARY KEY,
+  proveedor TEXT DEFAULT 'claude',
+  modelo TEXT DEFAULT '',
+  clave TEXT DEFAULT '',
+  url_base TEXT DEFAULT '',
+  activo INTEGER DEFAULT 0,
+  actualizado TEXT DEFAULT(datetime('now','localtime'))
+)`);
+
 // ── PRODUCCIÓN 2.0 (Fase D) · eventos de taller ──
 // Registro APPEND-ONLY: nunca se sobrescribe ni se borra (manifiesto: todo trazable).
 // Un solo lugar para los tres casos, distinguidos por `tipo`:
@@ -2508,12 +2521,17 @@ function recorte(txt,q,largo){
   return (desde>0?'…':'')+s.slice(desde,desde+largo)+(desde+largo<s.length?'…':'');
 }
 app.get('/api/buscar',(req,res)=>{
-  try{
-    const q=String(req.query.q||'').trim();
-    if(q.length<2)return res.json({q,pedidos:[],clientes:[],productos:[],notas:[],total:0});
-    const L=bLike(q), ws=req.wsId, perm=req.permisos||{};
+  try{ res.json(svcBuscar(req.wsId,req.query.q,req.permisos)); }
+  catch(e){logError('GET /api/buscar',e);res.status(500).json({error:e.message})}
+});
+/* SERVICIO de búsqueda. Vive aparte del endpoint a propósito: el AI Gateway consume
+   ESTA función, no la base de datos — misma información y mismos permisos que ve un humano. */
+function svcBuscar(wsId,consulta,permisos,tope){
+    const q=String(consulta||'').trim();
+    if(q.length<2)return {q,pedidos:[],clientes:[],productos:[],notas:[],total:0};
+    const L=bLike(q), ws=wsId, perm=permisos||{};
     const puede=k=>!!(perm.__admin||perm[k]===true);
-    const TOPE=8;
+    const TOPE=tope||8;
     const out={q,pedidos:[],clientes:[],productos:[],notas:[]};
 
     // Pedidos: por referencia, cliente o anotaciones. Los archivados no estorban la búsqueda.
@@ -2546,8 +2564,287 @@ app.get('/api/buscar',(req,res)=>{
       favorita:!!n.favorita, adjuntos:(adj[n.id]||[]).length, relaciones:rel[n.id]||[]}));
 
     out.total=out.pedidos.length+out.clientes.length+out.productos.length+out.notas.length;
-    res.json(out);
-  }catch(e){logError('GET /api/buscar',e);res.status(500).json({error:e.message})}
+    return out;
+}
+
+/* ══ AI GATEWAY · CAPA DE SERVICIOS ═══════════════════════════════════════════════════
+   Regla de arquitectura (visión del usuario): la IA NUNCA toca la base de datos. Consulta
+   estos servicios, que son los mismos que alimentan la app y respetan workspace y permisos.
+   Si mañana cambia el motor de IA, esto no se toca; si cambia el negocio, la IA se entera
+   sola porque lee de aquí. Todo servicio devuelve datos ya digeridos, no filas crudas.     */
+function iaPagado(p){ return (p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0); }
+function iaEstadoPedido(p){
+  if(p.cancelado)return 'cancelado';
+  if(p.es_cotizacion)return 'cotización';
+  if(p.entregado)return 'entregado';
+  return 'en curso';
+}
+function iaPedidoResumen(p){
+  const total=p.valor_total||0, pag=iaPagado(p);
+  return {
+    ref:p.ref, cliente:p.nombre, estado:iaEstadoPedido(p),
+    urgente:!!p.urgente, fecha_pedido:p.fecha_pedido||'', entrega:p.fecha_entrega||'',
+    valor:total, pagado:pag, saldo:Math.max(0,total-pag),
+    etapas:[...new Set((p.encargos||[]).map(e=>e.estado).filter(Boolean))],
+    anotaciones:String(p.notas||'').slice(0,300)
+  };
+}
+// Panorama: lo que un dueño querría saber al abrir el negocio por la mañana.
+function svcPanorama(wsId){
+  const hoyStr=hoy(wsId);
+  const activos=db.prepare(`SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cancelado=0 AND entregado=0 AND es_cotizacion=0`).all(wsId).map(pedidoCompleto);
+  const cotiz=db.prepare(`SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cancelado=0 AND es_cotizacion=1`).all(wsId).map(pedidoCompleto);
+  const enDias=(p,n)=>{ if(!p.fecha_entrega)return false; const d=(new Date(p.fecha_entrega)-new Date(hoyStr))/86400000; return d>=0&&d<=n; };
+  const vencidos=activos.filter(p=>p.fecha_entrega&&p.fecha_entrega<hoyStr);
+  const conSaldo=activos.filter(p=>(p.valor_total||0)-iaPagado(p)>0);
+  return {
+    hoy:hoyStr,
+    pedidos_activos:activos.length,
+    urgentes:activos.filter(p=>p.urgente).length,
+    entregan_hoy:activos.filter(p=>p.fecha_entrega===hoyStr).map(iaPedidoResumen),
+    entregan_esta_semana:activos.filter(p=>enDias(p,7)).map(iaPedidoResumen),
+    atrasados:vencidos.map(iaPedidoResumen),
+    cotizaciones_abiertas:cotiz.length,
+    por_cobrar_total:conSaldo.reduce((a,p)=>a+((p.valor_total||0)-iaPagado(p)),0),
+    pedidos_con_saldo:conSaldo.map(iaPedidoResumen).slice(0,15)
+  };
+}
+// Un pedido concreto, por referencia (#0021 o 0021).
+function svcPedido(wsId,ref){
+  const r=String(ref||'').replace(/^#/,'').trim();
+  if(!r)return null;
+  const p=db.prepare('SELECT * FROM pedidos WHERE workspace_id=? AND ref=?').get(wsId,r);
+  if(!p)return null;
+  const c=pedidoCompleto(p);
+  const base=iaPedidoResumen(c);
+  base.encargos=(c.encargos||[]).map(e=>({estado:e.estado,responsable:e.responsable||'',
+    items:(e.items||[]).map(it=>({cantidad:it.cantidad,detalle:it.detalle,valor_unitario:toNum(it.valor_unitario_calc||it.valor_unitario)}))}));
+  base.pagos=(c.pagos||[]).map(x=>({fecha:x.fecha||x.creado,monto:toNum(x.monto_calc),metodo:x.metodo||''}));
+  return base;
+}
+// Historial de un cliente: lo que pidió, cuánto dejó, qué debe.
+function svcCliente(wsId,nombre){
+  const n=String(nombre||'').trim(); if(n.length<2)return null;
+  const cli=db.prepare(`SELECT * FROM clientes WHERE workspace_id=? AND archivado=0 AND nombre LIKE ? ESCAPE '\\' ORDER BY LENGTH(nombre) LIMIT 1`).get(wsId,bLike(n));
+  if(!cli)return null;
+  const peds=db.prepare('SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cliente_id=? ORDER BY creado DESC').all(wsId,cli.id).map(pedidoCompleto);
+  const validos=peds.filter(p=>!p.cancelado&&!p.es_cotizacion);
+  const facturado=validos.reduce((a,p)=>a+(p.valor_total||0),0);
+  const pagado=validos.reduce((a,p)=>a+iaPagado(p),0);
+  return {
+    nombre:cli.nombre, telefono:cli.tel||'', email:cli.email||'', nit:cli.nit||'',
+    pedidos_totales:validos.length, facturado, pagado, saldo:Math.max(0,facturado-pagado),
+    ultimos_pedidos:peds.slice(0,8).map(iaPedidoResumen)
+  };
+}
+// Un producto y CÓMO se cobra (incluye las condiciones de la Fase E).
+function svcProducto(wsId,nombre){
+  const n=String(nombre||'').trim(); if(n.length<2)return null;
+  const f=db.prepare(`SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0 AND (nombre LIKE ? ESCAPE '\\' OR codigo LIKE ? ESCAPE '\\') ORDER BY LENGTH(nombre) LIMIT 1`).get(wsId,bLike(n),bLike(n));
+  if(!f)return null;
+  const ficha=fichaCompleta(f);
+  const out={nombre:ficha.nombre,codigo:ficha.codigo||'',tipo_precio:ficha.tipo_precio,
+    precio:ficha.precio_oficial||0,descripcion:String(ficha.descripcion||'').slice(0,300)};
+  if(ficha.tipo_precio==='medidas'){
+    out.unidad=ficha.medida_unidad||'m2';
+    out.tarifa=toFloatCO(ficha.medida_tarifa_calc);
+    out.cobro_minimo=toNum(ficha.cobro_minimo_calc);
+    if((ficha.medida_cond||[]).length)out.condiciones={eje:ficha.medida_cond_eje,tramos:ficha.medida_cond};
+  }
+  if(ficha.tipo_precio==='escalonado'&&(ficha.rangos||[]).length)out.tramos_por_cantidad=ficha.rangos;
+  if(ficha.tipo_precio==='variantes')out.partes=(ficha.variantes||[]).map(v=>({nombre:v.nombre,
+    opciones:(v.hijos||[]).map(h=>h.nombre)}));
+  return out;
+}
+// Qué se entrega en los próximos N días — la pregunta más frecuente de un taller.
+function svcAgenda(wsId,dias){
+  const n=Math.min(60,Math.max(1,parseInt(dias,10)||7)), hoyStr=hoy(wsId);
+  return db.prepare(`SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cancelado=0 AND entregado=0 AND es_cotizacion=0
+    AND fecha_entrega!='' AND fecha_entrega<=date(?, '+'||?||' day') ORDER BY fecha_entrega`).all(wsId,hoyStr,n)
+    .map(pedidoCompleto).map(iaPedidoResumen);
+}
+
+/* ══ AI GATEWAY · EL PUENTE ═══════════════════════════════════════════════════════════
+   Toda la app habla SOLO con esta capa; esta capa habla con el proveedor de turno.
+   Cambiar de motor de IA (Claude, OpenAI, un Ollama local) no debe tocar nada más.     */
+const IA_PROVEEDORES={
+  claude:{nombre:'Claude (Anthropic)', modelo:'claude-sonnet-5',  url:'https://api.anthropic.com/v1/messages'},
+  openai:{nombre:'OpenAI (GPT)',       modelo:'gpt-4o-mini',      url:'https://api.openai.com/v1/chat/completions'},
+  ollama:{nombre:'Ollama (local)',     modelo:'llama3.1',         url:'http://localhost:11434/api/chat'}
+};
+function iaConfig(wsId){
+  const r=db.prepare('SELECT * FROM ia_config WHERE workspace_id=?').get(wsId)||{};
+  const prov=IA_PROVEEDORES[r.proveedor]?r.proveedor:'claude';
+  return {
+    proveedor:prov,
+    modelo:String(r.modelo||'').trim()||IA_PROVEEDORES[prov].modelo,
+    clave:String(r.clave||''),
+    url_base:String(r.url_base||'').trim()||IA_PROVEEDORES[prov].url,
+    activo:!!r.activo
+  };
+}
+// Lo que SÍ puede ver el navegador: nunca la clave, solo si hay una puesta.
+function iaConfigPublica(wsId){
+  const c=iaConfig(wsId);
+  return {proveedor:c.proveedor, modelo:c.modelo, url_base:c.url_base, activo:c.activo,
+    clave_puesta:!!c.clave, requiere_clave:c.proveedor!=='ollama',
+    proveedores:Object.entries(IA_PROVEEDORES).map(([k,v])=>({id:k,nombre:v.nombre,modelo:v.modelo}))};
+}
+
+/* CONTEXTO · qué servicios se consultan según lo que se pregunta.
+   Es deliberadamente determinista y auditable: la IA recibe datos reales, no adivina.
+   Siempre va el panorama (barato y casi siempre relevante) + una búsqueda con la pregunta,
+   y se añade el detalle fino cuando la pregunta lo pide (una referencia, un cliente…). */
+/* Buscar con la frase entera no encuentra nada: "¿qué sabes de Textiles ABC?" no es el
+   nombre de nadie. Se extraen las palabras con peso (fuera preguntas y muletillas) y se
+   busca término por término, uniendo lo hallado. */
+const IA_VACIAS=new Set(['que','qué','como','cómo','cual','cuál','cuanto','cuánto','cuando','cuándo','donde','dónde','quien','quién',
+  'para','por','con','del','los','las','una','unos','unas','este','esta','estos','estas','eso','esa','ese',
+  'sabes','saber','dime','cuenta','quiero','puedes','puede','favor','hay','tengo','tiene','estan','están','esta','está',
+  'sobre','todo','toda','todos','todas','mas','más','muy','pero','desde','hasta','entre','sus','sus','mis','tus',
+  'pedido','pedidos','cliente','clientes','producto','productos','nota','notas','vale','cuesta','precio','hola']);
+function iaTerminos(q){
+  return [...new Set(String(q||'').toLowerCase().split(/[^0-9a-záéíóúñü]+/i)
+    .filter(w=>w.length>=4&&!IA_VACIAS.has(w)))].slice(0,4);
+}
+function iaUnir(destino,origen,clave){
+  const vistos=new Set((destino[clave]||[]).map(x=>x.id));
+  (origen[clave]||[]).forEach(x=>{ if(!vistos.has(x.id)){ (destino[clave]=destino[clave]||[]).push(x); vistos.add(x.id); } });
+}
+function iaContexto(wsId,pregunta,permisos){
+  const q=String(pregunta||'').trim();
+  const ctx={panorama:svcPanorama(wsId)};
+  const refs=[...q.matchAll(/#?\b(\d{3,5})\b/g)].map(m=>m[1]).slice(0,3);
+  refs.forEach(r=>{ const p=svcPedido(wsId,r); if(p){ (ctx.pedidos=ctx.pedidos||[]).push(p); } });
+  const enc={pedidos:[],clientes:[],productos:[],notas:[],total:0};
+  iaTerminos(q).forEach(t=>{ const r=svcBuscar(wsId,t,permisos,5); ['pedidos','clientes','productos','notas'].forEach(k=>iaUnir(enc,r,k)); });
+  enc.total=enc.pedidos.length+enc.clientes.length+enc.productos.length+enc.notas.length;
+  if(enc.total)ctx.coincidencias=enc;
+  // Del resultado de la búsqueda salen los nombres propios: así "¿qué sé de Textiles ABC?"
+  // trae la ficha completa del cliente sin necesidad de que la IA pida nada.
+  (enc.clientes||[]).slice(0,2).forEach(c=>{ const d=svcCliente(wsId,c.titulo); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
+  (enc.productos||[]).slice(0,3).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
+  if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7);
+  return ctx;
+}
+const IA_SISTEMA=`Eres el asistente de un taller de artes gráficas. Hablas español de Colombia, con voz serena, breve y con datos.
+
+REGLAS QUE NO SE ROMPEN:
+- Respondes ÚNICAMENTE con los datos del CONTEXTO que se te entrega. Si el dato no está ahí, dices exactamente qué falta y dónde mirarlo. Nunca inventas cifras, fechas, nombres ni precios.
+- Los valores van en pesos colombianos con separador de miles (ej: $1.250.000).
+- Si te piden algo que implique cambiar datos (crear, editar, borrar), explicas cómo hacerlo en la app: tú no ejecutas cambios.
+- Prefieres 3 líneas útiles a 10 de relleno. Sin saludos de cortesía ni "¡claro que sí!".
+- Si la pregunta es ambigua, respondes con lo más probable y ofreces la alternativa en una línea.`;
+
+// ── Adaptadores. Cada uno recibe lo mismo y devuelve texto; las diferencias mueren aquí.
+async function iaLlamar(cfg,sistema,mensajes,maxTokens){
+  const ctrl=new AbortController();
+  const reloj=setTimeout(()=>ctrl.abort(),45000); // que una IA colgada no cuelgue la app
+  try{
+    if(cfg.proveedor==='claude'){
+      const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
+        headers:{'content-type':'application/json','x-api-key':cfg.clave,'anthropic-version':'2023-06-01'},
+        body:JSON.stringify({model:cfg.modelo,max_tokens:maxTokens||1200,system:sistema,messages:mensajes})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error((j.error&&j.error.message)||('El proveedor respondió '+r.status));
+      return (j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+    }
+    if(cfg.proveedor==='openai'){
+      const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
+        headers:{'content-type':'application/json','authorization':'Bearer '+cfg.clave},
+        body:JSON.stringify({model:cfg.modelo,max_tokens:maxTokens||1200,
+          messages:[{role:'system',content:sistema},...mensajes]})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error((j.error&&j.error.message)||('El proveedor respondió '+r.status));
+      return ((j.choices||[])[0]?.message?.content||'').trim();
+    }
+    if(cfg.proveedor==='ollama'){
+      const r=await fetch(cfg.url_base,{method:'POST',signal:ctrl.signal,
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({model:cfg.modelo,stream:false,
+          messages:[{role:'system',content:sistema},...mensajes]})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(j.error||('El modelo local respondió '+r.status));
+      return String(j.message?.content||'').trim();
+    }
+    throw new Error('Proveedor no reconocido');
+  }catch(e){
+    if(e.name==='AbortError')throw new Error('El proveedor tardó demasiado en responder (45 s).');
+    if(/fetch failed|ECONNREFUSED/i.test(e.message))throw new Error('No se pudo conectar con el proveedor. Revisa la conexión'+(cfg.proveedor==='ollama'?' o que Ollama esté corriendo.':' o la URL.'));
+    throw e;
+  }finally{ clearTimeout(reloj); }
+}
+
+app.get('/api/ia/config',requiere('configurar_sistema'),(req,res)=>{ res.json(iaConfigPublica(req.wsId)); });
+app.put('/api/ia/config',requiere('configurar_sistema'),(req,res)=>{
+  try{
+    const b=req.body||{}, act=iaConfig(req.wsId);
+    const prov=IA_PROVEEDORES[b.proveedor]?b.proveedor:act.proveedor;
+    // Si no mandan clave, se CONSERVA la que había: el front nunca la recibe, así que
+    // no puede reenviarla, y sin esto guardar cualquier otro ajuste la borraría.
+    const clave=(b.clave===undefined||b.clave===null)?act.clave:String(b.clave);
+    const modelo=b.modelo!==undefined?String(b.modelo||'').trim():act.modelo;
+    const url=b.url_base!==undefined?String(b.url_base||'').trim():act.url_base;
+    db.prepare(`INSERT INTO ia_config(workspace_id,proveedor,modelo,clave,url_base,activo,actualizado)
+      VALUES(?,?,?,?,?,?,datetime('now','localtime'))
+      ON CONFLICT(workspace_id) DO UPDATE SET proveedor=excluded.proveedor,modelo=excluded.modelo,
+        clave=excluded.clave,url_base=excluded.url_base,activo=excluded.activo,actualizado=excluded.actualizado`)
+      .run(req.wsId,prov,modelo,clave,url,b.activo?1:0);
+    res.json(iaConfigPublica(req.wsId));
+  }catch(e){logError('PUT /api/ia/config',e);res.status(500).json({error:e.message})}
+});
+app.post('/api/ia/probar',requiere('configurar_sistema'),async(req,res)=>{
+  try{
+    const cfg=iaConfig(req.wsId);
+    if(cfg.proveedor!=='ollama'&&!cfg.clave)return res.status(400).json({error:'Falta la clave del proveedor'});
+    const t0=Date.now();
+    const txt=await iaLlamar(cfg,'Responde solo con la palabra: listo',[{role:'user',content:'Di listo'}],20);
+    res.json({ok:true,respuesta:txt.slice(0,80),ms:Date.now()-t0,proveedor:cfg.proveedor,modelo:cfg.modelo});
+  }catch(e){ res.status(400).json({error:e.message}); }
+});
+
+/* Transparencia: devuelve EXACTAMENTE el contexto que se le entregaría a la IA para esa
+   pregunta, sin llamar al proveedor (ni gastar tokens). Sirve para auditar de dónde salió
+   una respuesta y para probar toda la capa de servicios sin depender de una clave. */
+app.get('/api/ia/contexto',requiere('configurar_sistema'),(req,res)=>{
+  try{ res.json(iaContexto(req.wsId,req.query.q||'',req.permisos)); }
+  catch(e){ logError('GET /api/ia/contexto',e); res.status(500).json({error:e.message}); }
+});
+
+// Un turno de conversación por vez, por workspace: evita disparar la factura sin querer.
+const _iaOcupado=new Set();
+app.post('/api/ia/preguntar',async(req,res)=>{
+  const ws=req.wsId;
+  try{
+    const cfg=iaConfig(ws);
+    if(!cfg.activo)return res.status(400).json({error:'El asistente está apagado. Actívalo en Configuración.'});
+    if(cfg.proveedor!=='ollama'&&!cfg.clave)return res.status(400).json({error:'Falta la clave del proveedor en Configuración.'});
+    const pregunta=String((req.body||{}).pregunta||'').trim();
+    if(!pregunta)return res.status(400).json({error:'Escribe una pregunta'});
+    if(pregunta.length>2000)return res.status(400).json({error:'La pregunta es demasiado larga'});
+    if(_iaOcupado.has(ws))return res.status(429).json({error:'Ya hay una consulta en curso. Espera a que termine.'});
+    _iaOcupado.add(ws);
+    try{
+      const ctx=iaContexto(ws,pregunta,req.permisos);
+      const previo=(Array.isArray((req.body||{}).historial)?req.body.historial:[]).slice(-6)
+        .filter(m=>m&&(m.rol==='usuario'||m.rol==='asistente')&&String(m.texto||'').trim())
+        .map(m=>({role:m.rol==='usuario'?'user':'assistant',content:String(m.texto).slice(0,4000)}));
+      const hoyTxt=hoy(ws), neg=getConfiguracion(ws).nombre_negocio||'el taller';
+      const mensajes=[...previo,{role:'user',content:
+`Hoy es ${hoyTxt}. El negocio es ${neg}.
+
+CONTEXTO (datos reales del sistema, en JSON):
+${JSON.stringify(ctx,null,1).slice(0,60000)}
+
+PREGUNTA: ${pregunta}`}];
+      const t0=Date.now();
+      const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,1200);
+      // Se devuelve QUÉ se consultó: el usuario debe poder auditar de dónde salió la respuesta.
+      res.json({respuesta:texto,ms:Date.now()-t0,
+        consultado:Object.keys(ctx),
+        proveedor:cfg.proveedor,modelo:cfg.modelo});
+    }finally{ _iaOcupado.delete(ws); }
+  }catch(e){ logError('POST /api/ia/preguntar',e); res.status(400).json({error:e.message}); }
 });
 
 // ── PRODUCTOS (fichas de producto) ──
