@@ -2832,7 +2832,16 @@ function svcFinanzas(wsId,q,perm){
   // Si preguntaron por "hoy" o "esta semana", ese corte no está en la lista fija: se añade.
   if(!cortes.some(c=>c.periodo===per.clave))cortes.unshift(finCorte(wsId,per.desde,hoyStr,per.clave));
   return {preguntaste_por:per.clave, cortes,
-    ojo:'Cada corte es independiente y ya está calculado: usa el que te pidan, NO sumes ni restes cortes entre sí. "ingresos_cobrados" es plata que YA entró (pagos recibidos), no lo facturado.'};
+    /* Los dos números NO son del mismo grupo de pedidos, y eso hay que decirlo: un pago de
+       julio por un pedido de junio suma a los ingresos de julio, pero su costo contó en
+       junio. Es la misma fórmula del Dashboard (a propósito: una sola fuente de verdad),
+       pero al comparar mes contra mes produce saltos que parecen desplomes y son calendario
+       de pagos. Sin este aviso el asistente presenta un "-88%" como si fuera rendimiento. */
+    ojo:'Cada corte es independiente y ya está calculado: usa el que te pidan, NO sumes ni restes cortes entre sí. '
+      +'"ingresos_cobrados" es plata que YA entró (pagos recibidos por su fecha de pago), no lo facturado; '
+      +'"costos" son los de los pedidos CREADOS en ese rango. Al no ser el mismo grupo de pedidos, la utilidad '
+      +'de un mes puede subir o caer por CUÁNDO se cobró, no por cómo se trabajó: si comparas dos períodos y el '
+      +'salto es grande, dilo en una línea antes de que suene a desplome. Es el mismo cálculo del Dashboard.'};
 }
 // Cuántos insumos se han consumido (los vasos que ya se gastaron en pedidos).
 function svcConsumoInsumos(wsId,q){
@@ -3107,6 +3116,7 @@ CÓMO LEER LO QUE TE PIDEN (esto es un taller, la gente habla rápido y en desor
 CIFRAS DEL NEGOCIO (cómo leer lo que te llega):
 - FINANZAS no trae un solo número: trae varios CORTES ya calculados ("este mes", "el mes pasado", "este año", "desde siempre"). Usa el corte que te pidieron y NÓMBRALO. Nunca digas que no tienes el corte del mes: está ahí. No sumes ni restes cortes entre sí.
 - Si en una misma frase te piden cosas con tiempos distintos ("las ventas desde el inicio y las ganancias de este mes"), responde cada una con su corte. No apliques un solo período a todo.
+- Al comparar un período con otro: la utilidad mezcla pagos recibidos con costos de pedidos creados, que no son el mismo grupo. Un mes puede desplomarse solo porque los cobros entraron tarde. Cuando la variación sea fuerte, dilo en una línea ("puede ser cuándo se cobró, no cómo se trabajó") en vez de presentarlo como una caída del negocio. Y si el mes aún no cierra, recuérdalo.
 - COSTO POR PRODUCTO: viene repartido entre los ítems de cada encargo a prorrata del valor. Es una aproximación — cuando presentes márgenes por producto, dilo en una línea, una sola vez.
 - Si un producto dice "sin costo cargado", NO tiene margen 0% ni 100%: no se sabe. Sepáralo del ranking y di cuántos productos están en esa situación. Nunca inventes un costo ni supongas que algo salió gratis.
 
