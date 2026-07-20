@@ -1516,6 +1516,72 @@ app.post('/api/produccion/danos',requiere('ver_produccion'),(req,res)=>{
     cantidad:String(b.cantidad||''),origen,anonimo:1});
   res.json({ok:true});
 });
+/* D4 · MÉTRICAS DE PRODUCCIÓN — se calculan SOLO con lo que los eventos permiten medir
+   de verdad; no se inventan promedios. El tiempo por etapa sale de la diferencia entre
+   traspasos consecutivos del mismo ítem, así que solo cuenta lo que ya se movió dos veces
+   (se informa cuántos tramos se midieron para que el dato no engañe). */
+app.get('/api/produccion/metricas',requiere('ver_produccion'),(req,res)=>{
+  try{
+    const dias=Math.min(365,Math.max(1,parseInt(req.query.dias,10)||30));
+    const desde=db.prepare("SELECT date('now','localtime',?) d").get(`-${dias} days`).d;
+    const evs=db.prepare(`SELECT * FROM produccion_eventos WHERE workspace_id=? AND date(creado)>=?
+                          ORDER BY item_id, creado`).all(req.wsId,desde);
+
+    // ── Equipo: qué hizo cada persona (los daños NO se atribuyen: son anónimos) ──
+    const porPersona={};
+    const tocar=(nom)=>{ const k=nom||'(sin nombre)'; if(!porPersona[k])porPersona[k]={nombre:k,traspasos:0,calidad_ok:0,calidad_problema:0}; return porPersona[k]; };
+    evs.forEach(e=>{
+      if(e.tipo==='traspaso') tocar(e.usuario_nombre).traspasos++;
+      else if(e.tipo==='calidad'){ const p=tocar(e.usuario_nombre); if(e.resultado==='ok')p.calidad_ok++; else p.calidad_problema++; }
+    });
+
+    // ── Etapas: cuánto tiempo se queda un ítem en cada una ──
+    const porEtapa={}; const trasp=evs.filter(e=>e.tipo==='traspaso'&&e.item_id);
+    const porItem={}; trasp.forEach(e=>{ (porItem[e.item_id]=porItem[e.item_id]||[]).push(e); });
+    Object.values(porItem).forEach(lista=>{
+      lista.sort((a,b)=>String(a.creado).localeCompare(String(b.creado)));
+      for(let i=0;i<lista.length-1;i++){
+        const etapa=lista[i].estado_hasta; if(!etapa)continue;
+        const h=(new Date(lista[i+1].creado.replace(' ','T'))-new Date(lista[i].creado.replace(' ','T')))/3600000;
+        if(!isFinite(h)||h<0)continue;
+        const r=porEtapa[etapa]=porEtapa[etapa]||{etapa,horas:0,tramos:0};
+        r.horas+=h; r.tramos++;
+      }
+    });
+    const etapas=Object.values(porEtapa).map(r=>({etapa:r.etapa,tramos:r.tramos,
+      horas_promedio:Math.round((r.horas/r.tramos)*10)/10})).sort((a,b)=>b.horas_promedio-a.horas_promedio);
+
+    // ── Calidad y daños del negocio ──
+    const cal=evs.filter(e=>e.tipo==='calidad');
+    const danos=evs.filter(e=>e.tipo==='dano');
+    const danosPorOrigen={};
+    danos.forEach(d=>{ const k=d.origen||'otro'; danosPorOrigen[k]=(danosPorOrigen[k]||0)+1; });
+
+    // Qué se daña o falla más (por el detalle del ítem, si el reporte iba ligado a uno)
+    const itemsIds=[...new Set([...cal.filter(e=>e.resultado==='problema'),...danos].map(e=>e.item_id).filter(Boolean))];
+    const nombres={};
+    if(itemsIds.length){
+      const q=itemsIds.map(()=>'?').join(',');
+      db.prepare(`SELECT id,detalle FROM enc_items WHERE id IN (${q})`).all(...itemsIds)
+        .forEach(r=>{ nombres[r.id]=r.detalle||''; });
+    }
+    const problemasPorProducto={};
+    [...cal.filter(e=>e.resultado==='problema'),...danos].forEach(e=>{
+      const n=(nombres[e.item_id]||'').trim(); if(!n)return;
+      problemasPorProducto[n]=(problemasPorProducto[n]||0)+1;
+    });
+
+    res.json({
+      dias, desde,
+      equipo:Object.values(porPersona).sort((a,b)=>(b.traspasos+b.calidad_ok+b.calidad_problema)-(a.traspasos+a.calidad_ok+a.calidad_problema)),
+      etapas,
+      calidad:{ok:cal.filter(e=>e.resultado==='ok').length,problema:cal.filter(e=>e.resultado==='problema').length},
+      danos:{total:danos.length,por_origen:danosPorOrigen},
+      productos_con_problemas:Object.entries(problemasPorProducto).map(([nombre,n])=>({nombre,n})).sort((a,b)=>b.n-a.n).slice(0,8),
+      movimientos:trasp.length
+    });
+  }catch(e){ logError('GET /api/produccion/metricas',e); res.status(500).json({error:e.message}); }
+});
 // Cambiar el estado de UN ÍTEM desde Producción (cada ítem fluye por separado).
 app.put('/api/produccion/item/:id',requiere('gestionar_produccion'),(req,res)=>{
   const it=db.prepare(`SELECT i.id,i.estado,i.detalle,i.cantidad,i.encargo_id,e.numero,e.responsable_id,e.notas_tec,p.cerrado AS p_cerrado,p.id AS p_id

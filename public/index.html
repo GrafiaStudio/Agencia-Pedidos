@@ -760,6 +760,25 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .pcx-trasp-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
 .pcx-trasp-a .btn-add-row{padding:5px 10px;font-size:10.5px}
 
+/* D4 · métricas */
+.met-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;max-width:900px}
+.met-kpi{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;box-shadow:var(--sh)}
+.met-kpi .num{font-size:30px;font-weight:300;color:var(--navy);line-height:1;letter-spacing:-.02em}
+.met-kpi .lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:7px}
+.met-kpi .sub{font-size:10px;color:var(--slate);margin-top:3px}
+.met-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;max-width:1100px}
+.met-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;box-shadow:var(--sh)}
+.met-h{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:800;color:var(--slate);
+  text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px}
+.met-h i{color:var(--teal-dk);font-size:15px}
+.met-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.met-tbl th{text-align:left;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.06em;padding:0 8px 7px 0;border-bottom:1px solid var(--line)}
+.met-tbl td{padding:8px 8px 8px 0;border-bottom:1px solid var(--line-lt);color:var(--navy)}
+.met-sub{color:var(--muted);font-size:10px}
+.met-fila{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-lt);font-size:11.5px;color:var(--navy)}
+.met-fila b{color:var(--navy)}
+
 /* D3 · reportes de daños */
 .dano-lista{display:flex;flex-direction:column;gap:8px;max-width:760px}
 .dano-item{display:flex;gap:11px;align-items:flex-start;background:var(--white);border:1px solid var(--line);
@@ -1452,6 +1471,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
         <button class="pv-tab" data-pv="cronograma" onclick="prodSetVista('cronograma')"><i class="ti ti-timeline"></i>Cronograma</button>
         <button class="pv-tab" data-pv="agenda" onclick="prodSetVista('agenda')"><i class="ti ti-checkup-list"></i>Agenda</button>
         <button class="pv-tab" data-pv="danos" onclick="prodSetVista('danos')"><i class="ti ti-alert-triangle"></i>Daños</button>
+        <button class="pv-tab" data-pv="metricas" onclick="prodSetVista('metricas')"><i class="ti ti-chart-bar"></i>Métricas</button>
       </div>
       <div class="prod-bar">
         <div class="search-b" style="flex:1;min-width:180px;max-width:280px"><i class="ti ti-search"></i>
@@ -1469,6 +1489,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
       <div id="prod-crono" style="display:none"></div>
       <div id="prod-agenda" style="display:none"></div>
       <div id="prod-danos" style="display:none"></div>
+      <div id="prod-metricas" style="display:none"></div>
       <div class="empty" id="prod-empty" style="display:none"><i class="ti ti-tools-off"></i><p>No hay trabajos en producción ahora mismo</p></div>
     </div>
 
@@ -4184,7 +4205,7 @@ function prodCardsFiltradas(){
     return true;
   });
 }
-const PROD_VISTAS={kanban:'prod-board',lista:'prod-lista',calendario:'prod-cal',cronograma:'prod-crono',agenda:'prod-agenda',danos:'prod-danos'};
+const PROD_VISTAS={kanban:'prod-board',lista:'prod-lista',calendario:'prod-cal',cronograma:'prod-crono',agenda:'prod-agenda',danos:'prod-danos',metricas:'prod-metricas'};
 function prodSetVista(v){
   if(!PROD_VISTAS[v])return;
   prodVista=v;
@@ -4215,6 +4236,7 @@ function renderProduccion(){
   else if(prodVista==='calendario')renderProdCal(el,cards,editable);
   else if(prodVista==='cronograma')renderProdCrono(el,cards);
   else if(prodVista==='danos')el.innerHTML=renderDanosHTML(); // D3
+  else if(prodVista==='metricas'){ el.innerHTML=renderMetricasHTML(); if(!PROD_METRICAS)cargarMetricas(); } // D4
   else renderProdAgenda(el,cards,editable);
 }
 function renderProdKanban(board,cards,editable){
@@ -4538,6 +4560,66 @@ function prodTraspasoPanelHTML(c){
     </div>
   </div>`;
 }
+/* D4 · MÉTRICAS — solo lo que los eventos permiten medir de verdad. Cuando un dato se
+   apoya en pocos casos se dice cuántos, para que nadie tome decisiones sobre humo. */
+let PROD_METRICAS=null, metricasDias=30;
+async function cargarMetricas(){
+  try{ PROD_METRICAS=await api('GET','/produccion/metricas?dias='+metricasDias); }
+  catch(e){ PROD_METRICAS={error:e.message}; }
+  if(prodVista==='metricas')renderProduccion();
+}
+function metricasSetDias(d){ metricasDias=d; PROD_METRICAS=null; renderProduccion(); cargarMetricas(); }
+function mHoras(h){
+  if(h==null)return '—';
+  if(h<1)return Math.round(h*60)+' min';
+  if(h<48)return (Math.round(h*10)/10)+' h';
+  return Math.round(h/24)+' días';
+}
+function renderMetricasHTML(){
+  const m=PROD_METRICAS;
+  const chips=[7,30,90].map(d=>`<button class="pv-tab ${metricasDias===d?'active':''}" onclick="metricasSetDias(${d})">${d} días</button>`).join('');
+  const cab=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${chips}</div>`;
+  if(!m)return cab+'<div class="hint">Calculando…</div>';
+  if(m.error)return cab+`<div class="hint">No se pudieron cargar: ${pesc(m.error)}</div>`;
+  if(!m.movimientos && !m.danos.total && !m.calidad.ok && !m.calidad.problema)
+    return cab+`<div class="hint" style="padding:16px 0">Todavía no hay suficiente actividad en este periodo. Las métricas se van llenando solas a medida que el equipo mueve trabajos, sella calidad o reporta daños.</div>`;
+
+  const kpi=(n,l,sub)=>`<div class="met-kpi"><div class="num">${n}</div><div class="lbl">${l}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+  const totalCal=m.calidad.ok+m.calidad.problema;
+  const pctProb=totalCal?Math.round(m.calidad.problema/totalCal*100):0;
+
+  const equipo=m.equipo.length?`<table class="met-tbl"><thead><tr><th>Persona</th><th>Movimientos</th><th>Calidad OK</th><th>Con problema</th></tr></thead><tbody>
+    ${m.equipo.map(p=>`<tr><td>${pesc(p.nombre)}</td><td>${p.traspasos}</td><td>${p.calidad_ok}</td><td>${p.calidad_problema?`<b style="color:var(--red)">${p.calidad_problema}</b>`:'0'}</td></tr>`).join('')}
+    </tbody></table>`:'<div class="hint">Sin actividad del equipo en este periodo.</div>';
+
+  const etapas=m.etapas.length?`<table class="met-tbl"><thead><tr><th>Etapa</th><th>Tiempo promedio</th><th>Medido sobre</th></tr></thead><tbody>
+    ${m.etapas.map(e=>`<tr><td>${pesc(e.etapa)}</td><td><b>${mHoras(e.horas_promedio)}</b></td><td class="met-sub">${e.tramos} paso${e.tramos===1?'':'s'}</td></tr>`).join('')}
+    </tbody></table><div class="hint" style="margin-top:6px">Se mide el tiempo entre un movimiento y el siguiente del mismo ítem, así que solo cuentan los trabajos que ya avanzaron al menos dos veces.</div>`
+    :'<div class="hint">Aún no hay suficientes movimientos para medir tiempos por etapa.</div>';
+
+  const ORI={proveedor:'Del proveedor',interno:'Se dañó aquí',otro:'Otro'};
+  const danos=Object.entries(m.danos.por_origen||{});
+  const danosHtml=danos.length?danos.map(([k,n])=>`<div class="met-fila"><span>${pesc(ORI[k]||k)}</span><b>${n}</b></div>`).join('')
+    :'<div class="hint">Sin daños reportados 🙂</div>';
+
+  const prods=m.productos_con_problemas.length?m.productos_con_problemas.map(p=>`<div class="met-fila"><span>${pesc(p.nombre)}</span><b>${p.n}</b></div>`).join('')
+    :'<div class="hint">Ningún producto acumula problemas.</div>';
+
+  return cab+`
+    <div class="met-kpis">
+      ${kpi(m.movimientos,'Movimientos de trabajo')}
+      ${kpi(m.calidad.ok,'Vistos buenos')}
+      ${kpi(m.calidad.problema,'Con problema',totalCal?`${pctProb}% de lo revisado`:'')}
+      ${kpi(m.danos.total,'Daños reportados')}
+    </div>
+    <div class="met-grid">
+      <div class="met-card"><div class="met-h"><i class="ti ti-users"></i>Equipo</div>${equipo}</div>
+      <div class="met-card"><div class="met-h"><i class="ti ti-clock"></i>Tiempo por etapa</div>${etapas}</div>
+      <div class="met-card"><div class="met-h"><i class="ti ti-alert-triangle"></i>Daños por origen</div>${danosHtml}</div>
+      <div class="met-card"><div class="met-h"><i class="ti ti-box"></i>Productos con más problemas</div>${prods}</div>
+    </div>`;
+}
+
 /* D3 · REPORTES DE DAÑOS — anónimos EN PANTALLA: el sistema guarda quién reportó (nada
    queda sin rastro) pero no lo muestra; solo el administrador lo ve. La idea es que la
    gente reporte sin miedo a quedar señalada. */
