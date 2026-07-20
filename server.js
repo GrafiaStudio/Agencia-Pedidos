@@ -361,6 +361,12 @@ try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_minimo_calc TEXT");
 // Ej. cantidad: 1-20 prendas a $10, de 21 en adelante a $8. Ej. área: hasta 2 m² a $9, más grande a $7.
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_cond TEXT DEFAULT '[]'"); } catch(e){}
 try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_cond_eje TEXT DEFAULT 'cantidad'"); } catch(e){}
+/* La cuenta es ancho × alto × tarifa con los números TAL CUAL: no hay conversión en ningún
+   sitio (ver areaFicha). La unidad no cambia la matemática — dice en qué se van a escribir
+   las medidas, y con eso se rotula el campo del pedido. Las partes no la tenían y el campo
+   decía "(m)" siempre: quien cobra $20 el cm² escribía 10×10 y veía "metros". Por defecto
+   'm2' para no mover ni un precio de los que ya existen. */
+try { db.exec("ALTER TABLE ficha_variantes ADD COLUMN medida_unidad TEXT DEFAULT 'm2'"); } catch(e){}
 db.exec(`CREATE TABLE IF NOT EXISTS etiquetas_negocio(
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -2732,8 +2738,11 @@ function iaVarNodo(v){
     return o;
   }
   if(v.modo==='medidas'){
-    o.cobro='por medidas (ancho × alto, en metros)';
-    o.tarifa_por_m2=toFloatCO(v.medida_tarifa_calc);
+    // La unidad se dice SIEMPRE: sin ella el modelo cotiza 10×10 como metros y se equivoca
+    // por un factor de 10.000. No hay conversión — se multiplica lo que se escribe.
+    const cm=v.medida_unidad==='cm2';
+    o.cobro='por medidas: ancho × alto en '+(cm?'CENTÍMETROS':'METROS')+', multiplicado por la tarifa';
+    o['tarifa_por_'+(cm?'cm2':'m2')]=toFloatCO(v.medida_tarifa_calc);
     if(toNum(v.medida_minimo_calc)>0)o.cobro_minimo=toNum(v.medida_minimo_calc);
     if((v.medida_cond||[]).length)o.condiciones_de_tarifa={
       cambia_segun:v.medida_cond_eje==='area'?'el área de la pieza (m²)':'la cantidad de unidades del pedido',
@@ -3157,10 +3166,9 @@ CREAR UN PRODUCTO (lo único que puedes proponer; todo lo demás sigue siendo so
   · medidas → se cobra por tamaño. Campos: "medida_unidad" (m2 · cm2 · m), "medida_tarifa", opcional "cobro_minimo", y si la tarifa cambia por tramos: "medida_cond":[{"desde":2,"hasta":null,"tarifa":7000}] con "medida_cond_eje":"area" o "cantidad".
   · variantes → el precio se arma sumando partes. "variantes":[{"nombre":"Tamaño","hijos":[{"nombre":"Carta","precio":"3000"}]}]. Una parte que solo describe y no cobra lleva "informativa":true.
 - ⭐ UNA PARTE PUEDE COBRARSE POR MEDIDAS, no solo por precio fijo. Si dentro de un producto por variantes hay algo que se cobra por tamaño (un estampado a $20 el cm²), esa parte lleva "modo":"medidas" con su propia "medida_tarifa", y si la tarifa baja por cantidad o por área, sus propias "medida_cond" y "medida_cond_eje". NO uses "tramos" para eso: los tramos son el precio de la parte entera según cuántas unidades del PEDIDO, no una tarifa por medida.
-- ⚠️⚠️ UNIDADES · UNA PARTE POR MEDIDAS SIEMPRE SE COBRA POR m², no por cm². Las partes no tienen unidad propia (solo la tiene el producto simple, con "medida_unidad"). Si te dictan un precio por CENTÍMETRO cuadrado, tienes que MULTIPLICARLO POR 10.000 antes de ponerlo, y decírselo al usuario en una línea. Ejemplo: "$20 el cm²" son $200.000 el m². Si pones 20 a secas, un estampado de 10×10 cm costaría 20 centavos en vez de $2.000, y nadie lo notaría hasta cobrarlo mal.
-  Ejemplo completo: estampado a $20/cm² que baja a $18 desde 7 unidades y a $16 desde 13 → se convierte todo a m²:
-  {"nombre":"Estampado","modo":"medidas","medida_tarifa":"200000","medida_cond_eje":"cantidad","medida_cond":[{"desde":7,"hasta":12,"tarifa":180000},{"desde":13,"hasta":null,"tarifa":160000}]}
-  Y avisas: "lo guardé como $200.000/m², que es lo mismo que $20/cm²".
+- UNIDADES · NO conviertas nada, NUNCA multipliques por 10.000. El sistema calcula ancho × alto × tarifa con los números tal cual se escriben: si la tarifa es 20 y el operario escribe 10 × 10, el cobro es $2.000. La unidad no cambia la cuenta, solo dice EN QUÉ se van a escribir esas medidas. Pon la tarifa tal como te la dicten y declara la unidad con "medida_unidad":"cm2" (o "m2"), en la parte y también en el producto simple. Si no te dicen la unidad, pregúntala en una línea: es la diferencia entre cobrar $2.000 y cobrar $0,20.
+  Ejemplo: estampado a $20 el cm² que baja a $18 desde 7 unidades y a $16 desde 13 →
+  {"nombre":"Estampado","modo":"medidas","medida_unidad":"cm2","medida_tarifa":"20","medida_cond_eje":"cantidad","medida_cond":[{"desde":7,"hasta":12,"tarifa":18},{"desde":13,"hasta":null,"tarifa":16}]}
 - Si usas "tramos" en una parte, el PRIMERO tiene que empezar en 1: si no, no hay precio para 1 unidad y el sistema lo rechaza.
 
 EL COSTO SÍ SE PUEDE GUARDAR — nunca digas que la ficha no tiene dónde:
@@ -3224,6 +3232,7 @@ function iaNormVariante(v,prof,rec){
   if(modo==='medidas'){
     if(definido(v.medida_tarifa))o.medida_tarifa=String(v.medida_tarifa).trim();
     if(definido(v.medida_minimo))o.medida_minimo=String(v.medida_minimo).trim();
+    o.medida_unidad=v.medida_unidad==='cm2'?'cm2':'m2';
     o.medida_cond=iaNormCond(v.medida_cond);
     o.medida_cond_eje=v.medida_cond_eje==='area'?'area':'cantidad';
   }
@@ -3309,9 +3318,11 @@ function iaResumenPropuesta(b){
            tiene unidad propia, solo el producto simple la tiene. Decir "por unidad de
            medida" escondía justo el dato que hay que revisar: si alguien dicta "$20 el
            cm²" y se guarda 20, un estampado de 10×10 cm cobraría $0,20 en vez de $2.000. */
-        let s='por medidas: '+pesos(toFloatCO(n.medida_tarifa))+' por m²';
+        const um=n.medida_unidad==='cm2'?'cm²':'m²';
+        let s='por medidas: '+pesos(toFloatCO(n.medida_tarifa))+' por '+um+' (se escribe ancho × alto en '
+          +(n.medida_unidad==='cm2'?'centímetros':'metros')+')';
         (n.medida_cond||[]).forEach(c=>{ s+=' · desde '+c.desde
-          +(n.medida_cond_eje==='area'?' m²':' und')+': '+pesos(c.tarifa)+'/m²'; });
+          +(n.medida_cond_eje==='area'?(' '+um):' und')+': '+pesos(c.tarifa)+'/'+um; });
         return s+costoDe(n);
       }
       return (toFloatCO(n.precio)>0?pesos(toFloatCO(n.precio)):'sin precio')+costoDe(n);
@@ -3665,8 +3676,8 @@ function guardarVariantes(fichaId,variantes,wsId){
     // A4 · 'fijo' = precio fijo directo (ningún modo marcado): la tarjeta queda compacta, sin
     // tramos. Para el cálculo se comporta igual que 'precio' (cae al mismo else en todas partes).
     const modoV=(v.modo==='hoja'||v.modo==='medidas'||v.modo==='fijo')?v.modo:'precio';
-    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc,medida_cond,medida_cond_eje)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo),condJSON(v.medida_cond),condEje(v.medida_cond_eje));
+    db.prepare('INSERT INTO ficha_variantes(id,ficha_id,workspace_id,parent_id,nombre,precio,precio_calc,tramos,costos,multi,modo,piezas,orden,informativa,medida_tarifa,medida_tarifa_calc,medida_minimo,medida_minimo_calc,medida_cond,medida_cond_eje,medida_unidad)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id,fichaId,wsId,parentId||'',String(v.nombre||'').trim(),v.precio||'',normCalc(v.precio),JSON.stringify(v.tramos||[]),JSON.stringify(costos),v.multi?1:0,modoV,Number.isInteger(v.piezas)?v.piezas:(parseInt(v.piezas,10)||null),i,v.informativa?1:0,String(v.medida_tarifa||''),normDecimal(v.medida_tarifa),String(v.medida_minimo||''),normDecimal(v.medida_minimo),condJSON(v.medida_cond),condEje(v.medida_cond_eje),v.medida_unidad==='cm2'?'cm2':'m2');
     (v.hijos||[]).forEach((h,j)=>insertarNodo(h,id,j));
   };
   (variantes||[]).forEach((v,i)=>insertarNodo(v,'',i));
