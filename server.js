@@ -2586,51 +2586,75 @@ function iaFecha(iso){
   const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||''));
   return m?`${m[3]}/${m[2]}/${m[1]}`:String(iso||'');
 }
-function iaPedidoResumen(p){
+/* PERMISOS · el asistente no puede ser la puerta de atrás.
+   Un operario del taller ve sus pedidos pero NO el dinero (el Dashboard y el Centro de
+   Costos están detrás de ver_dashboard / ver_costos / ver_utilidad). Si el asistente le
+   entregara valores y saldos, bastaría con preguntar para saltarse el rol. Por eso todo
+   dato de plata se recorta ANTES de armar el contexto, no en el prompt: al modelo no le
+   pedimos que guarde secretos, simplemente no se los contamos. */
+function iaVeDinero(perm){
+  const p=perm||{};
+  return !!(p.__admin||p.ver_dashboard===true||p.ver_costos===true||p.ver_utilidad===true||p.ver_registros===true);
+}
+function iaPedidoResumen(p,perm){
   const total=p.valor_total||0, pag=iaPagado(p);
-  return {
+  const base={
     ref:p.ref, cliente:p.nombre, estado:iaEstadoPedido(p),
     urgente:!!p.urgente, fecha_pedido:iaFecha(p.fecha_pedido), entrega:iaFecha(p.fecha_entrega),
-    valor:total, pagado:pag, saldo:Math.max(0,total-pag),
     etapas:[...new Set((p.encargos||[]).map(e=>e.estado).filter(Boolean))],
     anotaciones:String(p.notas||'').slice(0,300)
   };
+  // perm undefined = llamada interna sin contexto de usuario: se asume lo más restrictivo.
+  if(iaVeDinero(perm))Object.assign(base,{valor:total,pagado:pag,saldo:Math.max(0,total-pag)});
+  return base;
 }
 // Panorama: lo que un dueño querría saber al abrir el negocio por la mañana.
-function svcPanorama(wsId){
+function svcPanorama(wsId,perm){
   const hoyStr=hoy(wsId);
   const activos=db.prepare(`SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cancelado=0 AND entregado=0 AND es_cotizacion=0`).all(wsId).map(pedidoCompleto);
   const cotiz=db.prepare(`SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cancelado=0 AND es_cotizacion=1`).all(wsId).map(pedidoCompleto);
   const enDias=(p,n)=>{ if(!p.fecha_entrega)return false; const d=(new Date(p.fecha_entrega)-new Date(hoyStr))/86400000; return d>=0&&d<=n; };
   const vencidos=activos.filter(p=>p.fecha_entrega&&p.fecha_entrega<hoyStr);
   const conSaldo=activos.filter(p=>(p.valor_total||0)-iaPagado(p)>0);
-  return {
+  const out={
     hoy:iaFecha(hoyStr),
     pedidos_activos:activos.length,
     urgentes:activos.filter(p=>p.urgente).length,
-    entregan_hoy:activos.filter(p=>p.fecha_entrega===hoyStr).map(iaPedidoResumen),
-    entregan_esta_semana:activos.filter(p=>enDias(p,7)).map(iaPedidoResumen),
-    atrasados:vencidos.map(iaPedidoResumen),
-    cotizaciones_abiertas:cotiz.length,
-    por_cobrar_total:conSaldo.reduce((a,p)=>a+((p.valor_total||0)-iaPagado(p)),0),
-    pedidos_con_saldo:conSaldo.map(iaPedidoResumen).slice(0,15)
+    entregan_hoy:activos.filter(p=>p.fecha_entrega===hoyStr).map(p=>iaPedidoResumen(p,perm)),
+    entregan_esta_semana:activos.filter(p=>enDias(p,7)).map(p=>iaPedidoResumen(p,perm)),
+    atrasados:vencidos.map(p=>iaPedidoResumen(p,perm)),
+    cotizaciones_abiertas:cotiz.length
   };
+  // El resumen de cobranza es dinero puro: a quien no puede verlo, ni se le menciona.
+  if(iaVeDinero(perm)){
+    out.por_cobrar_total=conSaldo.reduce((a,p)=>a+((p.valor_total||0)-iaPagado(p)),0);
+    out.pedidos_con_saldo=conSaldo.map(p=>iaPedidoResumen(p,perm)).slice(0,15);
+  }else{
+    out.nota_permisos='Este usuario no tiene permiso para ver valores ni saldos; por eso el contexto no los incluye. Si pregunta por dinero, dile que su rol no tiene acceso a esa información.';
+  }
+  return out;
 }
 // Un pedido concreto, por referencia (#0021 o 0021).
-function svcPedido(wsId,ref){
+function svcPedido(wsId,ref,perm){
   const r=String(ref||'').replace(/^#/,'').trim();
   if(!r)return null;
   const p=db.prepare('SELECT * FROM pedidos WHERE workspace_id=? AND ref=?').get(wsId,r);
   if(!p)return null;
   const c=pedidoCompleto(p);
-  const base=iaPedidoResumen(c);
+  const base=iaPedidoResumen(c,perm);
+  const dinero=iaVeDinero(perm);
   base.encargos=(c.encargos||[]).map(e=>({estado:e.estado,responsable:e.responsable||'',
-    items:(e.items||[]).map(it=>({cantidad:it.cantidad,detalle:it.detalle,valor_unitario:toNum(it.valor_unitario_calc||it.valor_unitario)}))}));
-  base.pagos=(c.pagos||[]).map(x=>({fecha:iaFecha(x.fecha||x.creado),monto:toNum(x.monto_calc),metodo:x.metodo||''}));
+    items:(e.items||[]).map(it=>{
+      const i={cantidad:it.cantidad,detalle:it.detalle};
+      if(dinero)i.valor_unitario=toNum(it.valor_unitario_calc||it.valor_unitario);
+      return i;
+    })}));
+  // Los pagos son dinero: quien no puede verlos en la app tampoco los recibe por aquí.
+  if(dinero)base.pagos=(c.pagos||[]).map(x=>({fecha:iaFecha(x.fecha||x.creado),monto:toNum(x.monto_calc),metodo:x.metodo||''}));
   return base;
 }
 // Historial de un cliente: lo que pidió, cuánto dejó, qué debe.
-function svcCliente(wsId,nombre){
+function svcCliente(wsId,nombre,perm){
   const n=String(nombre||'').trim(); if(n.length<2)return null;
   const cli=db.prepare(`SELECT * FROM clientes WHERE workspace_id=? AND archivado=0 AND nombre LIKE ? ESCAPE '\\' ORDER BY LENGTH(nombre) LIMIT 1`).get(wsId,bLike(n));
   if(!cli)return null;
@@ -2638,11 +2662,13 @@ function svcCliente(wsId,nombre){
   const validos=peds.filter(p=>!p.cancelado&&!p.es_cotizacion);
   const facturado=validos.reduce((a,p)=>a+(p.valor_total||0),0);
   const pagado=validos.reduce((a,p)=>a+iaPagado(p),0);
-  return {
+  const out={
     nombre:cli.nombre, telefono:cli.tel||'', email:cli.email||'', nit:cli.nit||'',
-    pedidos_totales:validos.length, facturado, pagado, saldo:Math.max(0,facturado-pagado),
-    ultimos_pedidos:peds.slice(0,8).map(iaPedidoResumen)
+    pedidos_totales:validos.length,
+    ultimos_pedidos:peds.slice(0,8).map(p=>iaPedidoResumen(p,perm))
   };
+  if(iaVeDinero(perm))Object.assign(out,{facturado,pagado,saldo:Math.max(0,facturado-pagado)});
+  return out;
 }
 // Un producto y CÓMO se cobra (incluye las condiciones de la Fase E).
 function svcProducto(wsId,nombre){
@@ -2701,11 +2727,11 @@ function iaVarNodo(v){
   return o;
 }
 // Qué se entrega en los próximos N días — la pregunta más frecuente de un taller.
-function svcAgenda(wsId,dias){
+function svcAgenda(wsId,dias,perm){
   const n=Math.min(60,Math.max(1,parseInt(dias,10)||7)), hoyStr=hoy(wsId);
   return db.prepare(`SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 AND cancelado=0 AND entregado=0 AND es_cotizacion=0
     AND fecha_entrega!='' AND fecha_entrega<=date(?, '+'||?||' day') ORDER BY fecha_entrega`).all(wsId,hoyStr,n)
-    .map(pedidoCompleto).map(iaPedidoResumen);
+    .map(pedidoCompleto).map(p=>iaPedidoResumen(p,perm));
 }
 
 /* ══ AI GATEWAY · EL PUENTE ═══════════════════════════════════════════════════════════
@@ -2774,9 +2800,9 @@ function iaUnir(destino,origen,clave){
 }
 function iaContexto(wsId,pregunta,permisos){
   const q=String(pregunta||'').trim();
-  const ctx={panorama:svcPanorama(wsId)};
+  const ctx={panorama:svcPanorama(wsId,permisos)};
   const refs=[...q.matchAll(/#?\b(\d{3,5})\b/g)].map(m=>m[1]).slice(0,3);
-  refs.forEach(r=>{ const p=svcPedido(wsId,r); if(p){ (ctx.pedidos=ctx.pedidos||[]).push(p); } });
+  refs.forEach(r=>{ const p=svcPedido(wsId,r,permisos); if(p){ (ctx.pedidos=ctx.pedidos||[]).push(p); } });
   const enc={pedidos:[],clientes:[],productos:[],notas:[],total:0};
   iaTerminos(q).forEach(t=>{ const r=svcBuscar(wsId,t,permisos,5); ['pedidos','clientes','productos','notas'].forEach(k=>iaUnir(enc,r,k)); });
   enc.total=enc.pedidos.length+enc.clientes.length+enc.productos.length+enc.notas.length;
@@ -2785,9 +2811,9 @@ function iaContexto(wsId,pregunta,permisos){
   // trae la ficha completa del cliente sin necesidad de que la IA pida nada.
   // Se desarrolla la ficha completa de los primeros; con nombres parecidos ("Camiseta",
   // "Camiseta estampada"…) un tope corto dejaba fuera justo el que se estaba preguntando.
-  (enc.clientes||[]).slice(0,3).forEach(c=>{ const d=svcCliente(wsId,c.titulo); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
+  (enc.clientes||[]).slice(0,3).forEach(c=>{ const d=svcCliente(wsId,c.titulo,permisos); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
   (enc.productos||[]).slice(0,5).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
-  if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7);
+  if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7,permisos);
   return ctx;
 }
 const IA_SISTEMA=`Eres el asistente de un taller de artes gráficas. Hablas español de Colombia, con voz serena, breve y con datos.
