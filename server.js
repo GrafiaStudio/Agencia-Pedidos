@@ -2579,11 +2579,18 @@ function iaEstadoPedido(p){
   if(p.entregado)return 'entregado';
   return 'en curso';
 }
+/* Las fechas viajan en la base como 2026-08-03, y el modelo repetía eso tal cual en la
+   respuesta. Aquí se entregan ya en día/mes/año: la IA no tiene que formatear nada,
+   solo copiar lo que ve — es la forma más confiable de que no se equivoque. */
+function iaFecha(iso){
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||''));
+  return m?`${m[3]}/${m[2]}/${m[1]}`:String(iso||'');
+}
 function iaPedidoResumen(p){
   const total=p.valor_total||0, pag=iaPagado(p);
   return {
     ref:p.ref, cliente:p.nombre, estado:iaEstadoPedido(p),
-    urgente:!!p.urgente, fecha_pedido:p.fecha_pedido||'', entrega:p.fecha_entrega||'',
+    urgente:!!p.urgente, fecha_pedido:iaFecha(p.fecha_pedido), entrega:iaFecha(p.fecha_entrega),
     valor:total, pagado:pag, saldo:Math.max(0,total-pag),
     etapas:[...new Set((p.encargos||[]).map(e=>e.estado).filter(Boolean))],
     anotaciones:String(p.notas||'').slice(0,300)
@@ -2598,7 +2605,7 @@ function svcPanorama(wsId){
   const vencidos=activos.filter(p=>p.fecha_entrega&&p.fecha_entrega<hoyStr);
   const conSaldo=activos.filter(p=>(p.valor_total||0)-iaPagado(p)>0);
   return {
-    hoy:hoyStr,
+    hoy:iaFecha(hoyStr),
     pedidos_activos:activos.length,
     urgentes:activos.filter(p=>p.urgente).length,
     entregan_hoy:activos.filter(p=>p.fecha_entrega===hoyStr).map(iaPedidoResumen),
@@ -2619,7 +2626,7 @@ function svcPedido(wsId,ref){
   const base=iaPedidoResumen(c);
   base.encargos=(c.encargos||[]).map(e=>({estado:e.estado,responsable:e.responsable||'',
     items:(e.items||[]).map(it=>({cantidad:it.cantidad,detalle:it.detalle,valor_unitario:toNum(it.valor_unitario_calc||it.valor_unitario)}))}));
-  base.pagos=(c.pagos||[]).map(x=>({fecha:x.fecha||x.creado,monto:toNum(x.monto_calc),metodo:x.metodo||''}));
+  base.pagos=(c.pagos||[]).map(x=>({fecha:iaFecha(x.fecha||x.creado),monto:toNum(x.monto_calc),metodo:x.metodo||''}));
   return base;
 }
 // Historial de un cliente: lo que pidió, cuánto dejó, qué debe.
@@ -2702,7 +2709,13 @@ const IA_VACIAS=new Set(['que','qué','como','cómo','cual','cuál','cuanto','cu
   'para','por','con','del','los','las','una','unos','unas','este','esta','estos','estas','eso','esa','ese',
   'sabes','saber','dime','cuenta','quiero','puedes','puede','favor','hay','tengo','tiene','estan','están','esta','está',
   'sobre','todo','toda','todos','todas','mas','más','muy','pero','desde','hasta','entre','sus','sus','mis','tus',
-  'pedido','pedidos','cliente','clientes','producto','productos','nota','notas','vale','cuesta','precio','hola']);
+  'pedido','pedidos','cliente','clientes','producto','productos','nota','notas','vale','cuesta','precio','hola',
+  // Palabras de TIEMPO y de ESTADO: describen la pregunta, no son el nombre de nadie.
+  // Sin esto, "¿qué entrego esta semana?" se ponía a buscar clientes llamados "entrego".
+  'semana','semanas','entrego','entrega','entregas','entregar','entregado','entregados',
+  'mañana','manana','ayer','proxima','próxima','proximo','próximo','mes','meses','dias','días',
+  'atrasado','atrasados','atraso','pendiente','pendientes','urgente','urgentes','activo','activos',
+  'debe','deben','deuda','deudas','plata','dinero','saldo','saldos','cobrar','pagar','pagado']);
 function iaTerminos(q){
   return [...new Set(String(q||'').toLowerCase().split(/[^0-9a-záéíóúñü]+/i)
     .filter(w=>w.length>=4&&!IA_VACIAS.has(w)))].slice(0,4);
@@ -2732,6 +2745,7 @@ const IA_SISTEMA=`Eres el asistente de un taller de artes gráficas. Hablas espa
 REGLAS QUE NO SE ROMPEN:
 - Respondes ÚNICAMENTE con los datos del CONTEXTO que se te entrega. Si el dato no está ahí, dices exactamente qué falta y dónde mirarlo. Nunca inventas cifras, fechas, nombres ni precios.
 - Los valores van en pesos colombianos con separador de miles (ej: $1.250.000).
+- Las fechas del contexto YA vienen en día/mes/año (ej: 03/08/2026). Escríbelas tal cual; nunca las conviertas a otro formato ni las recalcules.
 - Si te piden algo que implique cambiar datos (crear, editar, borrar), explicas cómo hacerlo en la app: tú no ejecutas cambios.
 - Prefieres 3 líneas útiles a 10 de relleno. Sin saludos de cortesía ni "¡claro que sí!".
 - Si la pregunta es ambigua, respondes con lo más probable y ofreces la alternativa en una línea.`;
@@ -2829,7 +2843,7 @@ app.post('/api/ia/preguntar',async(req,res)=>{
       const previo=(Array.isArray((req.body||{}).historial)?req.body.historial:[]).slice(-6)
         .filter(m=>m&&(m.rol==='usuario'||m.rol==='asistente')&&String(m.texto||'').trim())
         .map(m=>({role:m.rol==='usuario'?'user':'assistant',content:String(m.texto).slice(0,4000)}));
-      const hoyTxt=hoy(ws), neg=getConfiguracion(ws).nombre_negocio||'el taller';
+      const hoyTxt=iaFecha(hoy(ws)), neg=getConfiguracion(ws).nombre_negocio||'el taller';
       const mensajes=[...previo,{role:'user',content:
 `Hoy es ${hoyTxt}. El negocio es ${neg}.
 
