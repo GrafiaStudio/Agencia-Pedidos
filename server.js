@@ -2659,9 +2659,46 @@ function svcProducto(wsId,nombre){
     if((ficha.medida_cond||[]).length)out.condiciones={eje:ficha.medida_cond_eje,tramos:ficha.medida_cond};
   }
   if(ficha.tipo_precio==='escalonado'&&(ficha.rangos||[]).length)out.tramos_por_cantidad=ficha.rangos;
-  if(ficha.tipo_precio==='variantes')out.partes=(ficha.variantes||[]).map(v=>({nombre:v.nombre,
-    opciones:(v.hijos||[]).map(h=>h.nombre)}));
+  if(ficha.tipo_precio==='variantes'){
+    out.precio_desde=ficha.precio_oficial||0;
+    delete out.precio; // en un producto por variantes no hay "un" precio: se arma sumando partes
+    out.como_se_cobra='El precio se arma sumando las partes que el cliente elija. Cada opción trae su propio precio, y si tiene tramos, el precio cambia según la cantidad.';
+    out.partes=(ficha.variantes||[]).map(iaVarNodo);
+  }
   return out;
+}
+/* Una parte/opción de un producto por variantes, con TODO lo que hace falta para cotizarla.
+   Antes solo se mandaban los nombres: el asistente veía que existía la opción "tabloide"
+   pero no cuánto costaba, así que no podía cotizar y lo decía. El dato faltaba de origen. */
+function iaVarNodo(v){
+  const o={nombre:v.nombre};
+  if(v.informativa){
+    o.informativa='solo para describir, no cambia el precio';
+    if((v.hijos||[]).length)o.opciones=(v.hijos||[]).slice(0,30).map(h=>h.nombre);
+    return o;
+  }
+  const hijos=(v.hijos||[]).slice(0,30);
+  if(hijos.length){
+    o.se_elige=v.multi?'se pueden elegir VARIAS opciones, cada una con su cantidad':'se elige UNA opción';
+    o.opciones=hijos.map(iaVarNodo);
+    return o;
+  }
+  if(v.modo==='medidas'){
+    o.cobro='por medidas (ancho × alto, en metros)';
+    o.tarifa_por_m2=toFloatCO(v.medida_tarifa_calc);
+    if(toNum(v.medida_minimo_calc)>0)o.cobro_minimo=toNum(v.medida_minimo_calc);
+    if((v.medida_cond||[]).length)o.condiciones_de_tarifa={
+      cambia_segun:v.medida_cond_eje==='area'?'el área de la pieza (m²)':'la cantidad de unidades del pedido',
+      tramos:v.medida_cond};
+  }else if(v.modo==='hoja'){
+    o.cobro='por hoja: se calcula cuántas hojas hacen falta';
+    o.piezas_por_hoja=parseInt(v.piezas,10)||0;
+    o.precio_por_hoja=toNum(v.precio_calc);
+  }else{
+    o.precio=toNum(v.precio_calc);
+    if((v.tramos||[]).length)o.precio_segun_cantidad=v.tramos;
+  }
+  return o;
 }
 // Qué se entrega en los próximos N días — la pregunta más frecuente de un taller.
 function svcAgenda(wsId,dias){
@@ -2716,9 +2753,20 @@ const IA_VACIAS=new Set(['que','qué','como','cómo','cual','cuál','cuanto','cu
   'mañana','manana','ayer','proxima','próxima','proximo','próximo','mes','meses','dias','días',
   'atrasado','atrasados','atraso','pendiente','pendientes','urgente','urgentes','activo','activos',
   'debe','deben','deuda','deudas','plata','dinero','saldo','saldos','cobrar','pagar','pagado']);
+/* El producto se llama "Camiseta" y el usuario escribe "camisetas": buscar '%camisetas%'
+   NO encuentra "Camiseta" (la consulta es más larga que el nombre guardado). Por eso cada
+   término aporta también su singular — en español se pregunta en plural casi siempre. */
+function iaSingular(w){
+  if(w.length>5&&/(es)$/.test(w))return w.slice(0,-2);   // pendones → pendon
+  if(w.length>4&&/[^s]s$/.test(w))return w.slice(0,-1);  // camisetas → camiseta
+  return null;
+}
 function iaTerminos(q){
-  return [...new Set(String(q||'').toLowerCase().split(/[^0-9a-záéíóúñü]+/i)
-    .filter(w=>w.length>=4&&!IA_VACIAS.has(w)))].slice(0,4);
+  const base=String(q||'').toLowerCase().split(/[^0-9a-záéíóúñü]+/i)
+    .filter(w=>w.length>=4&&!IA_VACIAS.has(w));
+  const out=[];
+  base.forEach(w=>{ out.push(w); const s=iaSingular(w); if(s&&!IA_VACIAS.has(s))out.push(s); });
+  return [...new Set(out)].slice(0,6);
 }
 function iaUnir(destino,origen,clave){
   const vistos=new Set((destino[clave]||[]).map(x=>x.id));
@@ -2735,8 +2783,10 @@ function iaContexto(wsId,pregunta,permisos){
   if(enc.total)ctx.coincidencias=enc;
   // Del resultado de la búsqueda salen los nombres propios: así "¿qué sé de Textiles ABC?"
   // trae la ficha completa del cliente sin necesidad de que la IA pida nada.
-  (enc.clientes||[]).slice(0,2).forEach(c=>{ const d=svcCliente(wsId,c.titulo); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
-  (enc.productos||[]).slice(0,3).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
+  // Se desarrolla la ficha completa de los primeros; con nombres parecidos ("Camiseta",
+  // "Camiseta estampada"…) un tope corto dejaba fuera justo el que se estaba preguntando.
+  (enc.clientes||[]).slice(0,3).forEach(c=>{ const d=svcCliente(wsId,c.titulo); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
+  (enc.productos||[]).slice(0,5).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
   if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7);
   return ctx;
 }
