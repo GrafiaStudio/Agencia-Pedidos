@@ -480,6 +480,25 @@ db.exec(`CREATE TABLE IF NOT EXISTS ia_config(
   activo INTEGER DEFAULT 0,
   actualizado TEXT DEFAULT(datetime('now','localtime'))
 )`);
+/* ── G6 · RASTRO DE LAS PROPUESTAS DEL ASISTENTE ────────────────────────────────────────
+   APPEND-ONLY, como produccion_eventos. La IA no crea nada: PROPONE, y aquí queda escrito
+   qué propuso, quién lo confirmó y qué salió. Sin esto no se puede responder "¿de dónde
+   salió este producto?" dentro de seis meses, y el trato era que todo quedara trazable.
+   `estado`: propuesta (se mostró) → confirmada (el humano apretó y se creó). Una propuesta
+   que nadie confirma se queda en 'propuesta' para siempre: también es información.        */
+db.exec(`CREATE TABLE IF NOT EXISTS ia_acciones(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT,
+  tipo TEXT DEFAULT 'crear_producto',
+  resumen TEXT DEFAULT '',
+  payload TEXT DEFAULT '{}',
+  estado TEXT DEFAULT 'propuesta',
+  propuesto_por TEXT DEFAULT '',
+  propuesto_en TEXT DEFAULT(datetime('now','localtime')),
+  confirmado_por TEXT DEFAULT '',
+  confirmado_en TEXT DEFAULT '',
+  resultado_id TEXT DEFAULT ''
+)`);
 
 // ── PRODUCCIÓN 2.0 (Fase D) · eventos de taller ──
 // Registro APPEND-ONLY: nunca se sobrescribe ni se borra (manifiesto: todo trazable).
@@ -3124,8 +3143,176 @@ MODO INFORME (cuando el contexto trae "te_piden_un_informe", o te piden un infor
 - Aquí SÍ te extiendes. Un informe corto es un informe inútil.
 - Estructura: (1) título con el período y la fecha de corte; (2) una sección por tema pedido, con sus cifras y su TOTAL; (3) comparación contra el período anterior cuando tengas los dos cortes, diciendo la variación; (4) cierre con 2 o 3 observaciones accionables, concretas, basadas solo en las cifras que mostraste.
 - Usa tablas o listas con viñetas y negrilla en los totales. Cada cifra debe poder rastrearse al dato que te dieron.
-- Si un dato del informe no está en el contexto, di en una línea qué falta y qué habría que cargar en la app para tenerlo la próxima vez. No dejes el hueco en silencio ni lo rellenes con supuestos.`;
+- Si un dato del informe no está en el contexto, di en una línea qué falta y qué habría que cargar en la app para tenerlo la próxima vez. No dejes el hueco en silencio ni lo rellenes con supuestos.
 
+CREAR UN PRODUCTO (lo único que puedes proponer; todo lo demás sigue siendo solo consulta):
+- Cuando te pidan CREAR/DAR DE ALTA/REGISTRAR un producto, tú NO lo creas: propones la ficha y una persona aprieta el botón. Explica en 2 o 3 líneas qué vas a proponer y AL FINAL del mensaje añades el bloque, exactamente así:
+\`\`\`propuesta
+{"accion":"crear_producto","nombre":"...","tipo_precio":"..."}
+\`\`\`
+- Un solo bloque por respuesta. Nunca lo comentes ni lo expliques por dentro: el usuario no ve ese JSON, ve una tarjeta con lo que se va a crear.
+- "tipo_precio" tiene que ser uno de: unitario · escalonado · medidas · variantes · pliego · regla. Elige según CÓMO SE COBRA de verdad:
+  · unitario → precio fijo por unidad. Campo: "precio_base".
+  · escalonado → el precio baja por cantidad. Campo: "rangos": [{"desde":1,"hasta":20,"precio":10000},{"desde":21,"hasta":null,"precio":8000}].
+  · medidas → se cobra por tamaño. Campos: "medida_unidad" (m2 · cm2 · m), "medida_tarifa", opcional "cobro_minimo", y si la tarifa cambia por tramos: "medida_cond":[{"desde":2,"hasta":null,"tarifa":7000}] con "medida_cond_eje":"area" o "cantidad".
+  · variantes → el precio se arma sumando partes. "variantes":[{"nombre":"Tamaño","hijos":[{"nombre":"Carta","precio":"3000"}]}]. Una parte que solo describe y no cobra lleva "informativa":true.
+- Antes de proponer, MIRA EL CATÁLOGO. Si ya existe algo con ese nombre o muy parecido, dilo y pregunta si quiere crearlo igual o editar el que hay. No dupliques productos en silencio.
+- Si te falta un dato para que el precio quede bien (la tarifa, el tamaño, desde qué cantidad baja), PREGUNTA en vez de inventarlo. Es preferible una pregunta corta a una ficha con precios que no son.
+- Precios en números, sin puntos de miles y sin el signo $ dentro del JSON.`;
+
+/* ══ G6 · LA IA PROPONE, EL HUMANO CONFIRMA ═══════════════════════════════════════════
+   Regla que no se toca: el asistente NO escribe en la base. Emite una propuesta, el
+   servidor la NORMALIZA CON LISTA BLANCA (nunca se reenvía lo que mandó el modelo tal
+   cual) y la valida con `validarFicha`, el mismo validador del formulario. Si sobrevive,
+   se muestra una tarjeta. Al confirmar, el navegador llama a `POST /api/productos` — la
+   MISMA puerta que usa una persona — con el token de quien aprieta: si no tiene permiso
+   de gestionar productos, le responde 403 igual que en la interfaz. No hay atajo.        */
+function iaNumPos(v){ const n=toFloatCO(v); return Number.isFinite(n)&&n>=0?n:null; }
+function iaEnteroONulo(v){
+  if(v===null||v===undefined||v==='')return null;
+  const n=parseInt(v,10); return Number.isFinite(n)?n:null;
+}
+function iaNormTramos(arr){
+  return (Array.isArray(arr)?arr:[]).slice(0,12).map(t=>({
+    desde:iaEnteroONulo(t&&t.desde)||0,
+    hasta:iaEnteroONulo(t&&t.hasta),
+    precio:iaNumPos(t&&t.precio)||0
+  })).filter(t=>t.precio>0);
+}
+function iaNormCond(arr){
+  return (Array.isArray(arr)?arr:[]).slice(0,10).map(c=>({
+    desde:iaNumPos(c&&c.desde)||0,
+    hasta:(c&&definido(c.hasta)&&c.hasta!==null)?iaNumPos(c.hasta):null,
+    tarifa:iaNumPos(c&&c.tarifa)||0
+  })).filter(c=>c.tarifa>0);
+}
+// Se copian SOLO los campos conocidos, y el árbol se limita en hondura y en anchura: una
+// propuesta no puede convertirse en un árbol de miles de nodos que tumbe el guardado.
+function iaNormVariante(v,prof,rec){
+  if(!v||typeof v!=='object')return null;
+  // Recortar en silencio y después culpar a la variante que quedó coja engaña: se anota.
+  if(prof>3){ if(rec)rec.hondo=true; return null; }
+  const nombre=String(v.nombre||'').trim().slice(0,80);
+  if(!nombre)return null;
+  const modo=['hoja','medidas','fijo'].includes(v.modo)?v.modo:'precio';
+  const o={nombre,modo};
+  if(v.informativa)o.informativa=true;
+  if(v.multi)o.multi=true;
+  if(definido(v.precio))o.precio=String(v.precio).trim();
+  if(modo==='medidas'){
+    if(definido(v.medida_tarifa))o.medida_tarifa=String(v.medida_tarifa).trim();
+    if(definido(v.medida_minimo))o.medida_minimo=String(v.medida_minimo).trim();
+    o.medida_cond=iaNormCond(v.medida_cond);
+    o.medida_cond_eje=v.medida_cond_eje==='area'?'area':'cantidad';
+  }
+  if(modo==='hoja')o.piezas=iaEnteroONulo(v.piezas);
+  const tr=iaNormTramos(v.tramos); if(tr.length)o.tramos=tr;
+  const brutos=Array.isArray(v.hijos)?v.hijos:[];
+  if(brutos.length>40&&rec)rec.ancho=true;
+  const hijos=brutos.slice(0,40).map(h=>iaNormVariante(h,prof+1,rec)).filter(Boolean);
+  if(hijos.length)o.hijos=hijos;
+  return o;
+}
+function iaNormPropuesta(p,rec){
+  const tipo=TIPOS_PRECIO_VALIDOS.includes(p.tipo_precio)?p.tipo_precio:'unitario';
+  const b={
+    nombre:String(p.nombre||'').trim().slice(0,120),
+    descripcion:String(p.descripcion||'').trim().slice(0,600),
+    tipo_precio:tipo,
+    activo:true
+  };
+  if(tipo==='unitario'||tipo==='regla'||tipo==='variantes'||tipo==='pliego'){
+    if(definido(p.precio_base))b.precio_base=String(p.precio_base).trim();
+  }
+  if(tipo==='escalonado'){
+    b.rangos=(Array.isArray(p.rangos)?p.rangos:[]).slice(0,12).map(r=>({
+      desde:iaNumPos(r&&r.desde)||0,
+      hasta:(r&&definido(r.hasta)&&r.hasta!==null)?iaNumPos(r.hasta):null,
+      precio:iaNumPos(r&&r.precio)||0
+    })).filter(r=>r.precio>0);
+  }
+  if(tipo==='medidas'){
+    b.medida_unidad=['m2','cm2','m'].includes(p.medida_unidad)?p.medida_unidad:'m2';
+    if(definido(p.medida_tarifa))b.medida_tarifa=String(p.medida_tarifa).trim();
+    if(definido(p.cobro_minimo))b.cobro_minimo=String(p.cobro_minimo).trim();
+    b.medida_cond=iaNormCond(p.medida_cond);
+    b.medida_cond_eje=p.medida_cond_eje==='area'?'area':'cantidad';
+  }
+  if(tipo==='variantes'){
+    const raiz=Array.isArray(p.variantes)?p.variantes:[];
+    if(raiz.length>20&&rec)rec.ancho=true;
+    b.variantes=raiz.slice(0,20).map(v=>iaNormVariante(v,0,rec)).filter(Boolean);
+  }
+  if(tipo==='regla'){
+    const lleva=iaEnteroONulo(p.regla_lleva), paga=iaEnteroONulo(p.regla_paga);
+    if(lleva!==null)b.regla_lleva=lleva;
+    if(paga!==null)b.regla_paga=paga;
+  }
+  return b;
+}
+// El usuario no ve JSON: ve en cristiano qué se va a crear. Si esta lista no coincide con
+// lo que él quería, no aprieta el botón — y ese es todo el punto de la confirmación.
+function iaResumenPropuesta(b){
+  const pesos=n=>'$'+Number(n||0).toLocaleString('es-CO');
+  const L=[{campo:'Producto',valor:b.nombre}];
+  if(b.descripcion)L.push({campo:'Descripción',valor:b.descripcion});
+  if(b.tipo_precio==='unitario')L.push({campo:'Se cobra',valor:'precio fijo de '+pesos(toFloatCO(b.precio_base))+' por unidad'});
+  else if(b.tipo_precio==='escalonado'){
+    L.push({campo:'Se cobra',valor:'por cantidad, con '+(b.rangos||[]).length+' tramo(s)'});
+    (b.rangos||[]).forEach(r=>L.push({campo:'  de '+r.desde+(r.hasta?(' a '+r.hasta):' en adelante'),valor:pesos(r.precio)+' c/u'}));
+  }else if(b.tipo_precio==='medidas'){
+    const u=b.medida_unidad==='m'?'metro lineal':(b.medida_unidad==='cm2'?'cm²':'m²');
+    L.push({campo:'Se cobra',valor:'por medidas: '+pesos(toFloatCO(b.medida_tarifa))+' por '+u});
+    if(toFloatCO(b.cobro_minimo)>0)L.push({campo:'Cobro mínimo',valor:pesos(toFloatCO(b.cobro_minimo))});
+    // "si el área pasa de 2" se leía a medias: 2 ¿qué? La unidad va pegada al número.
+    (b.medida_cond||[]).forEach(c=>L.push({
+      campo:'  si '+(b.medida_cond_eje==='area'
+        ? ('el área pasa de '+c.desde+' '+u)
+        : ('la cantidad pasa de '+c.desde+' und')),
+      valor:pesos(c.tarifa)+' por '+u}));
+  }else if(b.tipo_precio==='variantes'){
+    L.push({campo:'Se cobra',valor:'por variantes (se suman las partes elegidas)'});
+    (b.variantes||[]).forEach(v=>{
+      const ops=(v.hijos||[]).map(h=>h.nombre+(toFloatCO(h.precio)>0?(' '+pesos(toFloatCO(h.precio))):'')).join(' · ');
+      L.push({campo:'  '+v.nombre+(v.informativa?' (solo describe)':''),valor:ops||(toFloatCO(v.precio)>0?pesos(toFloatCO(v.precio)):'sin precio')});
+    });
+  }else L.push({campo:'Se cobra',valor:b.tipo_precio});
+  return L;
+}
+/* Saca el bloque ```propuesta del texto, lo valida, y devuelve el texto ya LIMPIO. Si el
+   bloque viene roto o no pasa la validación, no se muestra botón: se dice qué falló. Nunca
+   se deja a medias — un botón que crea algo distinto a lo que se leyó sería lo peor. */
+const IA_RX_PROPUESTA=/```\s*propuesta\s*\n([\s\S]*?)```/i;
+function iaExtraerPropuesta(texto,wsId){
+  const m=IA_RX_PROPUESTA.exec(String(texto||''));
+  if(!m)return {texto,propuesta:null};
+  const limpio=String(texto).replace(IA_RX_PROPUESTA,'').replace(/\n{3,}/g,'\n\n').trim();
+  let crudo;
+  try{ crudo=JSON.parse(m[1]); }
+  catch(e){ return {texto:limpio,propuesta:null,
+    aviso:'Preparé una ficha pero me salió mal escrita y no me fío de mostrarte un botón con ella. Pídemela otra vez.'}; }
+  if(!crudo||crudo.accion!=='crear_producto')return {texto:limpio,propuesta:null};
+  const rec={};
+  const payload=iaNormPropuesta(crudo,rec);
+  const errores=validarFicha(payload,wsId);
+  if(!payload.nombre)errores.push('La ficha venía sin nombre');
+  if(errores.length){
+    // Si además se recortó, decirlo: si no, el error señala a una variante que quedó
+    // coja por MI recorte y parece culpa de otra cosa.
+    const corte=[rec.hondo?'venía con variantes anidadas más de 3 niveles y las corté':null,
+                 rec.ancho?'traía demasiadas variantes y me quedé con las primeras':null]
+                 .filter(Boolean).join(' y ');
+    return {texto:limpio,propuesta:null,
+      aviso:'Preparé una ficha pero no pasa las validaciones del sistema ('+errores.join('. ')+')'
+        +(corte?('. Ojo: la ficha '+corte+', así que el fallo puede venir de ahí'):'')
+        +', así que no te muestro el botón.'};
+  }
+  // Aviso, no bloqueo: puede querer dos productos con el mismo nombre a propósito.
+  const dup=db.prepare(`SELECT nombre FROM fichas_producto WHERE workspace_id=? AND archivado=0
+    AND lower(nombre)=lower(?) LIMIT 1`).get(wsId,payload.nombre);
+  return {texto:limpio,propuesta:{payload,resumen:iaResumenPropuesta(payload),
+    ya_existe:dup?dup.nombre:null}};
+}
 /* Una respuesta cortada a media palabra ("Sin datos en el catál") parece un error del
    sistema y deja sin saber qué faltaba. Si el proveedor avisa que la cortó, se dice. */
 function iaAvisoCorte(txt,razon,diag){
@@ -3278,6 +3465,21 @@ app.post('/api/ia/probar',requiere('configurar_sistema'),async(req,res)=>{
 /* Transparencia: devuelve EXACTAMENTE el contexto que se le entregaría a la IA para esa
    pregunta, sin llamar al proveedor (ni gastar tokens). Sirve para auditar de dónde salió
    una respuesta y para probar toda la capa de servicios sin depender de una clave. */
+/* G6 · cierra el rastro: el producto ya se creó por POST /api/productos (la puerta normal,
+   con los permisos de quien apretó). Aquí solo se anota quién confirmó y qué salió, para
+   poder responder dentro de seis meses "¿de dónde salió este producto?".
+   Exige el MISMO permiso que crear: si no puede crear productos, no puede firmar que lo hizo. */
+app.post('/api/ia/acciones/:id/confirmada',requiere('gestionar_productos'),(req,res)=>{
+  try{
+    const a=db.prepare('SELECT * FROM ia_acciones WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
+    if(!a)return res.status(404).json({error:'Esa propuesta no existe'});
+    if(a.estado==='confirmada')return res.json({ok:true,ya:true});
+    db.prepare(`UPDATE ia_acciones SET estado='confirmada',confirmado_por=?,
+      confirmado_en=datetime('now','localtime'),resultado_id=? WHERE id=? AND workspace_id=?`)
+      .run(actorDe(req).nombre,String((req.body||{}).ficha_id||''),req.params.id,req.wsId);
+    res.json({ok:true});
+  }catch(e){logError('POST /api/ia/acciones/:id/confirmada',e);res.status(500).json({error:e.message})}
+});
 app.get('/api/ia/contexto',requiere('configurar_sistema'),(req,res)=>{
   try{ res.json(iaContexto(req.wsId,req.query.q||'',req.permisos)); }
   catch(e){ logError('GET /api/ia/contexto',e); res.status(500).json({error:e.message}); }
@@ -3313,9 +3515,30 @@ PREGUNTA: ${pregunta}`}];
       // 8000: con 4000 una cotización de 7 ítems se cortaba tras dos líneas — parte del
       // cupo se va en razonamiento interno del modelo, que no se ve pero sí se cuenta.
       // Es un TECHO, no un gasto: solo se paga lo que la respuesta ocupe de verdad.
-      const texto=await iaLlamar(cfg,IA_SISTEMA,mensajes,8000);
+      const bruto=await iaLlamar(cfg,IA_SISTEMA,mensajes,8000);
+      // G6 · si trae una ficha propuesta, se saca del texto, se valida y se guarda el rastro.
+      // El JSON nunca llega a la pantalla: el usuario ve una tarjeta con lo que se va a crear.
+      const ex=iaExtraerPropuesta(bruto,ws);
+      let texto=ex.texto, propuesta=null;
+      if(ex.aviso)texto=(texto?texto+'\n\n':'')+'⚠️ '+ex.aviso;
+      /* Quien no puede crear productos no ve el botón. La seguridad de verdad está en
+         POST /api/productos (que responde 403), pero enseñar un botón condenado a fallar
+         es mala interfaz: se le dice por qué y se acabó. */
+      const puedeCrear=!!(req.permisos&&(req.permisos.__admin||req.permisos.gestionar_productos===true));
+      if(ex.propuesta&&!puedeCrear){
+        texto+='\n\n⚠️ Te preparé la ficha, pero tu usuario no tiene permiso para crear productos. Pídeselo a quien administra el sistema.';
+        ex.propuesta=null;
+      }
+      if(ex.propuesta){
+        const accId=uid();
+        db.prepare(`INSERT INTO ia_acciones(id,workspace_id,tipo,resumen,payload,estado,propuesto_por)
+          VALUES(?,?,'crear_producto',?,?,'propuesta',?)`)
+          .run(accId,ws,ex.propuesta.payload.nombre,JSON.stringify(ex.propuesta.payload),
+               actorDe(req).nombre);
+        propuesta={id:accId,...ex.propuesta};
+      }
       // Se devuelve QUÉ se consultó: el usuario debe poder auditar de dónde salió la respuesta.
-      res.json({respuesta:texto,ms:Date.now()-t0,
+      res.json({respuesta:texto,propuesta,ms:Date.now()-t0,
         // Solo fuentes de DATOS. "te_piden_un_informe" es una bandera interna y aparecía
         // en el pie como si fuera algo que se hubiera consultado.
         consultado:Object.keys(ctx).filter(k=>k!=='_recortado'&&k!=='te_piden_un_informe'),

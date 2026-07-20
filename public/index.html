@@ -481,6 +481,28 @@ label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bot
 .ia-tabla th:not(:first-child),.ia-tabla td:not(:first-child){text-align:right}
 /* Una tabla ahogada en el 88% se lee mal: el mensaje que la lleva puede ocupar casi todo. */
 .ia-msg.asistente:has(.ia-tabla){max-width:97%}
+/* G6 · tarjeta de propuesta. Tiene que leerse como algo que AÚN NO existe: por eso el borde
+   punteado y la etiqueta "sin crear". Cuando se crea, pasa a línea continua y check. */
+.ia-msg.asistente:has(.ia-prop){max-width:97%}
+.ia-prop{margin-top:8px;border:1.5px dashed var(--line);border-radius:14px;padding:11px 13px;background:rgba(127,127,127,.05)}
+.ia-prop.hecha{border-style:solid;border-color:var(--brand)}
+.ia-prop-hd{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--navy);margin-bottom:8px}
+.ia-prop-tag{margin-left:auto;font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  border:1px solid var(--line);border-radius:20px;padding:2px 7px;font-weight:500}
+.ia-prop-fila{display:flex;gap:10px;justify-content:space-between;align-items:baseline;
+  font-size:11.5px;padding:3px 0;border-bottom:1px solid rgba(127,127,127,.10)}
+.ia-prop-fila:last-of-type{border-bottom:none}
+.ia-prop-fila span{color:var(--muted);white-space:pre}
+.ia-prop-fila b{text-align:right;color:var(--navy);font-weight:600}
+.ia-prop-ojo{display:flex;gap:6px;font-size:11px;margin-top:8px;padding:7px 9px;border-radius:9px;
+  background:rgba(210,150,20,.13);color:var(--navy);line-height:1.45}
+.ia-prop-acts{display:flex;gap:7px;justify-content:flex-end;margin-top:11px}
+.ia-prop-no,.ia-prop-si{border-radius:11px;padding:7px 13px;font-size:11.5px;font-family:inherit;cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px}
+.ia-prop-no{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.ia-prop-si{background:var(--brand);color:var(--brand-txt);border:1px solid var(--brand);font-weight:600}
+.ia-prop-si:disabled{opacity:.6;cursor:default}
+.ia-prop-pie{font-size:9.5px;color:var(--muted);margin-top:7px;line-height:1.45}
 .ia-fuente{display:flex;align-items:center;gap:4px;font-size:8.5px;color:var(--muted);margin:3px 0 0 5px;text-transform:uppercase;letter-spacing:.05em}
 .ia-pensando{display:flex;gap:4px;align-items:center;padding:13px}
 .ia-pensando span{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:iaLat 1.1s infinite}
@@ -4137,13 +4159,65 @@ function renderIaChat(){
     </div>`;
     return;
   }
-  c.innerHTML=IA_HIST.map(m=>`<div class="ia-msg ${m.rol}">
+  c.innerHTML=IA_HIST.map((m,i)=>`<div class="ia-msg ${m.rol}">
       <div class="ia-burbuja">${m.rol==='asistente'?iaFormato(m.texto):esc(m.texto)}</div>
+      ${m.propuesta?iaPropuestaHTML(m.propuesta,i):''}
       ${m.consultado?`<div class="ia-fuente" title="De dónde salieron los datos de esta respuesta"><i class="ti ti-database"></i>${m.consultado.map(esc).join(' · ')}</div>`:''}
     </div>`).join('')
     +(iaPensando?('<div class="ia-msg asistente"><div class="ia-burbuja ia-pensando"><span></span><span></span><span></span></div>'
       +(iaEspera?('<div class="ia-fuente"><i class="ti ti-clock"></i>'+esc(iaEspera)+'</div>'):'')+'</div>'):'');
   c.scrollTop=c.scrollHeight;
+}
+/* ── G6 · LA TARJETA DE CONFIRMACIÓN ─────────────────────────────────────────────────
+   El asistente no crea nada. Aquí se ve, en cristiano, la ficha que propone; el botón la
+   crea llamando a POST /productos, la MISMA ruta del formulario, con el token de quien
+   aprieta. Si no tiene permiso, recibe el mismo 403 que recibiría en la interfaz.
+   Nunca se muestra el JSON: si lo que se lee no es lo que se quería, no se aprieta.      */
+function iaPropuestaHTML(p,idx){
+  const esc=s=>String(s||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]));
+  if(p._creado)return `<div class="ia-prop hecha">
+      <div class="ia-prop-hd"><i class="ti ti-circle-check"></i> Producto creado: <b>${esc(p.payload.nombre)}</b></div>
+      <div class="ia-prop-pie">Lo propuso el asistente y lo confirmaste tú. Ya está en Productos.</div>
+    </div>`;
+  const filas=(p.resumen||[]).map(r=>`<div class="ia-prop-fila">
+      <span>${esc(r.campo)}</span><b>${esc(r.valor)}</b></div>`).join('');
+  return `<div class="ia-prop" id="ia-prop-${idx}">
+    <div class="ia-prop-hd"><i class="ti ti-file-plus"></i> Propuesta de producto <span class="ia-prop-tag">sin crear</span></div>
+    ${filas}
+    ${p.ya_existe?`<div class="ia-prop-ojo"><i class="ti ti-alert-triangle"></i> Ya tienes un producto llamado <b>${esc(p.ya_existe)}</b>. Si lo creas, quedarán los dos.</div>`:''}
+    <div class="ia-prop-acts">
+      <button class="ia-prop-no" onclick="iaDescartarPropuesta(${idx})">Descartar</button>
+      <button class="ia-prop-si" onclick="iaCrearPropuesta(${idx})"><i class="ti ti-check"></i> Crear producto</button>
+    </div>
+    <div class="ia-prop-pie">Nada se guarda hasta que aprietes. Se crea con tus permisos, igual que si lo hicieras a mano.</div>
+  </div>`;
+}
+function iaDescartarPropuesta(idx){
+  const m=IA_HIST[idx]; if(!m)return;
+  delete m.propuesta; renderIaChat();
+}
+async function iaCrearPropuesta(idx){
+  const m=IA_HIST[idx]; if(!m||!m.propuesta||m.propuesta._creando)return;
+  const p=m.propuesta;
+  p._creando=true; renderIaChat();
+  const btn=document.querySelector(`#ia-prop-${idx} .ia-prop-si`);
+  if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
+  try{
+    // La puerta de siempre. Si el usuario no tiene 'gestionar_productos', esto responde 403.
+    const ficha=await api('POST','/productos',p.payload);
+    p._creado=true;
+    // El rastro se cierra aparte: si fallara, el producto YA está creado y eso es lo que
+    // importa — no se deshace nada por no poder anotarlo.
+    try{ await api('POST','/ia/acciones/'+p.id+'/confirmada',{ficha_id:ficha&&ficha.id}); }catch(e){}
+    if(typeof cargarProductos==='function')cargarProductos();
+    toast('Producto creado: '+p.payload.nombre);
+  }catch(e){
+    p._creando=false;
+    toast(String(e.message||e).toLowerCase().includes('permiso')
+      ? 'No tienes permiso para crear productos'
+      : 'No se pudo crear: '+e.message, false);
+  }
+  renderIaChat();
 }
 // Formato mínimo: negritas, saltos y viñetas. Nada de HTML del modelo (se escapa primero).
 /* Antes solo entendía negrilla y viñetas. Un informe trae títulos y tablas, y salían con
@@ -4192,7 +4266,7 @@ async function iaPreguntar(txt){
   const t2=setTimeout(()=>{ if(iaPensando){ iaEspera='Sigue trabajando. Si tarda mucho, pídeselo por partes.'; renderIaChat(); } },35000);
   try{
     const r=await api('POST','/ia/preguntar',{pregunta,historial:IA_HIST.slice(0,-1).slice(-6)});
-    IA_HIST.push({rol:'asistente',texto:r.respuesta||'(sin respuesta)',consultado:r.consultado});
+    IA_HIST.push({rol:'asistente',texto:r.respuesta||'(sin respuesta)',consultado:r.consultado,propuesta:r.propuesta||null});
   }catch(e){
     IA_HIST.push({rol:'asistente',texto:'No pude responder: '+e.message});
   }finally{ clearTimeout(t1); clearTimeout(t2); iaPensando=false; iaEspera=''; renderIaChat(); }
