@@ -2726,6 +2726,23 @@ function iaVarNodo(v){
   }
   return o;
 }
+/* Existencias. Faltaba: preguntaron "necesito saber si tengo inventario de ello" y el
+   asistente no tenía forma de saberlo, así que decía que no había. Ahora consulta el
+   mismo inventario del módulo, y avisa cuando algo está por debajo de su mínimo. */
+function svcInventario(wsId,terminos){
+  // Se usan TODOS los términos: el insumo que interesa suele nombrarse al final de la
+  // frase ("…además 150 vasos blancos"), y con un tope corto nunca se llegaba a buscarlo.
+  const ts=(terminos||[]).filter(t=>String(t).length>=4).slice(0,12);
+  if(!ts.length)return [];
+  const cond=ts.map(()=>`nombre LIKE ? ESCAPE '\\'`).join(' OR ');
+  const filas=db.prepare(`SELECT nombre,unidad_medida,stock_actual,stock_minimo FROM items_inventario
+    WHERE workspace_id=? AND activo=1 AND (${cond}) ORDER BY nombre LIMIT 10`).all(wsId,...ts.map(bLike));
+  return filas.map(i=>{
+    const hay=Number(i.stock_actual)||0, min=Number(i.stock_minimo)||0;
+    return {insumo:i.nombre, existencias:hay, unidad:i.unidad_medida||'unidad',
+      estado: hay<=0 ? 'AGOTADO' : (min>0&&hay<=min ? 'por debajo del mínimo ('+min+')' : 'disponible')};
+  });
+}
 // Qué se entrega en los próximos N días — la pregunta más frecuente de un taller.
 function svcAgenda(wsId,dias,perm){
   const n=Math.min(60,Math.max(1,parseInt(dias,10)||7)), hoyStr=hoy(wsId);
@@ -2778,7 +2795,13 @@ const IA_VACIAS=new Set(['que','qué','como','cómo','cual','cuál','cuanto','cu
   'semana','semanas','entrego','entrega','entregas','entregar','entregado','entregados',
   'mañana','manana','ayer','proxima','próxima','proximo','próximo','mes','meses','dias','días',
   'atrasado','atrasados','atraso','pendiente','pendientes','urgente','urgentes','activo','activos',
-  'debe','deben','deuda','deudas','plata','dinero','saldo','saldos','cobrar','pagar','pagado']);
+  'debe','deben','deuda','deudas','plata','dinero','saldo','saldos','cobrar','pagar','pagado',
+  // Muletillas de quien pide una cotización: describen el encargo, no nombran productos.
+  // (Salieron de una cotización real: gastaban 4 de los 6 cupos de búsqueda.)
+  'pidio','pidió','pide','piden','cotizacion','cotización','cotizar','ayudame','ayúdame','ayuda',
+  'necesito','necesita','saber','ademas','además','cuales','cuáles','tienen','tiene','otras','otros',
+  'ultimas','últimas','ultimos','últimos','esas','esos','estos','estas','dame','darle','decir','sale',
+  'total','cuanto','cuánta','cuantas','cuántas','hacer','tamaño','tamano','frente','espalda']);
 /* El producto se llama "Camiseta" y el usuario escribe "camisetas": buscar '%camisetas%'
    NO encuentra "Camiseta" (la consulta es más larga que el nombre guardado). Por eso cada
    término aporta también su singular — en español se pregunta en plural casi siempre. */
@@ -2787,12 +2810,20 @@ function iaSingular(w){
   if(w.length>4&&/[^s]s$/.test(w))return w.slice(0,-1);  // camisetas → camiseta
   return null;
 }
+// "300x250" y "20x30" son MEDIDAS, no nombres de nada: buscarlas gasta cupo y no encuentra.
+// Un código como "P0010" sí se conserva, porque sí identifica un producto.
+const IA_MEDIDA=/^[\d.,]+(?:[x×][\d.,]+)*$/;
 function iaTerminos(q){
-  const base=String(q||'').toLowerCase().split(/[^0-9a-záéíóúñü]+/i)
-    .filter(w=>w.length>=4&&!IA_VACIAS.has(w));
+  // El tope se aplica a las palabras BASE, y el singular se añade DESPUÉS: antes el corte
+  // separaba "camisetas" de su singular "camiseta" — se buscaba el plural, que no existe
+  // en el catálogo, y se perdía justo el término que sí encontraba algo.
+  const base=[...new Set(String(q||'').toLowerCase().split(/[^0-9a-záéíóúñü]+/i)
+    // 8 palabras: una cotización real nombra varios productos ("1 pendón… 10 camisetas…
+    // 150 vasos"). Con un tope corto, lo último que pedía el cliente nunca se buscaba.
+    .filter(w=>w.length>=4&&!IA_VACIAS.has(w)&&!IA_MEDIDA.test(w)))].slice(0,8);
   const out=[];
   base.forEach(w=>{ out.push(w); const s=iaSingular(w); if(s&&!IA_VACIAS.has(s))out.push(s); });
-  return [...new Set(out)].slice(0,6);
+  return [...new Set(out)];
 }
 function iaUnir(destino,origen,clave){
   const vistos=new Set((destino[clave]||[]).map(x=>x.id));
@@ -2803,16 +2834,31 @@ function iaContexto(wsId,pregunta,permisos){
   const ctx={panorama:svcPanorama(wsId,permisos)};
   const refs=[...q.matchAll(/#?\b(\d{3,5})\b/g)].map(m=>m[1]).slice(0,3);
   refs.forEach(r=>{ const p=svcPedido(wsId,r,permisos); if(p){ (ctx.pedidos=ctx.pedidos||[]).push(p); } });
+  const porTermino=iaTerminos(q).map(t=>svcBuscar(wsId,t,permisos,5));
   const enc={pedidos:[],clientes:[],productos:[],notas:[],total:0};
-  iaTerminos(q).forEach(t=>{ const r=svcBuscar(wsId,t,permisos,5); ['pedidos','clientes','productos','notas'].forEach(k=>iaUnir(enc,r,k)); });
+  porTermino.forEach(r=>['pedidos','clientes','productos','notas'].forEach(k=>iaUnir(enc,r,k)));
   enc.total=enc.pedidos.length+enc.clientes.length+enc.productos.length+enc.notas.length;
   if(enc.total)ctx.coincidencias=enc;
-  // Del resultado de la búsqueda salen los nombres propios: así "¿qué sé de Textiles ABC?"
-  // trae la ficha completa del cliente sin necesidad de que la IA pida nada.
-  // Se desarrolla la ficha completa de los primeros; con nombres parecidos ("Camiseta",
-  // "Camiseta estampada"…) un tope corto dejaba fuera justo el que se estaba preguntando.
-  (enc.clientes||[]).slice(0,3).forEach(c=>{ const d=svcCliente(wsId,c.titulo,permisos); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
-  (enc.productos||[]).slice(0,5).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
+  /* Reparto POR RONDAS entre los términos, no por orden de llegada.
+     En una cotización real ("1 pendón … 10 camisetas") el término "pendon" encontraba 5
+     productos y se quedaba con todos los cupos: la camiseta no llegaba nunca y el asistente
+     respondía que no existía. Ahora cada término aporta su mejor resultado antes de que
+     ninguno aporte el segundo. */
+  const porRondas=(clave,tope)=>{
+    const out=[], vistos=new Set();
+    for(let i=0;i<6&&out.length<tope;i++){
+      for(const r of porTermino){
+        const x=(r[clave]||[])[i];
+        if(x&&!vistos.has(x.id)){ vistos.add(x.id); out.push(x); if(out.length>=tope)break; }
+      }
+    }
+    return out;
+  };
+  porRondas('clientes',3).forEach(c=>{ const d=svcCliente(wsId,c.titulo,permisos); if(d)(ctx.clientes=ctx.clientes||[]).push(d); });
+  porRondas('productos',6).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
+  // Inventario: se pidió explícitamente ("necesito saber si tengo inventario de ello").
+  const inv=svcInventario(wsId,iaTerminos(q));
+  if(inv.length)ctx.inventario=inv;
   if(/entrega|agenda|semana|hoy|mañana|pendiente|cuando/i.test(q))ctx.agenda=svcAgenda(wsId,7,permisos);
   return ctx;
 }
