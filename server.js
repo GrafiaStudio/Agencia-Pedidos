@@ -2705,11 +2705,11 @@ function svcCliente(wsId,nombre,perm){
   return out;
 }
 // Un producto y CÓMO se cobra (incluye las condiciones de la Fase E).
-function svcProducto(wsId,nombre){
+function svcProducto(wsId,nombre,perm){
   const n=String(nombre||'').trim(); if(n.length<2)return null;
   const f=db.prepare(`SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0 AND (nombre LIKE ? ESCAPE '\\' OR codigo LIKE ? ESCAPE '\\') ORDER BY LENGTH(nombre) LIMIT 1`).get(wsId,bLike(n),bLike(n));
   if(!f)return null;
-  const ficha=fichaCompleta(f);
+  const ficha=fichaCompleta(f), dinero=iaVeDinero(perm);
   const out={nombre:ficha.nombre,codigo:ficha.codigo||'',tipo_precio:ficha.tipo_precio,
     precio:ficha.precio_oficial||0,descripcion:String(ficha.descripcion||'').slice(0,300)};
   if(ficha.tipo_precio==='medidas'){
@@ -2723,14 +2723,33 @@ function svcProducto(wsId,nombre){
     out.precio_desde=ficha.precio_oficial||0;
     delete out.precio; // en un producto por variantes no hay "un" precio: se arma sumando partes
     out.como_se_cobra='El precio se arma sumando las partes que el cliente elija. Cada opción trae su propio precio, y si tiene tramos, el precio cambia según la cantidad.';
-    out.partes=(ficha.variantes||[]).map(iaVarNodo);
+    out.partes=(ficha.variantes||[]).map(v=>iaVarNodo(v,dinero));
+  }
+  /* COSTO PROPIO de la ficha: lo que cuesta PRODUCIR una unidad (la composición de insumos +
+     costos fijos, o la tarifa de costo por medida). Faltaba de origen: ningún servicio se lo
+     mandaba al modelo, así que preguntar "el costo del mug y su margen" recibía siempre "no
+     trae costo cargado" aunque la ficha SÍ tuviera $6.700 en insumos. Solo si ve dinero. */
+  if(dinero){
+    const cm=ficha.tipo_precio==='medidas';
+    const costo=cm?toFloatCO(ficha.costo_medida_tarifa_calc):toNum(ficha.costo_total);
+    if(costo>0){
+      out.costo=cm?{por_medida:costo,unidad:(ficha.medida_unidad==='cm2'?'cm2':'m2')}:costo;
+      out.costo_es='lo que cuesta hacer UNA unidad, según la ficha (no es el costo de lo vendido)';
+      const ins=(ficha.insumos||[]).map(i=>({insumo:i.nombre_insumo,costo:Math.round(toNum(i.costo_unitario_calc)*(parseFloat(i.cantidad_usada)||1))})).filter(x=>x.insumo&&x.costo>0);
+      if(ins.length)out.costo_desglose=ins;
+      const fij=(ficha.costos_fijos||[]).map(c=>({concepto:c.nombre,costo:toNum(c.valor_calc!=null?c.valor_calc:evalExpr(c.valor))})).filter(x=>x.concepto&&x.costo>0);
+      if(fij.length)out.costos_fijos=fij;
+      if(!cm&&(ficha.precio_oficial||0)>0){
+        const p=ficha.precio_oficial; out.margen_por_unidad={precio:p,costo,utilidad:p-costo,margen_pct:Math.round((p-costo)*100/p)};
+      }
+    }
   }
   return out;
 }
 /* Una parte/opción de un producto por variantes, con TODO lo que hace falta para cotizarla.
    Antes solo se mandaban los nombres: el asistente veía que existía la opción "tabloide"
    pero no cuánto costaba, así que no podía cotizar y lo decía. El dato faltaba de origen. */
-function iaVarNodo(v){
+function iaVarNodo(v,dinero){
   const o={nombre:v.nombre};
   if(v.informativa){
     o.informativa='solo para describir, no cambia el precio';
@@ -2740,7 +2759,7 @@ function iaVarNodo(v){
   const hijos=(v.hijos||[]).slice(0,30);
   if(hijos.length){
     o.se_elige=v.multi?'se pueden elegir VARIAS opciones, cada una con su cantidad':'se elige UNA opción';
-    o.opciones=hijos.map(iaVarNodo);
+    o.opciones=hijos.map(h=>iaVarNodo(h,dinero));
     return o;
   }
   if(v.modo==='medidas'){
@@ -2753,6 +2772,7 @@ function iaVarNodo(v){
     if((v.medida_cond||[]).length)o.condiciones_de_tarifa={
       cambia_segun:v.medida_cond_eje==='area'?'el área de la pieza (m²)':'la cantidad de unidades del pedido',
       tramos:v.medida_cond};
+    if(dinero&&toFloatCO(v.costo_medida_tarifa_calc)>0)o['costo_por_'+(cm?'cm2':'m2')]=toFloatCO(v.costo_medida_tarifa_calc);
   }else if(v.modo==='hoja'){
     o.cobro='por hoja: se calcula cuántas hojas hacen falta';
     o.piezas_por_hoja=parseInt(v.piezas,10)||0;
@@ -2760,6 +2780,12 @@ function iaVarNodo(v){
   }else{
     o.precio=toNum(v.precio_calc);
     if((v.tramos||[]).length)o.precio_segun_cantidad=v.tramos;
+  }
+  // Costo propio de esta parte (lo que le da de comer al margen): mismo motivo que arriba,
+  // el modelo veía el precio de la opción pero no su costo. Solo si quien pregunta ve dinero.
+  if(dinero){
+    const cp=(v.costos||[]).reduce((a,c)=>a+(evalExpr(c.valor)||0),0);
+    if(cp>0)o.costo=Math.round(cp);
   }
   return o;
 }
@@ -2785,15 +2811,23 @@ function iaCobroResumen(f){
   if(f.tipo_precio==='regla')return 'promoción por cantidad, desde $'+p;
   return 'precio fijo $'+p;
 }
-function svcCatalogo(wsId){
+function svcCatalogo(wsId,perm){
   const cats={};
   try{ db.prepare('SELECT id,label FROM etiquetas_negocio WHERE workspace_id=?').all(wsId).forEach(c=>cats[c.id]=c.label); }catch(e){}
   const filas=db.prepare('SELECT * FROM fichas_producto WHERE workspace_id=? AND archivado=0 AND activo=1 ORDER BY nombre LIMIT 120').all(wsId);
+  const dinero=iaVeDinero(perm);
   return filas.map(f=>{
     const ficha=fichaCompleta(f);
     const o={producto:ficha.nombre, cobro:iaCobroResumen(ficha)};
     if(ficha.codigo)o.codigo=ficha.codigo;
     if(cats[ficha.categoria_id])o.categoria=cats[ficha.categoria_id];
+    // Costo de la ficha (lo que cuesta producir una unidad), solo el número, solo con permiso
+    // de dinero. Así ningún producto del catálogo aparece "sin costo" cuando su ficha sí lo
+    // tiene; el desglose completo llega por svcProducto cuando se pregunta por él en concreto.
+    if(dinero){
+      if(ficha.tipo_precio==='medidas'){ const c=toFloatCO(ficha.costo_medida_tarifa_calc); if(c>0)o.costo_por_medida=c; }
+      else { const c=toNum(ficha.costo_total); if(c>0)o.costo=c; }
+    }
     // De los productos por variantes se anuncian las partes: así se sabe que "camiseta"
     // tiene estampados de varios tamaños sin tener que pedir la ficha completa.
     if(ficha.tipo_precio==='variantes'){
@@ -3098,10 +3132,10 @@ function iaContexto(wsId,pregunta,permisos){
   const yaCli=new Set();
   clientesDePedido.forEach(n=>{ const d=svcCliente(wsId,n,permisos); if(d&&!yaCli.has(d.nombre)){ yaCli.add(d.nombre); (ctx.clientes=ctx.clientes||[]).push(d); } });
   porRondas('clientes',3).forEach(c=>{ const d=svcCliente(wsId,c.titulo,permisos); if(d&&!yaCli.has(d.nombre)){ yaCli.add(d.nombre); (ctx.clientes=ctx.clientes||[]).push(d); } });
-  porRondas('productos',6).forEach(p=>{ const d=svcProducto(wsId,p.titulo); if(d)(ctx.productos=ctx.productos||[]).push(d); });
+  porRondas('productos',6).forEach(p=>{ const d=svcProducto(wsId,p.titulo,permisos); if(d)(ctx.productos=ctx.productos||[]).push(d); });
   // El catálogo y el inventario van SIEMPRE completos: son la única forma de que el
   // asistente no diga "no existe" sobre algo que sí está, solo porque se llama distinto.
-  const cat=svcCatalogo(wsId);
+  const cat=svcCatalogo(wsId,permisos);
   if(cat.length)ctx.catalogo=cat;
   const inv=svcInventario(wsId);
   if(inv.length)ctx.inventario=inv;
@@ -3151,8 +3185,10 @@ CIFRAS DEL NEGOCIO (cómo leer lo que te llega):
 - FINANZAS no trae un solo número: trae varios CORTES ya calculados ("este mes", "el mes pasado", "este año", "desde siempre"). Usa el corte que te pidieron y NÓMBRALO. Nunca digas que no tienes el corte del mes: está ahí. No sumes ni restes cortes entre sí.
 - Si en una misma frase te piden cosas con tiempos distintos ("las ventas desde el inicio y las ganancias de este mes"), responde cada una con su corte. No apliques un solo período a todo.
 - Al comparar un período con otro: la utilidad mezcla pagos recibidos con costos de pedidos creados, que no son el mismo grupo. Un mes puede desplomarse solo porque los cobros entraron tarde. Cuando la variación sea fuerte, dilo en una línea ("puede ser cuándo se cobró, no cómo se trabajó") en vez de presentarlo como una caída del negocio. Y si el mes aún no cierra, recuérdalo.
-- COSTO POR PRODUCTO: viene repartido entre los ítems de cada encargo a prorrata del valor. Es una aproximación — cuando presentes márgenes por producto, dilo en una línea, una sola vez.
-- Si un producto dice "sin costo cargado", NO tiene margen 0% ni 100%: no se sabe. Sepáralo del ranking y di cuántos productos están en esa situación. Nunca inventes un costo ni supongas que algo salió gratis.
+- HAY DOS COSTOS DISTINTOS, no los confundas:
+  · El del CATÁLOGO y de cada producto ("costo" / "costo_por_medida", con su "costo_desglose") es lo que cuesta PRODUCIR una unidad, según la ficha. Úsalo para "¿cuánto me cuesta hacer X?" y para el margen unitario (precio − costo), aunque el producto no se haya vendido. Si el producto trae "costo", NUNCA digas que su ficha no tiene costo cargado: ahí está.
+  · El de "ventas_por_producto" es el costo de lo que YA SE VENDIÓ, repartido entre los ítems del pedido a prorrata del valor. Es una aproximación — al presentar márgenes de lo vendido, dilo en una línea, una sola vez.
+- Si un producto NO trae "costo" en el catálogo y "ventas_por_producto" dice "sin costo cargado", entonces sí: no se sabe su costo. NO es margen 0% ni 100%. Sepáralo del ranking, di cuántos están así y qué habría que cargar. Nunca inventes un costo ni supongas que algo salió gratis.
 
 MODO INFORME (cuando el contexto trae "te_piden_un_informe", o te piden un informe/reporte/análisis):
 - Aquí SÍ te extiendes. Un informe corto es un informe inútil.
@@ -3185,7 +3221,8 @@ PRODUCTOS · PUEDES PROPONER TRES COSAS (todo lo demás sigue siendo solo consul
 - Si usas "tramos" en una parte, el PRIMERO tiene que empezar en 1: si no, no hay precio para 1 unidad y el sistema lo rechaza.
 
 EL COSTO SÍ SE PUEDE GUARDAR — nunca digas que la ficha no tiene dónde:
-- Cada parte y cada opción lleva su propio costo: "costos":[{"nombre":"Camiseta algodón","valor":"12000"}]. Ahí van los costos que te den por opción.
+- PRODUCTO SIMPLE (unitario, escalonado, medidas): el costo de lo que está hecho va en "insumos":[{"nombre":"Vaso","costo":"3700"},{"nombre":"Sublimación","costo":"2000"}]. Esa es la composición que forma el COSTO TOTAL de la ficha. Si te dictan "el cuadro en resina me cuesta: resina 8000, marco 5000", eso son dos insumos. Ponlos SIEMPRE que te den un costo de un producto simple — sin esto el producto se crea sin costo y no hay margen.
+- Cada parte y cada opción (en productos por variantes) lleva su propio costo: "costos":[{"nombre":"Camiseta algodón","valor":"12000"}]. Ahí van los costos que te den por opción.
 - El producto entero puede llevar costos que no dependen de la opción: "costos_fijos":[{"nombre":"...","valor":"..."}].
 - Un producto por medidas lleva además su costo por medida: "costo_medida_tarifa" (y "costo_medida_minimo" si aplica).
 - Una parte que se cobra por medidas puede llevar su COSTO por medida: "costo_medida_tarifa". Va en la misma unidad que su tarifa. Ej: el transfer se cobra a $20 el cm² y cuesta $8 el cm² → "medida_tarifa":"20","costo_medida_tarifa":"8","medida_unidad":"cm2". Ese costo se convierte solo en una línea de costo del pedido (área × tarifa × cantidad).
@@ -3231,6 +3268,22 @@ function iaNormCostos(arr){
     nombre:String((c&&c.nombre)||'').trim().slice(0,80),
     valor:definido(c&&c.valor)?String(c.valor).trim():''
   })).filter(c=>c.nombre&&toFloatCO(c.valor)>0);
+}
+/* INSUMOS = la composición que forma el COSTO TOTAL de una ficha (vaso $3.700 + sublimación
+   $2.000…). Es el costo de un producto SIMPLE. Faltaba en la lista blanca: el modelo dictaba
+   los costos de "cuadro resina", se creaba el producto y quedaba SIN costo, porque no había
+   dónde meterlos. guardarInsumos() espera exactamente estas claves. Se aceptan sinónimos
+   (costo/valor por costo_unitario, cantidad por cantidad_usada) porque el modelo los mezcla. */
+function iaNormInsumos(arr){
+  return (Array.isArray(arr)?arr:[]).slice(0,20).map(x=>{
+    if(!x||typeof x!=='object')return null;
+    const nombre=String(x.nombre_insumo||x.nombre||'').trim().slice(0,80);
+    const costo=String((x.costo_unitario!=null?x.costo_unitario:(x.costo!=null?x.costo:x.valor))||'').trim();
+    const cant=String((x.cantidad_usada!=null?x.cantidad_usada:(x.cantidad!=null?x.cantidad:'1'))||'1').trim()||'1';
+    return {nombre_insumo:nombre, proveedor:String(x.proveedor||'').trim().slice(0,80),
+      costo_unitario:costo, cantidad_usada:cant,
+      unidad_medida:String(x.unidad_medida||x.unidad||'unidad').trim().slice(0,20)};
+  }).filter(i=>i&&i.nombre_insumo&&toFloatCO(i.costo_unitario)>0);
 }
 function iaNormVariante(v,prof,rec){
   if(!v||typeof v!=='object')return null;
@@ -3289,6 +3342,8 @@ function iaNormPropuesta(p,rec){
     if(definido(p.costo_medida_minimo))b.costo_medida_minimo=String(p.costo_medida_minimo).trim();
   }
   const cf=iaNormCostos(p.costos_fijos); if(cf.length)b.costos_fijos=cf;
+  // El costo de un producto simple (su composición de materiales) va aquí, en cualquier tipo.
+  const ins=iaNormInsumos(p.insumos); if(ins.length)b.insumos=ins;
   if(tipo==='variantes'){
     const raiz=Array.isArray(p.variantes)?p.variantes:[];
     if(raiz.length>20&&rec)rec.ancho=true;
@@ -3351,7 +3406,13 @@ function iaResumenPropuesta(b){
   }else L.push({campo:'Se cobra',valor:b.tipo_precio});
   if(b.tipo_precio==='medidas'&&toFloatCO(b.costo_medida_tarifa)>0)
     L.push({campo:'Costo por medida',valor:pesos(toFloatCO(b.costo_medida_tarifa))});
+  (b.insumos||[]).forEach(c=>{ const q=toFloatCO(c.cantidad_usada)||1;
+    L.push({campo:'  costo · '+c.nombre_insumo,valor:pesos(toFloatCO(c.costo_unitario))+(q>1?(' × '+c.cantidad_usada):'')}); });
   (b.costos_fijos||[]).forEach(c=>L.push({campo:'  costo: '+c.nombre,valor:pesos(toFloatCO(c.valor))}));
+  // Total de costo bien visible: es lo que hay que comparar contra el precio antes de crear.
+  const costoTot=(b.insumos||[]).reduce((s,c)=>s+toFloatCO(c.costo_unitario)*(toFloatCO(c.cantidad_usada)||1),0)
+    +(b.costos_fijos||[]).reduce((s,c)=>s+toFloatCO(c.valor),0);
+  if(costoTot>0)L.push({campo:'Costo total',valor:pesos(Math.round(costoTot))});
   return L;
 }
 /* Saca el bloque ```propuesta del texto, lo valida, y devuelve el texto ya LIMPIO. Si el
@@ -3401,7 +3462,7 @@ function iaDiffFicha(antes,despues){
   });
   const cnt=(o,k)=>Array.isArray(o[k])?o[k].length:0;
   [['medida_cond','Condiciones de tarifa'],['rangos','Tramos por cantidad'],
-   ['variantes','Variantes'],['costos_fijos','Costos fijos']].forEach(([k,lbl])=>{
+   ['variantes','Variantes'],['costos_fijos','Costos fijos'],['insumos','Insumos (costo)']].forEach(([k,lbl])=>{
     if(!Object.prototype.hasOwnProperty.call(despues,k))return;
     if(cnt(antes,k)===cnt(despues,k)&&JSON.stringify(antes[k])===JSON.stringify(despues[k]))return;
     d.push({campo:lbl,antes:cnt(antes,k)+'',despues:cnt(despues,k)+''});
