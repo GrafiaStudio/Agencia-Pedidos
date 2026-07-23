@@ -949,6 +949,27 @@ function detectarPrecioEscalonado(rangos,cantidad){
   if(ultimo.hasta!=null&&cantidad>ultimo.hasta)return ultimo.precio;
   return null;
 }
+/* Tramos por cantidad CONTIGUOS — respaldo del servidor (la UI ya deriva el "desde", pero la
+   IA o la API cruda podrían mandar tramos sueltos). Evita el caso ambiguo "de 6 a 10 = 5.000
+   y de 8 a 12 = 4.000": para 8, 9 o 10 el precio quedaba indefinido. Regla: el primero empieza
+   en 1, cada siguiente en (hasta anterior + 1), y solo el último puede quedar "en adelante". */
+function erroresTramos(arr,pre){
+  const out=[]; const t=Array.isArray(arr)?arr:[];
+  if(!t.length)return out;
+  let prevH=null;
+  t.forEach((r,i)=>{
+    const d=Number(r&&r.desde);
+    const hRaw=r&&r.hasta;
+    const h=(hRaw==null||hRaw==='')?null:Number(hRaw);
+    const esUlt=i===t.length-1;
+    if(i===0){ if(d!==1)out.push(`${pre}el primer tramo debe empezar en 1`); }
+    else if(prevH!=null&&d!==prevH+1)out.push(`${pre}el tramo #${i+1} debe empezar en ${prevH+1} (justo después del anterior, sin huecos ni solapes)`);
+    if(!esUlt&&h==null)out.push(`${pre}solo el último tramo puede quedar "en adelante"; el #${i+1} necesita un "hasta"`);
+    if(h!=null&&Number.isFinite(d)&&h<d)out.push(`${pre}el "hasta" del tramo #${i+1} no puede ser menor que su inicio`);
+    prevH=h;
+  });
+  return out;
+}
 // FASE E · CONDICIONES — validación. Una fila sin tarifa se descartaría en silencio al guardar,
 // y el usuario creería que quedó guardada: por eso se avisa en vez de dejarla caer.
 function erroresCond(arr,etiq){
@@ -1048,6 +1069,7 @@ function validarFicha(b,wsId,fid){
       if(r.hasta!=null&&(!Number.isFinite(r.hasta)||r.hasta<r.desde))errores.push(`Rango #${i+1}: "Hasta" no es válido`);
       if(!Number.isFinite(r.precio)||r.precio<0)errores.push(`Rango #${i+1}: precio no es válido`);
     });
+    erroresTramos(b.rangos,'Tramos por cantidad: ').forEach(e=>errores.push(e));
   }
   if(b.tipo_precio==='combo'||b.tipo_precio==='promocional'){
     if(b.combo_precio_modo!==undefined&&!['global','individual'].includes(b.combo_precio_modo))errores.push('Modo de precio no válido');
@@ -1115,6 +1137,7 @@ function validarFicha(b,wsId,fid){
         const precioOk=definido(v.precio)&&evalExpr(v.precio)!==null;
         const tramoUno=detectarPrecioEscalonado(v.tramos||[],1);
         if(!precioOk&&tramoUno==null)errores.push(`Variante ${etiq}: necesita un precio (o un tramo que empiece en 1)`);
+        erroresTramos(v.tramos,`Variante ${etiq}: `).forEach(e=>errores.push(e));
       }
     };
     (b.variantes||[]).forEach((v,i)=>validarNodo(v,String(i+1)));
@@ -3218,7 +3241,7 @@ PRODUCTOS · PUEDES PROPONER TRES COSAS (todo lo demás sigue siendo solo consul
 - UNIDADES · NO conviertas nada, NUNCA multipliques por 10.000. El sistema calcula ancho × alto × tarifa con los números tal cual se escriben: si la tarifa es 20 y el operario escribe 10 × 10, el cobro es $2.000. La unidad no cambia la cuenta, solo dice EN QUÉ se van a escribir esas medidas. Pon la tarifa tal como te la dicten y declara la unidad con "medida_unidad":"cm2" (o "m2"), en la parte y también en el producto simple. Si no te dicen la unidad, pregúntala en una línea: es la diferencia entre cobrar $2.000 y cobrar $0,20.
   Ejemplo: estampado a $20 el cm² que baja a $18 desde 7 unidades y a $16 desde 13 →
   {"nombre":"Estampado","modo":"medidas","medida_unidad":"cm2","medida_tarifa":"20","medida_cond_eje":"cantidad","medida_cond":[{"desde":7,"hasta":12,"tarifa":18},{"desde":13,"hasta":null,"tarifa":16}]}
-- Si usas "tramos" en una parte, el PRIMERO tiene que empezar en 1: si no, no hay precio para 1 unidad y el sistema lo rechaza.
+- TRAMOS/RANGOS por cantidad tienen que ser CONTIGUOS: el primero empieza en 1, y cada siguiente empieza justo en (el "hasta" del anterior + 1). Nada de solapes ni huecos (ej. válido: 1-5, 6-20, 21 en adelante). Solo el último puede ir "en adelante" (hasta null). Si no, el sistema lo rechaza porque una cantidad podría tener dos precios.
 
 EL COSTO SÍ SE PUEDE GUARDAR — nunca digas que la ficha no tiene dónde:
 - PRODUCTO SIMPLE (unitario, escalonado, medidas): el costo de lo que está hecho va en "insumos":[{"nombre":"Vaso","costo":"3700"},{"nombre":"Sublimación","costo":"2000"}]. Esa es la composición que forma el COSTO TOTAL de la ficha. Si te dictan "el cuadro en resina me cuesta: resina 8000, marco 5000", eso son dos insumos. Ponlos SIEMPRE que te den un costo de un producto simple — sin esto el producto se crea sin costo y no hay margen.

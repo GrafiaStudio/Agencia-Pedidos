@@ -6483,7 +6483,19 @@ function remVariante(id){quitarNodoVar(id);renderVariantes()}
 function setVariante(id,k,v){const c=buscarNodoVar(id);if(c){c[k]=v;if(k==='precio')actualizarUtilidadVariante(id)}}
 function addTramoVariante(vid){const v=buscarNodoVar(vid);if(v){v.tramos=v.tramos||[];v.tramos.push({id:uid(),desde:'',hasta:'',precio:''});renderVariantes()}}
 function remTramoVariante(vid,tid){const v=buscarNodoVar(vid);if(v){v.tramos=(v.tramos||[]).filter(t=>t.id!==tid);renderVariantes()}}
-function setTramoVariante(vid,tid,k,val){const v=buscarNodoVar(vid);if(v){const t=(v.tramos||[]).find(x=>x.id===tid);if(t)t[k]=val}}
+function setTramoVariante(vid,tid,k,val){const v=buscarNodoVar(vid);if(v){const t=(v.tramos||[]).find(x=>x.id===tid);if(t)t[k]=val;if(k==='hasta')syncDesdeTramosVar(vid);}}
+// El "desde" de los tramos de una variante también se calcula solo (ver syncDesdeRangos).
+function syncDesdeTramosVar(vid){
+  const v=buscarNodoVar(vid); if(!v)return;
+  let prevH=null;
+  (v.tramos||[]).forEach((t,i)=>{
+    const desde = i===0 ? 1 : (prevH!=null ? prevH+1 : null);
+    t.desde = desde!=null ? String(desde) : '';
+    const el=document.getElementById('vtramo-desde-'+t.id);
+    if(el)el.value = desde!=null ? String(desde) : '';
+    const h=parseInt(t.hasta,10); prevH=Number.isFinite(h)?h:null;
+  });
+}
 function addCostoVariante(vid){const v=buscarNodoVar(vid);if(v){v.costos=v.costos||[];v.costos.push({id:uid(),nombre:'',valor:''});varCostosPlegados.delete(vid);renderVariantes()}}
 function remCostoVariante(vid,cid){const v=buscarNodoVar(vid);if(v){v.costos=(v.costos||[]).filter(c=>c.id!==cid);renderVariantes()}}
 function setCostoVariante(vid,cid,k,val){const v=buscarNodoVar(vid);if(v){const c=(v.costos||[]).find(x=>x.id===cid);if(c){c[k]=val;if(k==='valor')actualizarUtilidadVariante(vid)}}}
@@ -6615,15 +6627,22 @@ async function cvAutoEnlazarUI(){
   toast(`${r.enlazados} costo${r.enlazados===1?'':'s'} enlazado${r.enlazados===1?'':'s'} desde ${r.listas.join(', ')} ✓`);
 }
 function htmlTramosVar(v){
-  return `<div class="var-chips">
-    ${(v.tramos||[]).map(t=>`<div class="var-chip">
+  const tr=v.tramos||[]; const n=tr.length; let prevH=null;
+  const filas=tr.map((t,i)=>{
+    const desde = i===0 ? 1 : (prevH!=null ? prevH+1 : null);
+    t.desde = desde!=null ? String(desde) : '';   // el desde se deriva, no se teclea
+    const h=parseInt(t.hasta,10); prevH=Number.isFinite(h)?h:null;
+    return `<div class="var-chip">
       <span class="chip-lbl">De</span>
-      <input class="chip-inp chip-sm" type="text" value="${String(t.desde||'').replace(/"/g,'&quot;')}" placeholder="1" oninput="setTramoVariante('${v.id}','${t.id}','desde',this.value)">
+      <input id="vtramo-desde-${t.id}" class="chip-inp chip-sm" type="text" value="${t.desde}" placeholder="1" readonly title="Se calcula solo: sigue donde termina el tramo anterior" style="background:#f1f2f6;color:var(--slate);cursor:not-allowed">
       <span class="chip-lbl">a</span>
-      <input class="chip-inp chip-sm" type="text" value="${String(t.hasta||'').replace(/"/g,'&quot;')}" placeholder="+" oninput="setTramoVariante('${v.id}','${t.id}','hasta',this.value)">
+      <input class="chip-inp chip-sm" type="text" value="${String(t.hasta||'').replace(/"/g,'&quot;')}" placeholder="${i===n-1?'+':'?'}" title="${i===n-1?'Vacío = de aquí en adelante':'Hasta cuántas unidades'}" oninput="setTramoVariante('${v.id}','${t.id}','hasta',this.value)">
       <input class="chip-inp chip-val" type="text" value="${String(t.precio||'').replace(/"/g,'&quot;')}" placeholder="$ 0" oninput="setTramoVariante('${v.id}','${t.id}','precio',this.value)">
       <button class="chip-x" title="Quitar" onclick="remTramoVariante('${v.id}','${t.id}')"><i class="ti ti-x"></i></button>
-    </div>`).join('')}
+    </div>`;
+  }).join('');
+  return `<div class="var-chips">
+    ${filas}
     <button class="chip-add" onclick="addTramoVariante('${v.id}')"><i class="ti ti-plus"></i>Agregar tramo</button>
   </div>`;
 }
@@ -7393,7 +7412,20 @@ function onEsReglaChange(){
 }
 function addRango(){fProdRangos.push({id:uid(),desde:'',hasta:'',precio:''});renderRangos()}
 function remRango(id){fProdRangos=fProdRangos.filter(x=>x.id!==id);renderRangos()}
-function setRango(id,k,v){const r=fProdRangos.find(x=>x.id===id);if(r)r[k]=v;actualizarVisibilidadPrecioBase()}
+function setRango(id,k,v){const r=fProdRangos.find(x=>x.id===id);if(r)r[k]=v;if(k==='hasta')syncDesdeRangos();actualizarVisibilidadPrecioBase()}
+/* El "desde" NO se escribe: se calcula solo. Primer tramo empieza en 1; cada siguiente en
+   (hasta del anterior + 1). Así es IMPOSIBLE crear tramos que se solapen (el bug de "6-10 y
+   8-12": ¿8 cuánto cobra?). Se sincroniza sin re-render para no perder el foco al teclear. */
+function syncDesdeRangos(){
+  let prevH=null;
+  fProdRangos.forEach((r,i)=>{
+    const desde = i===0 ? 1 : (prevH!=null ? prevH+1 : null);
+    r.desde = desde!=null ? String(desde) : '';
+    const el=document.getElementById('rango-desde-'+r.id);
+    if(el)el.value = desde!=null ? String(desde) : '';
+    const h=parseInt(r.hasta,10); prevH=Number.isFinite(h)?h:null;
+  });
+}
 function focusRangoPrecio(el,id){
   const r=fProdRangos.find(x=>x.id===id);
   el.value=(r&&r.precio)||'';
@@ -7403,15 +7435,17 @@ function blurRangoPrecio(el,id){
   el.value=displayMoneyVal(r&&r.precio);
 }
 function renderRangos(){
-  document.getElementById('prod-rangos-body').innerHTML='<div class="var-chips">'+fProdRangos.map(r=>`
+  const n=fProdRangos.length;
+  document.getElementById('prod-rangos-body').innerHTML='<div class="var-chips">'+fProdRangos.map((r,i)=>`
     <div class="var-chip">
       <span class="chip-lbl">De</span>
-      <input class="chip-inp chip-sm" type="text" value="${String(r.desde||'').replace(/"/g,'&quot;')}" placeholder="1" oninput="setRango('${r.id}','desde',this.value)">
+      <input id="rango-desde-${r.id}" class="chip-inp chip-sm" type="text" value="" placeholder="1" readonly title="Se calcula solo: continúa donde termina el tramo anterior" style="background:#f1f2f6;color:var(--slate);cursor:not-allowed">
       <span class="chip-lbl">a</span>
-      <input class="chip-inp chip-sm" type="text" value="${String(r.hasta||'').replace(/"/g,'&quot;')}" placeholder="+" oninput="setRango('${r.id}','hasta',this.value)">
+      <input class="chip-inp chip-sm" type="text" value="${String(r.hasta||'').replace(/"/g,'&quot;')}" placeholder="${i===n-1?'+':'?'}" title="${i===n-1?'Vacío = de aquí en adelante':'Hasta cuántas unidades'}" oninput="setRango('${r.id}','hasta',this.value)">
       <input class="chip-inp chip-val" type="text" value="${displayMoneyVal(r.precio)}" placeholder="$ 0" oninput="setRango('${r.id}','precio',this.value)" onfocus="focusRangoPrecio(this,'${r.id}')" onblur="blurRangoPrecio(this,'${r.id}')">
       <button class="chip-x" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button>
     </div>`).join('')+'<button class="chip-add" onclick="addRango()"><i class="ti ti-plus"></i>Agregar tramo</button></div>';
+  syncDesdeRangos();
   actualizarVisibilidadPrecioBase();
 }
 function resetProdForm(){
