@@ -3204,6 +3204,14 @@ function toFloatCO(s){
   const v=parseFloat(t);
   return isFinite(v)?v:0;
 }
+/* Gemelo servidor de toPctCO: toFloatCO se come el "-" a propósito (no hay precios negativos).
+   El % de ajuste de la 2.ª dimensión es el único número con signo, y casi siempre negativo. */
+function toPctCO(s){
+  if(s==null)return 0;
+  const t=String(s).trim();
+  const v=toFloatCO(t);
+  return /^-/.test(t)?-v:v;
+}
 function fmtTarifa(v){ const n=(typeof v==='number')?v:toFloatCO(v); if(!isFinite(n)||n===0)return ''; return String(n).replace('.',','); }
 function calcReferencialEncargo(enc){
   return(enc.items||[]).reduce((a,it)=>{
@@ -5900,7 +5908,9 @@ function areaFicha(ficha,ancho,alto){
 // FASE E · tarifa vigente del producto simple por medidas, ya con las condiciones aplicadas.
 function tarifaFicha(ficha,ancho,alto,cant){
   const base=parseFloat(ficha.medida_tarifa_calc)||0;
-  return tarifaCondicional(ficha.medida_cond,ficha.medida_cond_eje,cant,areaFicha(ficha,ancho,alto),base);
+  const area=areaFicha(ficha,ancho,alto);
+  const tar=tarifaCondicional(ficha.medida_cond,ficha.medida_cond_eje,cant,area,base);
+  return tar*factorAjuste(ficha.medida_ajuste,ficha.medida_ajuste_eje,cant,area);
 }
 function calcPrecioMedidas(ficha,ancho,alto,cant){
   if(!ficha)return 0;
@@ -5956,7 +5966,13 @@ function pintarHintMedidaVar(it){
       const n=s.opcion||s.parte;
       if(n.modo!=='medidas')continue;
       const c=condAplica(n.medida_cond,n.medida_cond_eje,cant,area);
-      if(c){ txt+=' · '+n.nombre+': condición '+condEtiqueta(c,n.medida_cond_eje)+' → tarifa '+fCOPd(toFloatCO(c.tarifa)); break; }
+      const aj=ajusteAplica(n.medida_ajuste,n.medida_ajuste_eje,cant,area);
+      if(c||aj){
+        if(c)txt+=' · '+n.nombre+': condición '+condEtiqueta(c,n.medida_cond_eje)+' → tarifa '+fCOPd(toFloatCO(c.tarifa));
+        else txt+=' · '+n.nombre;
+        if(aj)txt+=' · ajuste '+etiquetaAjuste(aj,n.medida_ajuste_eje);
+        break;
+      }
     }
   }catch(e){}
   hv.textContent=txt;
@@ -5970,9 +5986,11 @@ function pintarHintMedida(it){
   if(!(area>0)){hint.textContent='';return;}
   const cant=parseInt(String(it.cantidad||0).replace(/\D/g,''))||0;
   const c=condAplica(f.medida_cond,f.medida_cond_eje,cant,area);
+  const aj=ajusteAplica(f.medida_ajuste,f.medida_ajuste_eje,cant,area);
   const nA=String(Math.round(area*10000)/10000).replace('.',',');
   hint.textContent=nA+' '+suf+' → '+fCOP(parseInt(it.valor_unitario,10)||0)+' por pieza'
-    +(c?(' · condición '+condEtiqueta(c,f.medida_cond_eje)+' → tarifa '+fCOPd(toFloatCO(c.tarifa))):'');
+    +(c?(' · condición '+condEtiqueta(c,f.medida_cond_eje)+' → tarifa '+fCOPd(toFloatCO(c.tarifa))):'')
+    +(aj?(' · ajuste '+etiquetaAjuste(aj,f.medida_ajuste_eje)):'');
 }
 /* ===== FASE E · CONDICIONES ============================================================
    La tarifa por medida deja de ser una constante. Puede cambiar por tramos, con DOS ejes:
@@ -5981,8 +5999,9 @@ function pintarHintMedida(it){
    El emparejamiento es EL MISMO que el de los tramos de precio (detectarPrecioEscalonado):
    el primer tramo que cubre el valor manda, y si el valor supera al último tramo cerrado,
    se queda con ese último. Si no hay condiciones o el valor aún no se conoce → tarifa base. */
-function condAplica(cond,eje,cant,area){
-  const arr=(cond||[]).filter(c=>toFloatCO(c.tarifa)>0);
+// Qué tramo cubre este valor. Lo comparten las dos dimensiones: cambia qué filas son válidas
+// (tarifa > 0 en la 1.ª · ajuste ≠ 0 en la 2.ª), no cómo se busca el tramo.
+function tramoQueAplica(arr,eje,cant,area){
   if(!arr.length)return null;
   const x=(eje==='area')?(parseFloat(area)||0):(parseFloat(cant)||0);
   if(!(x>0))return null;
@@ -5995,9 +6014,23 @@ function condAplica(cond,eje,cant,area){
   const uh=(u.hasta===''||u.hasta==null)?null:toFloatCO(u.hasta);
   return (uh!=null&&x>uh)?u:null;
 }
+function condAplica(cond,eje,cant,area){
+  return tramoQueAplica((cond||[]).filter(c=>toFloatCO(c.tarifa)>0),eje,cant,area);
+}
 function tarifaCondicional(cond,eje,cant,area,base){
   const c=condAplica(cond,eje,cant,area);
   return c?toFloatCO(c.tarifa):base;
+}
+/* SEGUNDA DIMENSIÓN · la 1.ª elige la tarifa por un eje; esta la ajusta un % por el otro.
+   Componer así cuesta N+M reglas en vez de una cuadrícula N×M, y el usuario solo abre la
+   segunda si la necesita. El ajuste es un % con signo: -15 = 15% más barato, +10 = recargo. */
+function ajusteAplica(aj,eje,cant,area){
+  return tramoQueAplica((aj||[]).filter(c=>toPctCO(c.ajuste)!==0),eje,cant,area);
+}
+function factorAjuste(aj,eje,cant,area){
+  const c=ajusteAplica(aj,eje,cant,area);
+  const f=c?(1+toPctCO(c.ajuste)/100):1;
+  return f>0?f:1; // un -100% dejaría todo en 0; el servidor lo rechaza, aquí no se cobra gratis
 }
 // Etiqueta legible del tramo que se aplicó, para que el usuario VEA por qué le cobró distinto.
 function condEtiqueta(c,eje){
@@ -6008,13 +6041,22 @@ function condEtiqueta(c,eje){
   const h=(c.hasta===''||c.hasta==null)?null:toFloatCO(c.hasta);
   return (h==null?`de ${n(d)}${suf} en adelante`:`${n(d)} a ${n(h)}${suf}`);
 }
+// Igual que condEtiqueta pero para la 2.ª dimensión: dice el tramo Y cuánto movió la tarifa.
+function etiquetaAjuste(c,eje){
+  if(!c)return '';
+  const a=toPctCO(c.ajuste);
+  const pct=(a>0?'+':'')+String(a).replace('.',',')+'%';
+  return condEtiqueta(c,eje)+' → '+pct;
+}
 function varMedidaTarifa(n){ return toFloatCO(n.medida_tarifa_calc||n.medida_tarifa||0); }
 function varMedidaMinimo(n){ return toFloatCO(n.medida_minimo_calc||n.medida_minimo||0); }
 function varPrecioNodoFE(n,cant,ancho,alto){
   if(n.modo==='medidas'){
     const area=toFloatCO(ancho)*toFloatCO(alto);
     // FASE E · la tarifa puede bajar (o subir) según la cantidad del pedido o el área de la pieza.
-    const tar=tarifaCondicional(n.medida_cond,n.medida_cond_eje,cant,area,varMedidaTarifa(n));
+    // …y la 2.ª dimensión ajusta esa tarifa un % por el otro eje (ver factorAjuste).
+    const tar=tarifaCondicional(n.medida_cond,n.medida_cond_eje,cant,area,varMedidaTarifa(n))
+             *factorAjuste(n.medida_ajuste,n.medida_ajuste_eje,cant,area);
     return Math.round(Math.max(varMedidaMinimo(n), area*tar));
   }
   if(n.modo==='hoja'){
@@ -6484,12 +6526,14 @@ function moverVariante(id,dir){
 let varItemPlegados=new Set();
 function toggleVarItem(encId,itemId){if(varItemPlegados.has(itemId))varItemPlegados.delete(itemId);else varItemPlegados.add(itemId);renderEncItems(encId)}
 // A4 · las variantes nuevas arrancan en 'fijo' (compactas): solo Precio público, sin desplegar tramos.
-function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'fijo',piezas:'',informativa:false,medida_tarifa:'',medida_minimo:'',medida_cond:[],medida_cond_eje:'cantidad'}}
+function nodoVarNuevo(){return {id:uid(),nombre:'',precio:'',costos:[],tramos:[],hijos:[],multi:false,modo:'fijo',piezas:'',informativa:false,medida_tarifa:'',medida_minimo:'',medida_cond:[],medida_cond_eje:'cantidad',medida_ajuste:[],medida_ajuste_eje:'cantidad'}}
 function clonarNodoVar(v){return {id:uid(),nombre:v.nombre||'',precio:v.precio||'',multi:!!v.multi,modo:v.modo||'precio',piezas:v.piezas||'',informativa:!!v.informativa,medida_tarifa:v.medida_tarifa||'',medida_minimo:v.medida_minimo||'',
   costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||'',lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
   tramos:(v.tramos||[]).map(t=>({id:uid(),desde:t.desde,hasta:t.hasta,precio:t.precio})),
   medida_cond:(v.medida_cond||[]).map(c=>({id:uid(),desde:c.desde,hasta:c.hasta,tarifa:c.tarifa})),
   medida_cond_eje:v.medida_cond_eje||'cantidad',
+  medida_ajuste:(v.medida_ajuste||[]).map(c=>({id:uid(),desde:c.desde,hasta:c.hasta,ajuste:c.ajuste})),
+  medida_ajuste_eje:v.medida_ajuste_eje||'cantidad',
   hijos:(v.hijos||[]).map(clonarNodoVar)}}
 function setVarModo(id,modo){const v=buscarNodoVar(id);if(v){v.modo=modo;renderVariantes()}}
 // A4 · los 3 modos son opcionales: tocar el que ya está activo lo quita y deja "precio fijo".
@@ -6722,6 +6766,65 @@ function htmlCondiciones(cond,eje,f,abierto,unidad){
     </div>`:''}
   </div>`;
 }
+/* SEGUNDA DIMENSIÓN · el bloque de ajustes. Solo se PINTA si ya hay condiciones (o si el
+   producto ya traía ajustes): primero se aprende a mover la tarifa por un eje, y solo entonces
+   aparece la opción de cruzarla con el otro. Quien necesita un solo eje nunca lo ve. */
+function htmlAjuste(aj,eje,f,abierto,unidad,ejeCond){
+  const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
+  const fns={toggle:f.toggle(),add:f.add(),rem:id=>f.rem(id),set:(id,k)=>f.set(id,k),eje:e=>f.eje(e)};
+  const arr=aj||[];
+  const esArea=eje==='area';
+  const um=unidad==='cm2'?'cm²':'m²';
+  const uCant=esArea?um:'u';
+  const porCond=ejeCond==='area'?'el área':'la cantidad';
+  const porAj=esArea?'el área':'la cantidad';
+  return `<div class="cond-box${abierto?' open':''}" style="margin-top:8px">
+    <div class="cond-hd" onclick="${fns.toggle}">
+      <i class="ti ti-chevron-${abierto?'down':'right'}"></i>
+      <span>Y además, ajustar esa tarifa <b>(opcional)</b></span>
+      ${arr.length?`<span class="cond-badge">${arr.length}</span>`:''}
+      <span class="cond-sub">${arr.length?('un % según '+porAj):'sin ajustes'}</span>
+    </div>
+    ${abierto?`<div class="cond-body">
+      <div class="cond-ejes">
+        <label class="var-modo-pill${esArea?'':' active'}" onclick="${fns.eje('cantidad')}"><span class="rd"></span>Según la cantidad</label>
+        <label class="var-modo-pill${esArea?' active':''}" onclick="${fns.eje('area')}"><span class="rd"></span>Según el área</label>
+      </div>
+      <div class="var-hint">Arriba la tarifa se elige según <b>${porCond}</b>; aquí se sube o se baja un <b>%</b> según <b>${porAj}</b>.
+        Así se cobran las dos cosas a la vez sin llenar una tabla enorme.
+        Ej: de 21 en adelante → <b>-15</b> (quince por ciento más barato). Un número positivo es recargo.</div>
+      <div class="var-chips">
+        ${arr.map(c=>`<div class="var-chip">
+          <span class="chip-lbl">De</span>
+          <input class="chip-inp chip-sm" type="text" value="${esc(c.desde)}" placeholder="1" oninput="${fns.set(c.id,'desde')}">
+          <span class="chip-lbl">a</span>
+          <input class="chip-inp chip-sm" type="text" value="${esc(c.hasta)}" placeholder="+" oninput="${fns.set(c.id,'hasta')}">
+          <span class="chip-lbl">${uCant} →</span>
+          <input class="chip-inp chip-sm" type="text" value="${esc(c.ajuste)}" placeholder="-15" title="Porcentaje: negativo abarata, positivo recarga" oninput="${fns.set(c.id,'ajuste')}">
+          <span class="chip-lbl">%</span>
+          <button class="chip-x" title="Quitar" onclick="${fns.rem(c.id)}"><i class="ti ti-x"></i></button>
+        </div>`).join('')}
+        <button class="chip-add" onclick="${fns.add}"><i class="ti ti-plus"></i>Agregar ajuste</button>
+      </div>
+    </div>`:''}
+  </div>`;
+}
+function ajusteSerializar(arr){
+  return (arr||[])
+    .filter(c=>String(c.desde||'').trim()||String(c.hasta||'').trim()||String(c.ajuste||'').trim())
+    .map(c=>({desde:String(c.desde||'').trim(),hasta:String(c.hasta||'').trim(),ajuste:String(c.ajuste||'').trim()}));
+}
+// Mismo criterio que errorCondFE: avisar antes de guardar en vez de dejar caer la fila.
+function errorAjusteFE(arr,etiq){
+  const pre=etiq?`${etiq}: `:'';
+  for(let i=0;i<(arr||[]).length;i++){
+    const c=arr[i], a=toPctCO(c.ajuste);
+    if(!a)return `${pre}el ajuste #${i+1} necesita un porcentaje distinto de 0 (ej: -15)`;
+    if(a<=-100)return `${pre}el ajuste #${i+1} no puede bajar 100% o más`;
+    if(String(c.hasta||'').trim()&&toFloatCO(c.hasta)<toFloatCO(c.desde))return `${pre}en el ajuste #${i+1} el "hasta" es menor que el "desde"`;
+  }
+  return null;
+}
 // Se manda al servidor lo que el usuario escribió (con coma decimal); allá se normaliza a número.
 // Las filas del todo vacías se descartan: son las que quedan al tocar "Agregar" y arrepentirse.
 // Mismo criterio que el servidor: una condición sin tarifa se descartaría en silencio.
@@ -6746,14 +6849,33 @@ function addCondVar(vid){const v=buscarNodoVar(vid);if(v){v.medida_cond=v.medida
 function remCondVar(vid,cid){const v=buscarNodoVar(vid);if(v){v.medida_cond=(v.medida_cond||[]).filter(c=>c.id!==cid);renderVariantes()}}
 function setCondVar(vid,cid,k,val){const v=buscarNodoVar(vid);if(v){const c=(v.medida_cond||[]).find(x=>x.id===cid);if(c)c[k]=val}}
 function setCondEjeVar(vid,eje){const v=buscarNodoVar(vid);if(v){v.medida_cond_eje=eje;renderVariantes()}}
+let varAjusteAbiertas=new Set();
+function toggleAjusteVar(vid){ varAjusteAbiertas.has(vid)?varAjusteAbiertas.delete(vid):varAjusteAbiertas.add(vid); renderVariantes(); }
+function addAjusteVar(vid){const v=buscarNodoVar(vid);if(v){
+  v.medida_ajuste=v.medida_ajuste||[];
+  // El ajuste se estrena en el eje CONTRARIO al de las condiciones: es para lo que aquél no cubre.
+  if(!v.medida_ajuste.length)v.medida_ajuste_eje=(v.medida_cond_eje==='area')?'cantidad':'area';
+  v.medida_ajuste.push({id:uid(),desde:'',hasta:'',ajuste:''});varAjusteAbiertas.add(vid);renderVariantes()}}
+function remAjusteVar(vid,cid){const v=buscarNodoVar(vid);if(v){v.medida_ajuste=(v.medida_ajuste||[]).filter(c=>c.id!==cid);renderVariantes()}}
+function setAjusteVar(vid,cid,k,val){const v=buscarNodoVar(vid);if(v){const c=(v.medida_ajuste||[]).find(x=>x.id===cid);if(c)c[k]=val}}
+function setAjusteEjeVar(vid,eje){const v=buscarNodoVar(vid);if(v){v.medida_ajuste_eje=eje;renderVariantes()}}
 function htmlCondVar(v){
-  return htmlCondiciones(v.medida_cond,v.medida_cond_eje,{
+  const cond=htmlCondiciones(v.medida_cond,v.medida_cond_eje,{
     toggle:()=>`toggleCondVar('${v.id}')`,
     add:()=>`addCondVar('${v.id}')`,
     rem:cid=>`remCondVar('${v.id}','${cid}')`,
     set:(cid,k)=>`setCondVar('${v.id}','${cid}','${k}',this.value)`,
     eje:e=>`setCondEjeVar('${v.id}','${e}')`
   },varCondAbiertas.has(v.id),v.medida_unidad);
+  // La 2.ª dimensión se ofrece solo cuando la 1.ª ya está en uso (o si ya venía guardada).
+  if(!(v.medida_cond||[]).length&&!(v.medida_ajuste||[]).length)return cond;
+  return cond+htmlAjuste(v.medida_ajuste,v.medida_ajuste_eje,{
+    toggle:()=>`toggleAjusteVar('${v.id}')`,
+    add:()=>`addAjusteVar('${v.id}')`,
+    rem:cid=>`remAjusteVar('${v.id}','${cid}')`,
+    set:(cid,k)=>`setAjusteVar('${v.id}','${cid}','${k}',this.value)`,
+    eje:e=>`setAjusteEjeVar('${v.id}','${e}')`
+  },varAjusteAbiertas.has(v.id),v.medida_unidad,v.medida_cond_eje);
 }
 // B1.5 (CORR 002) — variable INFORMATIVA (sin costo): solo nombre + lista simple de opciones
 function htmlNodoInformativa(v){
@@ -7189,6 +7311,8 @@ function cargarNodoVar(v){
     medida_tarifa:v.medida_tarifa||'',medida_tarifa_calc:v.medida_tarifa_calc||'',medida_minimo:v.medida_minimo||'',medida_minimo_calc:v.medida_minimo_calc||'',
     medida_cond:(v.medida_cond||[]).map(c=>({id:uid(),desde:c.desde==null?'':String(c.desde).replace('.',','),hasta:c.hasta==null?'':String(c.hasta).replace('.',','),tarifa:c.tarifa==null?'':String(c.tarifa).replace('.',',')})),
     medida_cond_eje:v.medida_cond_eje==='area'?'area':'cantidad',
+    medida_ajuste:(v.medida_ajuste||[]).map(c=>({id:uid(),desde:c.desde==null?'':String(c.desde).replace('.',','),hasta:c.hasta==null?'':String(c.hasta).replace('.',','),ajuste:c.ajuste==null?'':String(c.ajuste).replace('.',',')})),
+    medida_ajuste_eje:v.medida_ajuste_eje==='area'?'area':'cantidad',
     medida_unidad:v.medida_unidad==='cm2'?'cm2':'m2',
     costo_medida_tarifa:v.costo_medida_tarifa||'',costo_medida_tarifa_calc:v.costo_medida_tarifa_calc||'',
     costos:(v.costos||[]).map(c=>({id:uid(),nombre:c.nombre||'',valor:c.valor||'',lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
@@ -7201,6 +7325,7 @@ function serializarNodoVar(v){
   return {id:v.id,nombre:(v.nombre||'').trim(),precio:(v.precio||'').toString().trim(),multi:v.multi?1:0,modo,piezas:parseInt(v.piezas,10)||null,informativa:v.informativa?1:0,
     medida_tarifa:(v.medida_tarifa||'').toString().trim(),medida_minimo:(v.medida_minimo||'').toString().trim(),
     medida_cond:condSerializar(v.medida_cond),medida_cond_eje:v.medida_cond_eje==='area'?'area':'cantidad',
+    medida_ajuste:ajusteSerializar(v.medida_ajuste),medida_ajuste_eje:v.medida_ajuste_eje==='area'?'area':'cantidad',
     medida_unidad:v.medida_unidad==='cm2'?'cm2':'m2',
     costo_medida_tarifa:(v.costo_medida_tarifa||'').toString().trim(),
     costos:(v.costos||[]).map(c=>({nombre:(c.nombre||'').trim(),valor:(c.valor||'').toString().trim(),lista_id:c.lista_id||'',item_id:c.item_id||'',columna:c.columna||''})),
@@ -7217,22 +7342,44 @@ function colapsarInsumos(){
 /* FASE E · Condiciones del PRODUCTO SIMPLE por medidas (el caso del pendón: tarifa 9,
    pero si la pieza pasa de 2 m² baja a 7). Mismo bloque visual que en las variantes. */
 let fProdMedidaCond=[], fProdMedidaEje='cantidad', prodCondAbierta=false;
+let fProdMedidaAjuste=[], fProdMedidaAjusteEje='cantidad', prodAjusteAbierto=false;
 function renderCondProd(){
   const cont=document.getElementById('prod-medida-cond-body');
   if(!cont)return;
-  cont.innerHTML=htmlCondiciones(fProdMedidaCond,fProdMedidaEje,{
+  const unidad=(document.getElementById('prod-medida-unidad')||{}).value;
+  let html=htmlCondiciones(fProdMedidaCond,fProdMedidaEje,{
     toggle:()=>'toggleCondProd()',
     add:()=>'addCondProd()',
     rem:cid=>`remCondProd('${cid}')`,
     set:(cid,k)=>`setCondProd('${cid}','${k}',this.value)`,
     eje:e=>`setCondEjeProd('${e}')`
-  },prodCondAbierta,(document.getElementById('prod-medida-unidad')||{}).value);
+  },prodCondAbierta,unidad);
+  // La 2.ª dimensión solo se ofrece cuando la 1.ª ya está en uso (o si ya venía guardada).
+  if(fProdMedidaCond.length||fProdMedidaAjuste.length){
+    html+=htmlAjuste(fProdMedidaAjuste,fProdMedidaAjusteEje,{
+      toggle:()=>'toggleAjusteProd()',
+      add:()=>'addAjusteProd()',
+      rem:cid=>`remAjusteProd('${cid}')`,
+      set:(cid,k)=>`setAjusteProd('${cid}','${k}',this.value)`,
+      eje:e=>`setAjusteEjeProd('${e}')`
+    },prodAjusteAbierto,unidad,fProdMedidaEje);
+  }
+  cont.innerHTML=html;
 }
 function toggleCondProd(){prodCondAbierta=!prodCondAbierta;renderCondProd()}
 function addCondProd(){fProdMedidaCond.push({id:uid(),desde:'',hasta:'',tarifa:''});prodCondAbierta=true;renderCondProd()}
 function remCondProd(cid){fProdMedidaCond=fProdMedidaCond.filter(c=>c.id!==cid);renderCondProd()}
 function setCondProd(cid,k,val){const c=fProdMedidaCond.find(x=>x.id===cid);if(c)c[k]=val}
 function setCondEjeProd(e){fProdMedidaEje=e;renderCondProd()}
+function toggleAjusteProd(){prodAjusteAbierto=!prodAjusteAbierto;renderCondProd()}
+function addAjusteProd(){
+  // Estrena en el eje contrario al de las condiciones: es justo para lo que aquél no cubre.
+  if(!fProdMedidaAjuste.length)fProdMedidaAjusteEje=(fProdMedidaEje==='area')?'cantidad':'area';
+  fProdMedidaAjuste.push({id:uid(),desde:'',hasta:'',ajuste:''});prodAjusteAbierto=true;renderCondProd();
+}
+function remAjusteProd(cid){fProdMedidaAjuste=fProdMedidaAjuste.filter(c=>c.id!==cid);renderCondProd()}
+function setAjusteProd(cid,k,val){const c=fProdMedidaAjuste.find(x=>x.id===cid);if(c)c[k]=val}
+function setAjusteEjeProd(e){fProdMedidaAjusteEje=e;renderCondProd()}
 function addCostoFijo(){fProdCostosFijos.push({id:uid(),nombre:'',valor:''});renderCostosFijos()}
 function remCostoFijo(id){fProdCostosFijos=fProdCostosFijos.filter(x=>x.id!==id);renderCostosFijos()}
 function setCostoFijo(id,k,v){const c=fProdCostosFijos.find(x=>x.id===id);if(c)c[k]=v}
@@ -7491,6 +7638,7 @@ function resetProdForm(){
   prodModoCalculo='cantidad';
   fProdCostosFijos=[];fProdVariantes=[];
   fProdMedidaCond=[];fProdMedidaEje='cantidad';prodCondAbierta=false;varCondAbiertas.clear();
+  fProdMedidaAjuste=[];fProdMedidaAjusteEje='cantidad';prodAjusteAbierto=false;varAjusteAbiertas.clear();
   document.getElementById('prod-modo-cantidad').checked=true;
   document.getElementById('prod-modo-medidas').checked=false;
   document.getElementById('prod-modo-variantes').checked=false;
@@ -7625,7 +7773,10 @@ async function abrirEditarProducto(id){
   fProdMedidaCond=(p.medida_cond||[]).map(c=>({id:uid(),desde:c.desde==null?'':String(c.desde).replace('.',','),hasta:c.hasta==null?'':String(c.hasta).replace('.',','),tarifa:c.tarifa==null?'':String(c.tarifa).replace('.',',')}));
   fProdMedidaEje=p.medida_cond_eje==='area'?'area':'cantidad';
   prodCondAbierta=fProdMedidaCond.length>0;
-  varCondAbiertas.clear();
+  fProdMedidaAjuste=(p.medida_ajuste||[]).map(c=>({id:uid(),desde:c.desde==null?'':String(c.desde).replace('.',','),hasta:c.hasta==null?'':String(c.hasta).replace('.',','),ajuste:c.ajuste==null?'':String(c.ajuste).replace('.',',')}));
+  fProdMedidaAjusteEje=p.medida_ajuste_eje==='area'?'area':'cantidad';
+  prodAjusteAbierto=fProdMedidaAjuste.length>0;
+  varCondAbiertas.clear();varAjusteAbiertas.clear();
   renderProdCatRow();
   renderInsumos();
   renderRangos();
@@ -7653,6 +7804,8 @@ function validarProductoBody(b){
   if(b.tipo_precio==='medidas'){
     const eCond=errorCondFE(b.medida_cond,'');
     if(eCond)return eCond;
+    const eAj=errorAjusteFE(b.medida_ajuste,'');
+    if(eAj)return eAj;
     if(!(toFloatCO(b.medida_tarifa)>0)&&!(b.medida_cond||[]).some(c=>toFloatCO(c.tarifa)>0))return'Falta la tarifa por unidad de medida (acepta decimales, ej: 8,5) — o al menos una condición de tarifa con su valor';
     if(definidoFE(b.costo_medida_tarifa)&&!(toFloatCO(b.costo_medida_tarifa)>0))return'El costo por medida debe ser un número válido (acepta decimales)';
     for(let i=0;i<(b.costos_fijos||[]).length;i++){
@@ -7691,6 +7844,8 @@ function validarProductoBody(b){
         if(!(toFloatCO(v.medida_tarifa)>0)&&!(v.medida_cond||[]).some(c=>toFloatCO(c.tarifa)>0))return`Variante ${etiq}: falta la tarifa por medida (acepta decimales, ej: 8,5) — o al menos una condición de tarifa con su valor`;
         const eC=errorCondFE(v.medida_cond,`Variante ${etiq}`);
         if(eC)return eC;
+        const eA=errorAjusteFE(v.medida_ajuste,`Variante ${etiq}`);
+        if(eA)return eA;
       }else if(v.modo==='hoja'){
         if(!(parseInt(v.piezas,10)>0))return`Variante ${etiq}: piezas por hoja debe ser un número mayor a 0`;
         if(!definidoFE(v.precio)||evalExpr(v.precio)===null)return`Variante ${etiq}: el precio por hoja no es válido`;
@@ -7753,6 +7908,8 @@ async function guardarProducto(){
     cobro_minimo:esMedidas?document.getElementById('prod-cobro-minimo').value.trim():'',
     medida_cond:esMedidas?condSerializar(fProdMedidaCond):[],
     medida_cond_eje:fProdMedidaEje,
+    medida_ajuste:esMedidas?ajusteSerializar(fProdMedidaAjuste):[],
+    medida_ajuste_eje:fProdMedidaAjusteEje,
     variantes:esVariantes?fProdVariantes.map(serializarNodoVar):[],
     pliego_superficies:esPliego?fProdHojaSuperficies.map(s=>({nombre:(s.nombre||'').trim(),piezas:parseInt(s.piezas,10)||0,precio:(s.precio||'').toString().trim()})):[],
     pliego_extras:esPliego?fProdHojaExtras.map(e=>({nombre:(e.nombre||'').trim(),valor:(e.valor||'').toString().trim(),tipo:e.tipo||'pieza'})):[],
