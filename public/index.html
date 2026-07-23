@@ -7350,8 +7350,16 @@ function actualizarVisibilidadPrecioBase(){
   }else{
     input.style.display='block';
     cap.style.display='none';
-    if(fProdPrecioSugeridoActual!=null){sugCap.style.display='block';sugCap.textContent='Precio sugerido: '+fCOP(fProdPrecioSugeridoActual)}
-    else{sugCap.style.display='none'}
+    if(fProdPrecioSugeridoActual!=null){
+      // El VALOR va en la casilla (placeholder) y "=sugerido" queda como nota abajo. Antes era
+      // al revés (placeholder "=sugerido" + número en la nota) y a la gente la confundía.
+      input.placeholder=fCOP(fProdPrecioSugeridoActual);
+      sugCap.style.display='block';
+      sugCap.textContent='= igual al sugerido (déjalo vacío para cobrar ese valor)';
+    }else{
+      input.placeholder='= sugerido';
+      sugCap.style.display='none';
+    }
   }
 }
 function onMargenTipoChange(){
@@ -7721,7 +7729,10 @@ function actualizarValorTotal(){
     if(elx)elx.textContent='Ref '+fCOP(calcReferencialEncargo(e));
   });
   const sug=calcValorSugerido(fEnc);
-  document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: '+fCOP(sug);
+  // Valor en la casilla (placeholder) y "=sugerido" como nota abajo — mismo criterio que en el editor de producto.
+  const vfInput=document.getElementById('f-valor-final');
+  if(vfInput)vfInput.placeholder=fCOP(sug);
+  document.getElementById('valor-sugerido-cap').textContent='= igual al sugerido';
   const vfRaw=(fValorFinalRaw||'').trim();
   const oficial=vfRaw!==''?(evalExpr(vfRaw)||0):sug;
   document.getElementById('valor-ajustado').style.display=(vfRaw!==''&&oficial!==sug)?'inline-block':'none';
@@ -8091,7 +8102,8 @@ function resetForm(){
   const crb=document.getElementById('f-cancel-reintegro');if(crb)crb.checked=false;
   const scb=document.getElementById('sec-cancel');if(scb)scb.style.display='none';
   document.getElementById('ac-drop').style.display='none';
-  document.getElementById('valor-sugerido-cap').textContent='Valor sugerido: $0';
+  document.getElementById('valor-sugerido-cap').textContent='= igual al sugerido';
+  const vfR=document.getElementById('f-valor-final');if(vfR)vfR.placeholder='= sugerido';
   document.getElementById('valor-ajustado').style.display='none';
   document.getElementById('prog-pct').textContent='0%';
   document.getElementById('pag-res').innerHTML='';
