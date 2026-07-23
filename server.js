@@ -130,6 +130,25 @@ try { db.exec("ALTER TABLE costos ADD COLUMN cantidad TEXT DEFAULT ''"); } catch
 try { db.exec("ALTER TABLE costos ADD COLUMN valor_unitario TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN valor_unitario_calc TEXT"); } catch(e){}
 try { db.exec("ALTER TABLE costos ADD COLUMN auto INTEGER DEFAULT 0"); } catch(e){}
+/* ── AUTOCODIFICACIÓN DE VENTA ──────────────────────────────────────────────────────────
+   Cada CONFIGURACIÓN vendida (ficha + variantes elegidas + medidas) recibe un código único
+   y ESTABLE: si mañana alguien pide exactamente lo mismo, se reusa el mismo código. Sirve
+   para que un auditor pueda referenciar lo vendido sin ambigüedad, y para que el vendedor
+   pueda inventar productos al vuelo sin llamar al desarrollador. El precio NO entra en la
+   identidad: se puede negociar y el código sigue siendo el mismo. La cantidad tampoco.  */
+db.exec(`CREATE TABLE IF NOT EXISTS codigos_venta(
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  ficha_id TEXT NOT NULL,
+  codigo TEXT NOT NULL,
+  clave TEXT NOT NULL,
+  descripcion TEXT DEFAULT '',
+  consecutivo INTEGER DEFAULT 0,
+  usos INTEGER DEFAULT 0,
+  creado TEXT DEFAULT(datetime('now','localtime')),
+  ultimo_uso TEXT DEFAULT(datetime('now','localtime')))`);
+try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_codven_clave ON codigos_venta(workspace_id,ficha_id,clave)"); } catch(e){}
+try { db.exec("ALTER TABLE enc_items ADD COLUMN codigo_venta TEXT DEFAULT ''"); } catch(e){}
 // ── VERSIONADO DE PEDIDOS (v3.0 Fase 2b) ──
 db.exec(`CREATE TABLE IF NOT EXISTS pedido_versiones(
   id TEXT PRIMARY KEY, pedido_id TEXT, workspace_id TEXT,
@@ -781,6 +800,50 @@ function crearVersion(pid,wsId,actor,motivo){
   return version;
 }
 
+/* ── AUTOCODIFICACIÓN · la huella de una configuración ─────────────────────────────────
+   Dos ítems son "el mismo producto" si coinciden ficha + variantes elegidas + medidas.
+   El JSON se serializa con las claves ORDENADAS: si no, {ancho,alto} y {alto,ancho}
+   producirían huellas distintas para la misma cosa y se crearían códigos duplicados.   */
+function jsonEstable(v){
+  if(v===null||v===undefined)return 'null';
+  if(Array.isArray(v))return '['+v.map(jsonEstable).join(',')+']';
+  if(typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+jsonEstable(v[k])).join(',')+'}';
+  return JSON.stringify(v);
+}
+// Las medidas se normalizan: "100", "100.0" y "100,0" son la MISMA pieza.
+function normMedida(x){ const n=toFloatCO(x); return n>0?String(n):''; }
+function claveConfigItem(it){
+  return jsonEstable({
+    f: String(it.ficha_id||''),
+    v: it._varPicks||null,
+    a: normMedida(it._ancho), h: normMedida(it._alto),
+    hs: (it._hojaSurf!==undefined&&it._hojaSurf!==null)?String(it._hojaSurf):'',
+    he: it._hojaExtras||null
+  });
+}
+/* Devuelve el código de venta de esa configuración: el que YA tenía, o uno nuevo con el
+   siguiente consecutivo de esa ficha. Formato `<código de la ficha>-<NN>` (ej. P0010-01):
+   se lee de dónde viene el producto y no colisiona entre fichas.                        */
+function codigoDeVenta(wsId,it,descripcion){
+  const fichaId=String(it.ficha_id||''); if(!fichaId)return '';
+  try{
+    const clave=claveConfigItem(it);
+    const ya=db.prepare('SELECT id,codigo FROM codigos_venta WHERE workspace_id=? AND ficha_id=? AND clave=?').get(wsId,fichaId,clave);
+    if(ya){
+      db.prepare("UPDATE codigos_venta SET usos=usos+1, ultimo_uso=datetime('now','localtime') WHERE id=?").run(ya.id);
+      return ya.codigo;
+    }
+    const f=db.prepare('SELECT codigo FROM fichas_producto WHERE id=? AND workspace_id=?').get(fichaId,wsId);
+    // Productos antiguos sin código: se usa un prefijo derivado del id, para no dejarlos fuera.
+    const pref=String((f&&f.codigo)||'').trim()||('X'+fichaId.slice(0,4).toUpperCase());
+    const max=db.prepare('SELECT COALESCE(MAX(consecutivo),0) c FROM codigos_venta WHERE workspace_id=? AND ficha_id=?').get(wsId,fichaId).c;
+    const cons=(max||0)+1;
+    const codigo=pref+'-'+String(cons).padStart(2,'0');
+    db.prepare('INSERT INTO codigos_venta(id,workspace_id,ficha_id,codigo,clave,descripcion,consecutivo,usos)VALUES(?,?,?,?,?,?,?,1)')
+      .run(uid(),wsId,fichaId,codigo,clave,String(descripcion||'').slice(0,160),cons);
+    return codigo;
+  }catch(e){ logError('codigoDeVenta',e); return ''; }
+}
 function saveEncargos(pid,encargos,wsId){
   db.prepare('DELETE FROM encargos WHERE pedido_id=? AND workspace_id=?').run(pid,wsId);
   (encargos||[]).forEach((enc,i)=>{
@@ -790,7 +853,10 @@ function saveEncargos(pid,encargos,wsId){
     db.prepare('DELETE FROM enc_items WHERE encargo_id=?').run(eid);
     (enc.items||[]).forEach((it,j)=>{
       const cfg=(it._varPicks||it._ancho||it._alto||it._hojaSurf!==undefined&&it._hojaSurf!==''||it._hojaExtras)?JSON.stringify({varPicks:it._varPicks||null,ancho:it._ancho||'',alto:it._alto||'',hojaSurf:(it._hojaSurf!==undefined?it._hojaSurf:''),hojaExtras:it._hojaExtras||null}):'';
-      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,suministrado,config,categoria,subcategoria,estado,nota,precio_sugerido,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,it.suministrado?1:0,cfg,it.categoria||'',it.subcategoria||'',it.estado||'Nuevo',it.nota||'',it.precio_sugerido||'',j,wsId);
+      // Autocodificación: misma configuración → mismo código, siempre (se reusa el que ya exista).
+      const med=(normMedida(it._ancho)&&normMedida(it._alto))?(normMedida(it._ancho)+'×'+normMedida(it._alto)):'';
+      const codVenta=codigoDeVenta(wsId,it,[String(it.detalle||'').trim(),med].filter(Boolean).join(' '));
+      db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,suministrado,config,categoria,subcategoria,estado,nota,precio_sugerido,codigo_venta,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,it.suministrado?1:0,cfg,it.categoria||'',it.subcategoria||'',it.estado||'Nuevo',it.nota||'',it.precio_sugerido||'',codVenta,j,wsId);
     });
   });
 }
@@ -3950,6 +4016,21 @@ app.delete('/api/productos/:id',requiere('gestionar_productos'),(req,res)=>{
   const r=db.prepare('DELETE FROM fichas_producto WHERE id=? AND workspace_id=?').run(req.params.id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});
   res.json({ok:true});
+});
+
+/* Base de CÓDIGOS DE VENTA generados: es el registro rastreable de cada configuración que
+   se ha vendido alguna vez. Un auditor puede pedir "qué es el P0010-03" y aquí está. */
+app.get('/api/codigos-venta',(req,res)=>{
+  try{
+    const q=String(req.query.q||'').trim();
+    let sql=`SELECT c.codigo,c.descripcion,c.usos,c.creado,c.ultimo_uso,c.ficha_id,f.nombre AS producto
+      FROM codigos_venta c LEFT JOIN fichas_producto f ON f.id=c.ficha_id
+      WHERE c.workspace_id=?`;
+    const params=[req.wsId];
+    if(q){ sql+=' AND (c.codigo LIKE ? OR c.descripcion LIKE ? OR f.nombre LIKE ?)'; params.push(bLike(q),bLike(q),bLike(q)); }
+    sql+=' ORDER BY c.ultimo_uso DESC LIMIT 200';
+    res.json({codigos:db.prepare(sql).all(...params)});
+  }catch(e){logError('GET /api/codigos-venta',e);res.status(500).json({error:e.message})}
 });
 
 // ── ÍTEMS DE INVENTARIO (CORR 003/005: inventario separado del producto) ──
