@@ -3270,8 +3270,9 @@ function lineasDocumento(p,fichasPorId){
       const totItem=cantNum*(evalExpr(it.valor_unitario)||0);
       const ficha=it.ficha_id?fichasPorId[it.ficha_id]:null;
       const unit=evalExpr(it.valor_unitario)||0;
-      // Código de venta en el documento: es justo lo que un auditor referencia después.
-      const cod=it.codigo_venta?`  ·  ${it.codigo_venta}`:'';
+      // Código de venta: va en COLUMNA propia del documento (como la referencia de una factura),
+      // no pegado al detalle — es lo que el cliente y un auditor referencian después.
+      const cod=it.codigo_venta||'';
       if(ficha&&(ficha.tipo_precio==='combo'||ficha.tipo_precio==='promocional')&&(ficha.componentes||[]).length){
         const cantItem=cantNum||1;
         const titulo=ficha.tipo_precio==='promocional'?`Promoción: ${ficha.nombre}`:ficha.nombre;
@@ -3279,12 +3280,11 @@ function lineasDocumento(p,fichasPorId){
           const nombreComp=c.componente_ficha_id?(fichasPorId[c.componente_ficha_id]?.nombre||'(producto)'):(c.componente_nombre||'(ítem libre)');
           return `   • ${cantItem*c.cantidad_consumida} ${nombreComp}`;
         }).join('\n');
-        lineas.push({cant,descripcion:`${titulo}${cod}\n${sub}`.trim(),unit,monto:totItem});
+        lineas.push({cant,cod,descripcion:`${titulo}\n${sub}`.trim(),unit,monto:totItem});
       }else{
         let desc=det||'(sin detalle)';
-        if(cod)desc+=cod;
         if(it.nota)desc+=`\n   ${it.nota}`;
-        lineas.push({cant,descripcion:desc,unit,monto:totItem});
+        lineas.push({cant,cod,descripcion:desc,unit,monto:totItem});
       }
     });
     // Anotación del encargo (A2): antes no salía en el PDF. Fila propia, sin valores.
@@ -3412,14 +3412,24 @@ async function construirPdfPedido(){
   y+=cardH+7;
 
   // ── Tabla de ítems ──
+  // La columna "Código" solo aparece si algún ítem tiene código de venta: un pedido viejo
+  // (o sin fichas) no debe salir con una columna vacía. Revelación progresiva también aquí.
+  const lineasDoc=lineasDocumento(p,fichasPorId);
+  const hayCodigos=lineasDoc.some(l=>l.cod);
   doc.autoTable({
     startY:y,margin:{left:M,right:M},
-    head:[['Cant.','Detalle','V. Unitario','V. Total']],
-    body:lineasDocumento(p,fichasPorId).map(l=>[l.cant||'',l.descripcion,l.esNota?'':(l.unit?fCOP(l.unit):''),l.esNota?'':fCOP(l.monto)]),
+    head:[hayCodigos?['Cant.','Código','Detalle','V. Unitario','V. Total']:['Cant.','Detalle','V. Unitario','V. Total']],
+    body:lineasDoc.map(l=>{
+      const fila=[l.cant||'',l.descripcion,l.esNota?'':(l.unit?fCOP(l.unit):''),l.esNota?'':fCOP(l.monto)];
+      if(hayCodigos)fila.splice(1,0,l.esNota?'':(l.cod||''));
+      return fila;
+    }),
     styles:{fontSize:9,textColor:INK,lineColor:LINE,lineWidth:0.15,cellPadding:2.6},
     headStyles:{fillColor:NAVY,textColor:255,halign:'left',fontSize:8,fontStyle:'bold'},
     alternateRowStyles:{fillColor:[249,251,253]},
-    columnStyles:{0:{cellWidth:15,halign:'center'},2:{cellWidth:30,halign:'right'},3:{cellWidth:30,halign:'right',fontStyle:'bold'}}
+    columnStyles:hayCodigos
+      ?{0:{cellWidth:14,halign:'center'},1:{cellWidth:24,fontSize:8,fontStyle:'bold',textColor:SLATE},3:{cellWidth:28,halign:'right'},4:{cellWidth:28,halign:'right',fontStyle:'bold'}}
+      :{0:{cellWidth:15,halign:'center'},2:{cellWidth:30,halign:'right'},3:{cellWidth:30,halign:'right',fontStyle:'bold'}}
   });
   y=doc.lastAutoTable.finalY+7;
 
