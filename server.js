@@ -1998,7 +1998,8 @@ app.get('/api/export/csv',requiere('ver_registros'),(req,res)=>{
   // hacer tablas dinámicas en Excel; antes todo iba aplastado en una sola celda "Encargos".
   if(req.query.tipo==='items'){
     nombreArch='pedidos_grafia_detalle_por_item.csv';
-    rows=[['Ref','Cliente','Tel','Estado','F.Pedido','F.Entrega','Encargo','Categorías','Cantidad','Detalle','Nota del ítem','Estado del ítem','V. Unitario','V. Total ítem']];
+    // El "Código de venta" va aquí: es la columna por la que un auditor agrupa y referencia.
+    rows=[['Ref','Cliente','Tel','Estado','F.Pedido','F.Entrega','Encargo','Categorías','Código de venta','Cantidad','Detalle','Nota del ítem','Estado del ítem','V. Unitario','V. Total ítem']];
     pedidos.forEach(p=>{
       const est=estadoDe(p);
       (p.encargos||[]).forEach(e=>{
@@ -2007,7 +2008,7 @@ app.get('/api/export/csv',requiere('ver_registros'),(req,res)=>{
           const cant=parseInt(String(i.cantidad||0).replace(/\D/g,''))||0;
           const unit=toNum(i.valor_unitario_calc);
           rows.push([p.ref,p.nombre,p.tel||'',est,p.fecha_pedido||'',p.fecha_entrega||'',
-            e.numero||'',cats,i.cantidad||'',i.detalle||'',i.nota||'',i.estado||'',unit,cant*unit]);
+            e.numero||'',cats,i.codigo_venta||'',i.cantidad||'',i.detalle||'',i.nota||'',i.estado||'',unit,cant*unit]);
         });
       });
     });
@@ -2016,7 +2017,7 @@ app.get('/api/export/csv',requiere('ver_registros'),(req,res)=>{
     // Resumen: un pedido por fila, ahora CON costos y utilidad (antes no salían).
     rows=[['Ref','Cliente','Tel','Estado','Urgente','Encargos','Valor Total','Costos','Utilidad','Pagado','Saldo','F.Pedido','F.Entrega','Notas']];
     pedidos.forEach(p=>{
-      const encRes=(p.encargos||[]).map(e=>`[${(e.categorias||[]).join(', ')}] ${(e.items||[]).map(i=>`${i.cantidad} ${i.detalle}`).join(', ')}`).join(' | ');
+      const encRes=(p.encargos||[]).map(e=>`[${(e.categorias||[]).join(', ')}] ${(e.items||[]).map(i=>`${i.cantidad} ${i.detalle}${i.codigo_venta?' ('+i.codigo_venta+')':''}`).join(', ')}`).join(' | ');
       const pag=(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0);
       const val=p.valor_total||0, cos=costoDe(p);
       rows.push([p.ref,p.nombre,p.tel||'',estadoDe(p),p.urgente?'Sí':'No',encRes,val,cos,val-cos,pag,Math.max(0,val-pag),p.fecha_pedido||'',p.fecha_entrega||'',p.notas||'']);
@@ -4032,6 +4033,26 @@ app.get('/api/codigos-venta',(req,res)=>{
     sql+=' ORDER BY c.ultimo_uso DESC LIMIT 200';
     res.json({codigos:db.prepare(sql).all(...params)});
   }catch(e){logError('GET /api/codigos-venta',e);res.status(500).json({error:e.message})}
+});
+/* Histórico de UN código: en qué pedidos se vendió. Es lo que responde "muéstrame todo lo
+   que se facturó como P0030-01". El valor solo se incluye si quien pregunta ve dinero. */
+app.get('/api/codigos-venta/:codigo/usos',(req,res)=>{
+  try{
+    const cod=String(req.params.codigo||'').trim();
+    if(!cod)return res.json({codigo:'',usos:[]});
+    const filas=db.prepare(`SELECT p.ref, p.nombre AS cliente, p.fecha_pedido, p.entregado, p.cancelado,
+        i.cantidad, i.detalle, i.valor_unitario_calc AS unit
+      FROM enc_items i JOIN encargos e ON e.id=i.encargo_id JOIN pedidos p ON p.id=e.pedido_id
+      WHERE i.workspace_id=? AND i.codigo_venta=? AND p.archivado=0
+      ORDER BY p.fecha_pedido DESC, p.creado DESC LIMIT 100`).all(req.wsId,cod);
+    const dinero=iaVeDinero(req.permisos);
+    res.json({codigo:cod, usos:filas.map(f=>{
+      const o={ref:f.ref, cliente:f.cliente, fecha:f.fecha_pedido||'', cantidad:f.cantidad||'',
+        detalle:f.detalle||'', estado:f.cancelado?'Cancelado':(f.entregado?'Entregado':'Activo')};
+      if(dinero)o.valor_unitario=toNum(f.unit);
+      return o;
+    })});
+  }catch(e){logError('GET /api/codigos-venta/:codigo/usos',e);res.status(500).json({error:e.message})}
 });
 
 // ── ÍTEMS DE INVENTARIO (CORR 003/005: inventario separado del producto) ──
