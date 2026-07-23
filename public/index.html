@@ -4227,13 +4227,28 @@ const IA_PROP_TXT={
     pie:'Archivar no borra: el producto queda en Archivados y se puede recuperar cuando quieras.'},
   editar_cliente:{ico:'ti-user-edit',hd:'Cambios sobre un cliente',tag:'sin aplicar',
     btn:'Actualizar cliente',hecho:'Cliente actualizado',
-    pie:'Solo cambia lo que ves arriba; el resto de la ficha del cliente queda igual. Nada se guarda hasta que aprietes.'}
+    pie:'Solo cambia lo que ves arriba; el resto de la ficha del cliente queda igual. Nada se guarda hasta que aprietes.'},
+  crear_pedido:{ico:'ti-clipboard-plus',hd:'Propuesta de pedido',tag:'sin crear',
+    btn:'Crear',hecho:'Creado',
+    pie:'Revisa línea por línea antes de apretar: los precios son los que calculó el asistente. Después se edita como cualquier pedido.'}
 };
 // Cada acción entra por SU puerta y pide SU permiso: el aviso tiene que nombrar el correcto.
-const IA_PROP_PERM={editar_cliente:'No tienes permiso para editar clientes'};
+const IA_PROP_PERM={editar_cliente:'No tienes permiso para editar clientes',
+  crear_pedido:'No tienes permiso para crear pedidos'};
+/* Un pedido puede ser cotización o venta en firme, y la diferencia importa (la segunda
+   descuenta inventario). Es lo primero que hay que leer, así que se dice EN EL BOTÓN. */
+function iaPropTxt(p){
+  const T=IA_PROP_TXT[p.tipo]||IA_PROP_TXT.crear_producto;
+  if(p.tipo!=='crear_pedido')return T;
+  const cot=!!(p.payload&&p.payload.es_cotizacion);
+  return {...T,
+    hd:cot?'Propuesta de cotización':'Propuesta de pedido',
+    btn:cot?'Crear cotización':'Crear pedido en firme',
+    hecho:cot?'Cotización creada':'Pedido creado'};
+}
 function iaPropuestaHTML(p,idx){
   const esc=s=>String(s||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]));
-  const T=IA_PROP_TXT[p.tipo]||IA_PROP_TXT.crear_producto;
+  const T=iaPropTxt(p);
   const nombre=p.titulo||(p.payload&&p.payload.nombre)||'';
   if(p._creado)return `<div class="ia-prop hecha">
       <div class="ia-prop-hd"><i class="ti ti-circle-check"></i> ${T.hecho}: <b>${esc(nombre)}</b></div>
@@ -4277,6 +4292,7 @@ async function iaCrearPropuesta(idx){
     if(p.tipo==='editar_producto')      ficha=await api('PUT','/productos/'+p.ficha_id,p.payload);
     else if(p.tipo==='archivar_producto'){ await api('POST','/archivar',{tipo:'producto',id:p.ficha_id}); ficha={id:p.ficha_id}; }
     else if(p.tipo==='editar_cliente')  ficha=await api('PUT','/clientes/'+p.cliente_id,p.payload);
+    else if(p.tipo==='crear_pedido')    ficha=await api('POST','/pedidos',p.payload);
     else                                 ficha=await api('POST','/productos',p.payload);
     p._creado=true;
     // El rastro se cierra aparte: si fallara, el producto YA está creado y eso es lo que
@@ -4286,8 +4302,13 @@ async function iaCrearPropuesta(idx){
     if(p.tipo==='editar_cliente'){
       if(typeof cargarClientes==='function')cargarClientes();
       if(typeof cargarPedidos==='function')cargarPedidos();
+    }else if(p.tipo==='crear_pedido'){
+      // Un pedido nuevo mueve la lista, los contadores y (si va en firme) el inventario.
+      if(typeof cargarPedidos==='function')cargarPedidos();
+      if(typeof cargarClientes==='function')cargarClientes();
+      try{ if(typeof cargarStats==='function')cargarStats(); }catch(e){}
     }else if(typeof cargarProductos==='function')cargarProductos();
-    toast((IA_PROP_TXT[p.tipo]||IA_PROP_TXT.crear_producto).hecho+': '+(p.titulo||p.payload.nombre));
+    toast(iaPropTxt(p).hecho+': '+(p.titulo||p.payload.nombre)+(ficha&&ficha.ref?(' #'+ficha.ref):''));
   }catch(e){
     p._creando=false;
     toast(String(e.message||e).toLowerCase().includes('permiso')

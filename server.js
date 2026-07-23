@@ -3348,6 +3348,13 @@ PRODUCTOS · PUEDES PROPONER TRES COSAS (todo lo demás sigue siendo solo consul
 - ARCHIVAR: {"accion":"archivar_producto","codigo":"P0010"} (o "nombre" si no tiene código). Archivar NO borra: el producto sale del catálogo y se puede recuperar desde Archivados. Dilo así cuando lo propongas.
 - UNIFICAR DOS PRODUCTOS es editar uno y archivar el otro, y son DOS propuestas: haz primero la edición, y cuando esté confirmada ofrece archivar el que sobra. No prometas hacer las dos de una.
 - Si te piden editar o archivar algo que no encuentras en el catálogo, dilo y pide el código. No adivines cuál es.
+- PEDIDOS · cuando ya cotizaste y te dicen "hazlo", "créalo", "pásalo a pedido", puedes proponer el pedido:
+  {"accion":"crear_pedido","cliente":"Textiles ABC","items":[{"codigo":"P0030","detalle":"pendón 100x70","cantidad":2,"ancho":"1","alto":"0,7","valor_unitario":"50000"}]}
+  · Cada línea: "codigo" del catálogo (o "nombre" exacto si no tiene código), "cantidad", "detalle" en cristiano, "valor_unitario" — el precio de UNA unidad, el mismo que acabas de cotizar. Si el producto va por medidas, añade "ancho" y "alto".
+  · Opcionales del pedido: "fecha_entrega" (AAAA-MM-DD), "notas", "urgente":true.
+  · ⭐ Por defecto se crea una COTIZACIÓN. Solo si te piden un pedido EN FIRME añade "en_firme":true — un pedido en firme DESCUENTA EL INVENTARIO al crearse. Ante la duda, cotización, y dilo.
+  · La persona ve cada línea con su cantidad, su precio unitario y el total antes de apretar: pon los números que de verdad cotizaste, no los redondees por tu cuenta.
+  · Si el cliente no existe todavía, no pasa nada: se crea su ficha con el pedido. No puedes editar un pedido ya creado — eso se hace a mano en la app.
 - CLIENTES · también puedes proponer **actualizar los datos de un cliente que ya existe**: {"accion":"editar_cliente","nombre":"Textiles ABC","cambios":{"tel":"3001234567"}}. Campos: nombre · tel · nit · email · direccion · contacto · notas. Manda SOLO lo que cambia.
   · Identifica al cliente por su nombre EXACTO. Si no estás seguro de a cuál se refieren, pregunta — cambiarle el nombre o el teléfono al cliente equivocado también se lo cambia a todos sus pedidos.
   · "notas" es el sitio para los acuerdos con ese cliente ("pide aprobación antes de imprimir", "paga a 30 días"). Es útil: en las próximas consultas tú mismo lo vas a leer ahí.
@@ -3588,9 +3595,9 @@ function iaResumenPropuesta(b){
    bloque viene roto o no pasa la validación, no se muestra botón: se dice qué falló. Nunca
    se deja a medias — un botón que crea algo distinto a lo que se leyó sería lo peor. */
 const IA_RX_PROPUESTA=/```\s*propuesta\s*\n([\s\S]*?)```/i;
-const IA_ACCIONES=['crear_producto','editar_producto','archivar_producto','editar_cliente'];
+const IA_ACCIONES=['crear_producto','editar_producto','archivar_producto','editar_cliente','crear_pedido'];
 // Cada acción se confirma por la puerta de siempre, así que pide EL PERMISO DE ESA PUERTA.
-const IA_ACCION_PERM={editar_cliente:'editar_clientes'};
+const IA_ACCION_PERM={editar_cliente:'editar_clientes',crear_pedido:'crear_pedidos'};
 function iaPuedeAccion(perm,tipo){
   if(!perm)return false;
   if(perm.__admin)return true;
@@ -3647,6 +3654,86 @@ function iaNormCambiosCliente(c){
   });
   return out;
 }
+/* G6 · PEDIDOS. Cierra el arco: el asistente ya cotizaba bien, faltaba que esa cotización
+   se volviera un pedido de verdad. Alcance decidido a propósito:
+   · Solo CREAR. Editar un pedido existente toca estados, pagos, producción e historial —
+     demasiada superficie para una propuesta de una línea. Se hace a mano.
+   · Las VARIANTES elegidas NO entran: el modelo tendría que inventar los ids internos de los
+     nodos del árbol y sería frágil. Van ficha + cantidad + medidas + precio, que es lo que
+     cotiza de verdad; el detalle en texto explica el resto y la persona lo ajusta si hace falta.
+   · Nunca entran pagos, costos, valor_final, entregado, cancelado ni archivado. */
+function iaNumTexto(v,tope){
+  const s=String(v==null?'':v).trim().slice(0,tope||40);
+  return s;
+}
+function iaNormPedido(crudo,wsId,rec){
+  const b={};
+  b.nombre=String(crudo.cliente||crudo.nombre||'').trim().slice(0,120);
+  if(definido(crudo.tel))b.tel=String(crudo.tel).trim().slice(0,20);
+  if(definido(crudo.fecha_entrega)&&/^\d{4}-\d{2}-\d{2}$/.test(String(crudo.fecha_entrega).trim()))
+    b.fecha_entrega=String(crudo.fecha_entrega).trim();
+  if(definido(crudo.notas))b.notas=String(crudo.notas).slice(0,2000);
+  if(crudo.urgente)b.urgente=1;
+  /* ⭐ Por defecto COTIZACIÓN, no pedido en firme. Un pedido en firme DESCUENTA INVENTARIO
+     (descontarStock) en el momento de crearse; una cotización no toca nada. Ante la duda, la
+     opción que no mueve stock. Para que salga en firme el modelo tiene que pedirlo explícito. */
+  b.es_cotizacion=(crudo.en_firme===true||crudo.es_cotizacion===false)?0:1;
+  // Si el cliente ya existe se ata por id: así no nace un cliente duplicado con el mismo nombre.
+  const cli=iaResolverCliente(wsId,{nombre:b.nombre});
+  if(cli){ b.cliente_id=cli.id; if(!b.tel&&cli.tel)b.tel=cli.tel; }
+  rec.cliente_nuevo=!cli;
+
+  const itemsCrudos=Array.isArray(crudo.items)?crudo.items:[];
+  if(itemsCrudos.length>30&&rec)rec.muchos=true;
+  const items=itemsCrudos.slice(0,30).map(x=>{
+    if(!x||typeof x!=='object')return null;
+    const f=iaResolverFicha(wsId,x);
+    const it={ficha_id:f?f.id:'',
+      cantidad:iaNumTexto(x.cantidad!=null?x.cantidad:1,10)||'1',
+      detalle:String(x.detalle||x.nombre||(f?f.nombre:'')).trim().slice(0,300),
+      valor_unitario:iaNumTexto(x.valor_unitario!=null?x.valor_unitario:x.precio,20)};
+    // Las medidas se conservan: son las que hacen el precio Y las que codifican el ítem.
+    if(definido(x.ancho))it._ancho=iaNumTexto(x.ancho,20);
+    if(definido(x.alto))it._alto=iaNumTexto(x.alto,20);
+    if(!it.detalle&&!it.ficha_id)return null;
+    return it;
+  }).filter(Boolean);
+  b.encargos=items.length?[{numero:1,estado:'Nuevo',items}]:[];
+  return b;
+}
+/* La tarjeta de un pedido tiene que dejar ver el DINERO línea por línea: es lo único que
+   permite cazar un precio mal calculado por el modelo antes de que se convierta en un pedido. */
+function iaResumenPedido(b,wsId,rec){
+  const pesos=n=>'$'+Number(Math.round(n||0)).toLocaleString('es-CO');
+  const L=[];
+  L.push({campo:'Cliente',valor:b.nombre+(rec.cliente_nuevo?' — cliente NUEVO, se crea su ficha':'')});
+  L.push({campo:'Qué se crea',valor:b.es_cotizacion
+    ? 'una COTIZACIÓN (no descuenta inventario)'
+    : 'un PEDIDO EN FIRME — descuenta el inventario al crearse'});
+  if(b.fecha_entrega)L.push({campo:'Entrega',valor:iaFecha(b.fecha_entrega)});
+  if(b.urgente)L.push({campo:'Marcado',valor:'URGENTE'});
+  const avisos=[];
+  let total=0;
+  ((b.encargos[0]||{}).items||[]).forEach(it=>{
+    const cant=parseFloat(String(it.cantidad).replace(',','.'))||0;
+    const uni=toFloatCO(it.valor_unitario);
+    const sub=cant*uni; total+=sub;
+    const med=(it._ancho&&it._alto)?(' · '+it._ancho+'×'+it._alto):'';
+    L.push({campo:'  '+(it.detalle||'(ítem)')+med,
+      valor:it.cantidad+' × '+pesos(uni)+' = '+pesos(sub)});
+    /* Contraste contra el catálogo: si el producto tiene UN precio fijo y el modelo puso otro,
+       se dice. No se corrige solo — puede ser un descuento pactado — pero callarlo sería dejar
+       pasar el error más caro: un precio inventado que se vuelve pedido de un clic. */
+    if(it.ficha_id&&!it._ancho){
+      const f=fichaCompleta(db.prepare('SELECT * FROM fichas_producto WHERE id=? AND workspace_id=?').get(it.ficha_id,wsId));
+      const of=f&&Number(f.precio_oficial||0);
+      if(of>0&&uni>0&&Math.abs(of-uni)>=1&&f.tipo_precio!=='escalonado'&&f.tipo_precio!=='variantes')
+        avisos.push(`"${f.nombre}" está en el catálogo a ${pesos(of)} y aquí va a ${pesos(uni)}`);
+    }
+  });
+  L.push({campo:'TOTAL',valor:pesos(total)});
+  return {resumen:L,avisos};
+}
 /* Solo se cambia lo que el modelo NOMBRÓ. Sin este filtro, normalizar una ficha completa
    devolvería nombre:'' y descripcion:'' y una edición de la tarifa borraría el nombre. */
 function iaNormCambios(c,base,rec){
@@ -3700,6 +3787,22 @@ function iaExtraerPropuesta(texto,wsId){
       resumen:[{campo:'Producto',valor:f.nombre+(f.codigo?(' ('+f.codigo+')'):'')},
                {campo:'Qué pasa',valor:'deja de salir en el catálogo y al cotizar'},
                {campo:'Se puede deshacer',valor:'sí — queda en Archivados, no se borra'}]}};
+  }
+
+  // ── CREAR PEDIDO / COTIZACIÓN ─────────────────────────────────────────────────────
+  if(crudo.accion==='crear_pedido'){
+    const rec={};
+    const payload=iaNormPedido(crudo,wsId,rec);
+    if(!payload.nombre)return no('Preparé un pedido pero sin cliente. Dime a nombre de quién va.');
+    if(!((payload.encargos[0]||{}).items||[]).length)
+      return no('Preparé un pedido pero se quedó sin líneas: dime qué lleva y en qué cantidad.');
+    const errores=validarPedido(payload);
+    if(errores.length)return no('El pedido no pasa las validaciones del sistema ('+errores.join('. ')+'), así que no te muestro el botón.');
+    const {resumen,avisos}=iaResumenPedido(payload,wsId,rec);
+    if(rec.muchos)avisos.push('Traía más de 30 líneas y me quedé con las primeras 30.');
+    return {texto:limpio,propuesta:{tipo:'crear_pedido',payload,resumen,
+      titulo:payload.nombre,
+      ojo:avisos.length?avisos.join(' · '):null}};
   }
 
   // ── EDITAR CLIENTE ────────────────────────────────────────────────────────────────
