@@ -855,7 +855,8 @@ function saveEncargos(pid,encargos,wsId){
       const cfg=(it._varPicks||it._ancho||it._alto||it._hojaSurf!==undefined&&it._hojaSurf!==''||it._hojaExtras)?JSON.stringify({varPicks:it._varPicks||null,ancho:it._ancho||'',alto:it._alto||'',hojaSurf:(it._hojaSurf!==undefined?it._hojaSurf:''),hojaExtras:it._hojaExtras||null}):'';
       // Autocodificación: misma configuración → mismo código, siempre (se reusa el que ya exista).
       const med=(normMedida(it._ancho)&&normMedida(it._alto))?(normMedida(it._ancho)+'×'+normMedida(it._alto)):'';
-      const codVenta=codigoDeVenta(wsId,it,[String(it.detalle||'').trim(),med].filter(Boolean).join(' '));
+      // Descripción legible del código: el texto del ítem, y si no hay, las medidas.
+      const codVenta=codigoDeVenta(wsId,it,String(it.detalle||'').trim()||med);
       db.prepare('INSERT INTO enc_items(id,encargo_id,cantidad,detalle,valor_unitario,valor_unitario_calc,ficha_id,suministrado,config,categoria,subcategoria,estado,nota,precio_sugerido,codigo_venta,orden,workspace_id)VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(uid(),eid,it.cantidad||'',it.detalle||'',it.valor_unitario||'0',normCalc(it.valor_unitario)||'0',it.ficha_id||null,it.suministrado?1:0,cfg,it.categoria||'',it.subcategoria||'',it.estado||'Nuevo',it.nota||'',it.precio_sugerido||'',codVenta,j,wsId);
     });
   });

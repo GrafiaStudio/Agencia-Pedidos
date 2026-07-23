@@ -1579,7 +1579,8 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
           <option value="nombre">Ordenar por nombre</option>
           <option value="codigo">Ordenar por código</option>
         </select>
-        <button class="btn-new" style="margin-left:auto" onclick="abrirNuevoProducto()"><span class="tri"></span> Nuevo producto</button>
+        <button class="icon-btn" style="margin-left:auto" onclick="abrirCodigos()" title="Códigos de venta generados"><i class="ti ti-barcode"></i></button>
+        <button class="btn-new" onclick="abrirNuevoProducto()"><span class="tri"></span> Nuevo producto</button>
       </div>
       <div id="lista-prod"></div>
     </div>
@@ -2127,6 +2128,22 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 </div>
 
 <!-- MODAL EXPORT -->
+<!-- CÓDIGOS DE VENTA: el registro rastreable de cada configuración vendida -->
+<div class="overlay" id="ovCodigos">
+<div class="modal" style="max-width:560px">
+  <div class="mhead"><div class="mhead-l"><div class="mtitle">Códigos de venta</div></div><button class="mclose" onclick="cerrarCodigos()"><i class="ti ti-x"></i></button></div>
+  <div class="mbody">
+    <div class="search-b" style="margin-bottom:10px"><i class="ti ti-search"></i>
+      <input type="text" id="cod-s" placeholder="Buscar por código, producto o descripción…" oninput="cargarCodigos(this.value)">
+    </div>
+    <div id="cod-lista"></div>
+    <div style="font-size:10.5px;color:var(--muted);margin-top:10px;line-height:1.5">
+      Cada configuración vendida (producto + sus variantes + sus medidas) tiene un código propio y <b>estable</b>: si mañana piden lo mismo, se reusa el mismo código. El precio no cambia el código — se puede negociar sin perder el rastro.
+    </div>
+  </div>
+</div>
+</div>
+
 <div class="overlay" id="ovExp">
 <div class="modal" style="max-width:360px">
   <div class="mhead"><div class="mhead-l"><div class="mtitle">Exportar</div></div><button class="mclose" onclick="cerrarExp()"><i class="ti ti-x"></i></button></div>
@@ -3253,6 +3270,8 @@ function lineasDocumento(p,fichasPorId){
       const totItem=cantNum*(evalExpr(it.valor_unitario)||0);
       const ficha=it.ficha_id?fichasPorId[it.ficha_id]:null;
       const unit=evalExpr(it.valor_unitario)||0;
+      // Código de venta en el documento: es justo lo que un auditor referencia después.
+      const cod=it.codigo_venta?`  ·  ${it.codigo_venta}`:'';
       if(ficha&&(ficha.tipo_precio==='combo'||ficha.tipo_precio==='promocional')&&(ficha.componentes||[]).length){
         const cantItem=cantNum||1;
         const titulo=ficha.tipo_precio==='promocional'?`Promoción: ${ficha.nombre}`:ficha.nombre;
@@ -3260,9 +3279,10 @@ function lineasDocumento(p,fichasPorId){
           const nombreComp=c.componente_ficha_id?(fichasPorId[c.componente_ficha_id]?.nombre||'(producto)'):(c.componente_nombre||'(ítem libre)');
           return `   • ${cantItem*c.cantidad_consumida} ${nombreComp}`;
         }).join('\n');
-        lineas.push({cant,descripcion:`${titulo}\n${sub}`.trim(),unit,monto:totItem});
+        lineas.push({cant,descripcion:`${titulo}${cod}\n${sub}`.trim(),unit,monto:totItem});
       }else{
         let desc=det||'(sin detalle)';
+        if(cod)desc+=cod;
         if(it.nota)desc+=`\n   ${it.nota}`;
         lineas.push({cant,descripcion:desc,unit,monto:totItem});
       }
@@ -8386,6 +8406,36 @@ async function archivarCli(){
 function abrirMas(){document.getElementById('ovMas').classList.add('open')}
 function cerrarMas(){document.getElementById('ovMas').classList.remove('open')}
 function irDesdeMas(v){cerrarMas();showView(v)}
+/* ── CÓDIGOS DE VENTA (autocodificación) ────────────────────────────────────────────────
+   La base rastreable: qué configuración es cada código y cuántas veces se ha vendido.
+   Es la respuesta a "¿qué es el P0030-03?" que puede hacer un auditor.               */
+function abrirCodigos(){
+  document.getElementById('ovCodigos').classList.add('open');
+  const s=document.getElementById('cod-s'); if(s)s.value='';
+  cargarCodigos('');
+}
+function cerrarCodigos(){document.getElementById('ovCodigos').classList.remove('open')}
+async function cargarCodigos(q){
+  const cont=document.getElementById('cod-lista'); if(!cont)return;
+  cont.innerHTML='<div style="padding:14px;color:var(--muted);font-size:12px">Cargando…</div>';
+  try{
+    const r=await api('GET','/codigos-venta'+(q?('?q='+encodeURIComponent(q)):''));
+    renderCodigos(r.codigos||[]);
+  }catch(e){ cont.innerHTML='<div style="padding:14px;color:var(--red);font-size:12px">No pude cargar los códigos: '+pesc(e.message||e)+'</div>'; }
+}
+function renderCodigos(list){
+  const cont=document.getElementById('cod-lista');
+  if(!list.length){ cont.innerHTML='<div style="padding:16px;color:var(--muted);font-size:12px">Todavía no hay códigos generados. Se crean solos al guardar un pedido con productos.</div>'; return; }
+  cont.innerHTML=list.map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line)">
+      <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:800;font-size:12px;background:#eef1f7;color:var(--navy);padding:3px 7px;border-radius:6px;white-space:nowrap">${pesc(c.codigo)}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pesc(c.producto||'(producto borrado)')}</div>
+        ${c.descripcion?`<div style="font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pesc(c.descripcion)}</div>`:''}
+      </div>
+      <span style="font-size:10.5px;color:var(--slate);white-space:nowrap" title="Veces vendido">${c.usos||0}×</span>
+    </div>`).join('');
+}
 function abrirExp(){document.getElementById('ovExp').classList.add('open')}
 function cerrarExp(){document.getElementById('ovExp').classList.remove('open')}
 // B3 · el aviso cambia según el formato elegido
