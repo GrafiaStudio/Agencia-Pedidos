@@ -7579,7 +7579,7 @@ function validarProductoBody(b){
   if(b.tipo_precio==='medidas'){
     const eCond=errorCondFE(b.medida_cond,'');
     if(eCond)return eCond;
-    if(!definidoFE(b.medida_tarifa)||!(toFloatCO(b.medida_tarifa)>0))return'La tarifa por unidad de medida es obligatoria (acepta decimales, ej: 8,5)';
+    if(!(toFloatCO(b.medida_tarifa)>0)&&!(b.medida_cond||[]).some(c=>toFloatCO(c.tarifa)>0))return'Falta la tarifa por unidad de medida (acepta decimales, ej: 8,5) — o al menos una condición de tarifa con su valor';
     if(definidoFE(b.costo_medida_tarifa)&&!(toFloatCO(b.costo_medida_tarifa)>0))return'El costo por medida debe ser un número válido (acepta decimales)';
     for(let i=0;i<(b.costos_fijos||[]).length;i++){
       if(definidoFE(b.costos_fijos[i].valor)&&evalExpr(b.costos_fijos[i].valor)===null)return`Costo fijo #${i+1} no es una expresión válida`;
@@ -7614,7 +7614,7 @@ function validarProductoBody(b){
       if(v.hijos&&v.hijos.length){
         for(let j=0;j<v.hijos.length;j++){const e=valNodo(v.hijos[j],etiq+'.'+(j+1));if(e)return e}
       }else if(v.modo==='medidas'){
-        if(!definidoFE(v.medida_tarifa)||!(toFloatCO(v.medida_tarifa)>0))return`Variante ${etiq}: la tarifa por medida es obligatoria (acepta decimales, ej: 8,5)`;
+        if(!(toFloatCO(v.medida_tarifa)>0)&&!(v.medida_cond||[]).some(c=>toFloatCO(c.tarifa)>0))return`Variante ${etiq}: falta la tarifa por medida (acepta decimales, ej: 8,5) — o al menos una condición de tarifa con su valor`;
         const eC=errorCondFE(v.medida_cond,`Variante ${etiq}`);
         if(eC)return eC;
       }else if(v.modo==='hoja'){
