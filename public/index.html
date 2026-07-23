@@ -4224,8 +4224,13 @@ const IA_PROP_TXT={
     pie:'Solo cambia lo que ves arriba; el resto de la ficha queda igual. Nada se guarda hasta que aprietes.'},
   archivar_producto:{ico:'ti-archive',hd:'Archivar un producto',tag:'sin archivar',
     btn:'Archivar',hecho:'Producto archivado',
-    pie:'Archivar no borra: el producto queda en Archivados y se puede recuperar cuando quieras.'}
+    pie:'Archivar no borra: el producto queda en Archivados y se puede recuperar cuando quieras.'},
+  editar_cliente:{ico:'ti-user-edit',hd:'Cambios sobre un cliente',tag:'sin aplicar',
+    btn:'Actualizar cliente',hecho:'Cliente actualizado',
+    pie:'Solo cambia lo que ves arriba; el resto de la ficha del cliente queda igual. Nada se guarda hasta que aprietes.'}
 };
+// Cada acción entra por SU puerta y pide SU permiso: el aviso tiene que nombrar el correcto.
+const IA_PROP_PERM={editar_cliente:'No tienes permiso para editar clientes'};
 function iaPropuestaHTML(p,idx){
   const esc=s=>String(s||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]));
   const T=IA_PROP_TXT[p.tipo]||IA_PROP_TXT.crear_producto;
@@ -4247,6 +4252,7 @@ function iaPropuestaHTML(p,idx){
     <div class="ia-prop-hd"><i class="ti ${T.ico}"></i> ${T.hd} <span class="ia-prop-tag">${T.tag}</span></div>
     ${filas}
     ${p.ya_existe?`<div class="ia-prop-ojo"><i class="ti ti-alert-triangle"></i> Ya tienes un producto llamado <b>${esc(p.ya_existe)}</b>. Si lo creas, quedarán los dos.</div>`:''}
+    ${p.ojo?`<div class="ia-prop-ojo"><i class="ti ti-alert-triangle"></i> ${esc(p.ojo)}</div>`:''}
     <div class="ia-prop-acts">
       <button class="ia-prop-no" onclick="iaDescartarPropuesta(${idx})">Descartar</button>
       <button class="ia-prop-si" onclick="iaCrearPropuesta(${idx})"><i class="ti ti-check"></i> ${T.btn}</button>
@@ -4270,17 +4276,22 @@ async function iaCrearPropuesta(idx){
     let ficha=null;
     if(p.tipo==='editar_producto')      ficha=await api('PUT','/productos/'+p.ficha_id,p.payload);
     else if(p.tipo==='archivar_producto'){ await api('POST','/archivar',{tipo:'producto',id:p.ficha_id}); ficha={id:p.ficha_id}; }
+    else if(p.tipo==='editar_cliente')  ficha=await api('PUT','/clientes/'+p.cliente_id,p.payload);
     else                                 ficha=await api('POST','/productos',p.payload);
     p._creado=true;
     // El rastro se cierra aparte: si fallara, el producto YA está creado y eso es lo que
     // importa — no se deshace nada por no poder anotarlo.
     try{ await api('POST','/ia/acciones/'+p.id+'/confirmada',{ficha_id:ficha&&ficha.id}); }catch(e){}
-    if(typeof cargarProductos==='function')cargarProductos();
+    // Editar un cliente cambia su nombre/tel también en sus pedidos: se refrescan los dos.
+    if(p.tipo==='editar_cliente'){
+      if(typeof cargarClientes==='function')cargarClientes();
+      if(typeof cargarPedidos==='function')cargarPedidos();
+    }else if(typeof cargarProductos==='function')cargarProductos();
     toast((IA_PROP_TXT[p.tipo]||IA_PROP_TXT.crear_producto).hecho+': '+(p.titulo||p.payload.nombre));
   }catch(e){
     p._creando=false;
     toast(String(e.message||e).toLowerCase().includes('permiso')
-      ? 'No tienes permiso para crear productos'
+      ? (IA_PROP_PERM[p.tipo]||'No tienes permiso para crear productos')
       : 'No se pudo crear: '+e.message, false);
   }
   renderIaChat();

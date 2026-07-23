@@ -3348,6 +3348,10 @@ PRODUCTOS · PUEDES PROPONER TRES COSAS (todo lo demás sigue siendo solo consul
 - ARCHIVAR: {"accion":"archivar_producto","codigo":"P0010"} (o "nombre" si no tiene código). Archivar NO borra: el producto sale del catálogo y se puede recuperar desde Archivados. Dilo así cuando lo propongas.
 - UNIFICAR DOS PRODUCTOS es editar uno y archivar el otro, y son DOS propuestas: haz primero la edición, y cuando esté confirmada ofrece archivar el que sobra. No prometas hacer las dos de una.
 - Si te piden editar o archivar algo que no encuentras en el catálogo, dilo y pide el código. No adivines cuál es.
+- CLIENTES · también puedes proponer **actualizar los datos de un cliente que ya existe**: {"accion":"editar_cliente","nombre":"Textiles ABC","cambios":{"tel":"3001234567"}}. Campos: nombre · tel · nit · email · direccion · contacto · notas. Manda SOLO lo que cambia.
+  · Identifica al cliente por su nombre EXACTO. Si no estás seguro de a cuál se refieren, pregunta — cambiarle el nombre o el teléfono al cliente equivocado también se lo cambia a todos sus pedidos.
+  · "notas" es el sitio para los acuerdos con ese cliente ("pide aprobación antes de imprimir", "paga a 30 días"). Es útil: en las próximas consultas tú mismo lo vas a leer ahí.
+  · ⚠️ NO puedes CREAR un cliente: un cliente se da de alta creando su primer pedido. Si te lo piden, dilo así y explica que se hace desde Nuevo pedido.
 - Cuando te pidan CREAR/DAR DE ALTA/REGISTRAR un producto, explica en 2 o 3 líneas qué vas a proponer y AL FINAL del mensaje añades el bloque, exactamente así:
 \`\`\`propuesta
 {"accion":"crear_producto","nombre":"...","tipo_precio":"..."}
@@ -3584,7 +3588,14 @@ function iaResumenPropuesta(b){
    bloque viene roto o no pasa la validación, no se muestra botón: se dice qué falló. Nunca
    se deja a medias — un botón que crea algo distinto a lo que se leyó sería lo peor. */
 const IA_RX_PROPUESTA=/```\s*propuesta\s*\n([\s\S]*?)```/i;
-const IA_ACCIONES=['crear_producto','editar_producto','archivar_producto'];
+const IA_ACCIONES=['crear_producto','editar_producto','archivar_producto','editar_cliente'];
+// Cada acción se confirma por la puerta de siempre, así que pide EL PERMISO DE ESA PUERTA.
+const IA_ACCION_PERM={editar_cliente:'editar_clientes'};
+function iaPuedeAccion(perm,tipo){
+  if(!perm)return false;
+  if(perm.__admin)return true;
+  return perm[IA_ACCION_PERM[tipo]||'gestionar_productos']===true;
+}
 // Se identifica por CÓDIGO (P0010), que el modelo ya recibe en el catálogo y el usuario ve
 // en pantalla. Un id interno no lo puede teclear nadie y no se puede verificar de un vistazo.
 function iaResolverFicha(wsId,ref){
@@ -3601,6 +3612,40 @@ function iaResolverFicha(wsId,ref){
     if(f)return f;
   }
   return null;
+}
+/* G6 · CLIENTES. Ojo al alcance: un cliente NO se puede crear por su propia puerta — nace al
+   crear un pedido. No se le inventa un endpoint a la IA para eso: la regla es que confirme por
+   la MISMA puerta que una persona, y esa puerta (PUT /api/clientes/:id) solo edita. */
+function iaResolverCliente(wsId,ref){
+  const id=String((ref&&ref.cliente_id)||'').trim();
+  if(id){
+    const c=db.prepare('SELECT * FROM clientes WHERE workspace_id=? AND archivado=0 AND id=?').get(wsId,id);
+    if(c)return c;
+  }
+  const nom=String((ref&&ref.nombre)||'').trim();
+  if(nom.length<2)return null;
+  // Primero el nombre EXACTO; solo si no hay, el parecido más corto (mismo criterio que svcCliente).
+  const ex=db.prepare(`SELECT * FROM clientes WHERE workspace_id=? AND archivado=0
+    AND lower(nombre)=lower(?) LIMIT 1`).get(wsId,nom);
+  if(ex)return ex;
+  const parecidos=db.prepare(`SELECT * FROM clientes WHERE workspace_id=? AND archivado=0
+    AND nombre LIKE ? ESCAPE '\\' ORDER BY LENGTH(nombre) LIMIT 2`).all(wsId,bLike(nom));
+  // Si dos clientes casan, NO se elige por el sistema: se pregunta. Editar al que no era es peor
+  // que no editar (el nombre y el teléfono se copian a TODOS sus pedidos).
+  return parecidos.length===1?parecidos[0]:null;
+}
+const IA_CLI_CAMPOS={nombre:'Nombre',tel:'Teléfono',nit:'NIT/CC',email:'Email',
+  direccion:'Dirección',contacto:'Contacto',notas:'Observaciones'};
+/* Mismo filtro que iaNormCambios y por el mismo motivo: solo lo que el modelo NOMBRÓ. Sin él,
+   pedir "cámbiale el teléfono" borraría el email, la dirección y las notas del cliente. */
+function iaNormCambiosCliente(c){
+  const out={};
+  Object.keys(IA_CLI_CAMPOS).forEach(k=>{
+    if(!Object.prototype.hasOwnProperty.call(c||{},k))return;
+    const v=c[k]==null?'':String(c[k]);
+    out[k]=(k==='notas')?v.slice(0,4000):v.trim().slice(0,200);
+  });
+  return out;
 }
 /* Solo se cambia lo que el modelo NOMBRÓ. Sin este filtro, normalizar una ficha completa
    devolvería nombre:'' y descripcion:'' y una edición de la tarifa borraría el nombre. */
@@ -3655,6 +3700,26 @@ function iaExtraerPropuesta(texto,wsId){
       resumen:[{campo:'Producto',valor:f.nombre+(f.codigo?(' ('+f.codigo+')'):'')},
                {campo:'Qué pasa',valor:'deja de salir en el catálogo y al cotizar'},
                {campo:'Se puede deshacer',valor:'sí — queda en Archivados, no se borra'}]}};
+  }
+
+  // ── EDITAR CLIENTE ────────────────────────────────────────────────────────────────
+  if(crudo.accion==='editar_cliente'){
+    const c=iaResolverCliente(wsId,crudo);
+    if(!c)return no('Quise actualizar un cliente pero no tengo claro cuál: dime su nombre exacto tal como está en la lista de clientes.');
+    const cambios=iaNormCambiosCliente(crudo.cambios||{});
+    if(!Object.keys(cambios).length)return no('Preparé un cambio de cliente pero no traía ningún dato concreto que cambiar.');
+    if(Object.prototype.hasOwnProperty.call(cambios,'nombre')&&!cambios.nombre)
+      return no('El cambio dejaría al cliente sin nombre, así que no te muestro el botón.');
+    const diff=Object.keys(cambios)
+      .filter(k=>String(c[k]==null?'':c[k]).trim()!==String(cambios[k]).trim())
+      .map(k=>({campo:IA_CLI_CAMPOS[k],
+        antes:String(c[k]==null?'':c[k]).trim()||'(vacío)',
+        despues:String(cambios[k]).trim()||'(vacío)'}));
+    if(!diff.length)return no('Preparé un cambio de cliente pero quedaría exactamente igual que ahora.');
+    return {texto:limpio,propuesta:{tipo:'editar_cliente',cliente_id:c.id,payload:cambios,
+      titulo:c.nombre,diff,
+      // El nombre y el teléfono se copian a TODOS sus pedidos: hay que decirlo ANTES de apretar.
+      ojo:(cambios.nombre||cambios.tel)?'El nombre y el teléfono también se actualizan en todos los pedidos de este cliente.':null}};
   }
 
   // ── EDITAR ────────────────────────────────────────────────────────────────────────
@@ -3849,14 +3914,17 @@ app.post('/api/ia/probar',requiere('configurar_sistema'),async(req,res)=>{
 /* Transparencia: devuelve EXACTAMENTE el contexto que se le entregaría a la IA para esa
    pregunta, sin llamar al proveedor (ni gastar tokens). Sirve para auditar de dónde salió
    una respuesta y para probar toda la capa de servicios sin depender de una clave. */
-/* G6 · cierra el rastro: el producto ya se creó por POST /api/productos (la puerta normal,
-   con los permisos de quien apretó). Aquí solo se anota quién confirmó y qué salió, para
-   poder responder dentro de seis meses "¿de dónde salió este producto?".
-   Exige el MISMO permiso que crear: si no puede crear productos, no puede firmar que lo hizo. */
-app.post('/api/ia/acciones/:id/confirmada',requiere('gestionar_productos'),(req,res)=>{
+/* G6 · cierra el rastro: la escritura ya pasó por su puerta normal (POST /api/productos,
+   PUT /api/clientes/:id…) con los permisos de quien apretó. Aquí solo se anota quién confirmó
+   y qué salió, para poder responder dentro de seis meses "¿de dónde salió esto?".
+   ⚠️ El permiso se pide SEGÚN LA ACCIÓN, no fijo: exigir siempre 'gestionar_productos' dejaba
+   sin rastro las ediciones de cliente de un vendedor que solo tiene 'editar_clientes' — y el
+   navegador se traga el fallo del rastro a propósito, así que se habría perdido en silencio. */
+app.post('/api/ia/acciones/:id/confirmada',(req,res)=>{
   try{
     const a=db.prepare('SELECT * FROM ia_acciones WHERE id=? AND workspace_id=?').get(req.params.id,req.wsId);
     if(!a)return res.status(404).json({error:'Esa propuesta no existe'});
+    if(!iaPuedeAccion(req.permisos,a.tipo))return res.status(403).json({error:'No tienes permiso para esa acción'});
     if(a.estado==='confirmada')return res.json({ok:true,ya:true});
     db.prepare(`UPDATE ia_acciones SET estado='confirmada',confirmado_por=?,
       confirmado_en=datetime('now','localtime'),resultado_id=? WHERE id=? AND workspace_id=?`)
@@ -3905,12 +3973,13 @@ PREGUNTA: ${pregunta}`}];
       const ex=iaExtraerPropuesta(bruto,ws);
       let texto=ex.texto, propuesta=null;
       if(ex.aviso)texto=(texto?texto+'\n\n':'')+'⚠️ '+ex.aviso;
-      /* Quien no puede crear productos no ve el botón. La seguridad de verdad está en
-         POST /api/productos (que responde 403), pero enseñar un botón condenado a fallar
-         es mala interfaz: se le dice por qué y se acabó. */
-      const puedeCrear=!!(req.permisos&&(req.permisos.__admin||req.permisos.gestionar_productos===true));
-      if(ex.propuesta&&!puedeCrear){
-        texto+='\n\n⚠️ Te preparé la ficha, pero tu usuario no tiene permiso para crear productos. Pídeselo a quien administra el sistema.';
+      /* Quien no puede hacer la acción no ve el botón. La seguridad de verdad está en la
+         puerta real (que responde 403), pero enseñar un botón condenado a fallar es mala
+         interfaz: se le dice por qué y se acabó. El permiso depende de LA ACCIÓN. */
+      if(ex.propuesta&&!iaPuedeAccion(req.permisos,ex.propuesta.tipo)){
+        texto+='\n\n⚠️ Te lo preparé, pero tu usuario no tiene permiso para '
+          +(ex.propuesta.tipo==='editar_cliente'?'editar clientes':'crear o editar productos')
+          +'. Pídeselo a quien administra el sistema.';
         ex.propuesta=null;
       }
       if(ex.propuesta){
