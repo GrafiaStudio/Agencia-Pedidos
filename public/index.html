@@ -1559,12 +1559,14 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
         <button class="rtab" onclick="showReg('utilidades')">Utilidades</button>
         <button class="rtab" onclick="showReg('abonos')">Ingresos</button>
         <button class="rtab" onclick="showReg('saldos')">Saldos</button>
+        <button class="rtab" onclick="showReg('asistente')">Asistente</button>
       </div>
       <div id="reg-ingresos" class="reg-panel active"></div>
       <div id="reg-costos" class="reg-panel"></div>
       <div id="reg-utilidades" class="reg-panel"></div>
       <div id="reg-abonos" class="reg-panel"></div>
       <div id="reg-saldos" class="reg-panel"></div>
+      <div id="reg-asistente" class="reg-panel"></div>
     </div>
 
     <!-- PRODUCTOS -->
@@ -8753,10 +8755,56 @@ function showReg(tab){
   document.querySelectorAll('.reg-panel').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.rtab').forEach(x=>x.classList.remove('active'));
   document.getElementById('reg-'+tab).classList.add('active');
-  ['ingresos','costos','utilidades','abonos','saldos'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.rtab')[i].classList.add('active')});
+  ['ingresos','costos','utilidades','abonos','saldos','asistente'].forEach((t,i)=>{if(t===tab)document.querySelectorAll('.rtab')[i].classList.add('active')});
   buildRegPanel(tab);
 }
+/* RASTRO DE LA IA · lo que el asistente propuso y quién lo confirmó. Se escribía desde G6
+   pero no se leía en ningún sitio. Respeta el MISMO período que las píldoras de arriba: una
+   pestaña que las ignorara en silencio las volvería mentira. */
+const IA_ACC_TXT={crear_producto:'Crear producto',editar_producto:'Editar producto',
+  archivar_producto:'Archivar producto',editar_cliente:'Editar cliente',crear_pedido:'Crear pedido'};
+let regIaEstado='';
+async function buildRegAsistente(){
+  const el=document.getElementById('reg-asistente'); if(!el)return;
+  el.innerHTML='<div class="reg-nota">Cargando…</div>';
+  let filas=[];
+  try{ filas=await api('GET','/ia/acciones'+(regIaEstado?('?estado='+regIaEstado):'')); }
+  catch(e){ el.innerHTML='<div class="reg-nota">No se pudo cargar el rastro del asistente.</div>'; return; }
+  // El período viene de las píldoras; propuesto_en llega como dd/mm/aaaa hh:mm.
+  const aISO=s=>{ const m=/^(\d{2})\/(\d{2})\/(\d{4})/.exec(String(s||'')); return m?`${m[3]}-${m[2]}-${m[1]}`:''; };
+  filas=(filas||[]).filter(f=>{
+    const d=aISO(f.propuesto_en); if(!d)return true;
+    if(regFiltro.desde&&d<regFiltro.desde)return false;
+    if(regFiltro.hasta&&d>regFiltro.hasta)return false;
+    return true;
+  });
+  const conf=filas.filter(f=>f.estado==='confirmada').length;
+  el.innerHTML=`<div class="reg-nota"><i class="ti ti-info-circle"></i>Todo lo que el asistente propuso y quién lo confirmó.
+      <b>El asistente nunca escribe solo</b>: propone, y una persona aprieta. Lo que nadie confirmó también queda aquí.</div>
+    <div class="reg-stats">
+      <div class="sc tl"><div class="sc-l">Propuestas</div><div class="sc-n">${filas.length}</div></div>
+      <div class="sc gn"><div class="sc-l">Confirmadas</div><div class="sc-n">${conf}</div></div>
+      <div class="sc"><div class="sc-l">Sin confirmar</div><div class="sc-n">${filas.length-conf}</div></div>
+    </div>
+    <div class="reg-filtros" style="margin:0 0 10px">
+      ${[['','Todas'],['confirmada','Confirmadas'],['propuesta','Sin confirmar']].map(([v,t])=>
+        `<button class="rfpill${regIaEstado===v?' active':''}" onclick="regIaEstado='${v}';buildRegAsistente()">${t}</button>`).join('')}
+    </div>`
+    +(filas.length?`<table class="rtable"><thead><tr>
+        <th>Qué propuso</th><th>Sobre</th><th>Estado</th><th>Propuesto</th><th>Confirmado por</th></tr></thead><tbody>
+      ${filas.map(f=>`<tr>
+        <td style="font-weight:600">${pesc(IA_ACC_TXT[f.tipo]||f.tipo)}</td>
+        <td>${pesc(f.resumen||'—')}</td>
+        <td>${f.estado==='confirmada'
+          ? '<span class="ttag" style="background:#e7f5ec;color:var(--green)">confirmada</span>'
+          : '<span class="ttag" style="background:#f3f0e6;color:var(--amber,#8a6d1f)">sin confirmar</span>'}</td>
+        <td>${pesc(f.propuesto_en)}${f.propuesto_por?('<br><span style="color:var(--muted);font-size:10px">pidió: '+pesc(f.propuesto_por)+'</span>'):''}</td>
+        <td>${f.confirmado_por?(pesc(f.confirmado_por)+'<br><span style="color:var(--muted);font-size:10px">'+pesc(f.confirmado_en)+'</span>'):'—'}</td>
+      </tr>`).join('')}</tbody></table>`
+     :'<div class="empty"><i class="ti ti-sparkles"></i><p>El asistente no ha propuesto nada en este período</p></div>');
+}
 function buildRegPanel(tab){
+  if(tab==='asistente')return buildRegAsistente(); // no sale de los pedidos: tiene su propia fuente
   const todos=regPedidosFiltrados();
   const el=document.getElementById('reg-'+tab);if(!el)return;
   if(tab==='ingresos'){ // pestaña "Ventas": lo FACTURADO (valor de los pedidos por fecha del pedido)

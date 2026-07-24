@@ -2088,6 +2088,32 @@ app.get('/api/registros/utilidades',requiere('ver_registros'),(req,res)=>{
   res.json(rows);
 });
 
+/* RASTRO DE LA IA · el append-only `ia_acciones` se escribía desde G6 pero NO SE LEÍA EN
+   NINGÚN SITIO: ni endpoint ni pantalla. Un registro que nadie puede consultar no es un
+   registro. Vive en Registros (el módulo de auditoría) y pide 'ver_registros'.
+   ⭐ Las propuestas NO confirmadas también se listan: que alguien pidiera crear algo y nadie
+   apretara es información — puede ser justo lo que hay que revisar. */
+app.get('/api/ia/acciones',requiere('ver_registros'),(req,res)=>{
+  try{
+    const q=String(req.query.q||'').trim();
+    const estado=String(req.query.estado||'').trim();
+    const cond=['workspace_id=?'], args=[req.wsId];
+    if(estado==='confirmada'||estado==='propuesta'){ cond.push('estado=?'); args.push(estado); }
+    if(q){ cond.push('(resumen LIKE ? ESCAPE \'\\\' OR tipo LIKE ? ESCAPE \'\\\' OR propuesto_por LIKE ? ESCAPE \'\\\' OR confirmado_por LIKE ? ESCAPE \'\\\')');
+      const L=bLike(q); args.push(L,L,L,L); }
+    const filas=db.prepare(`SELECT id,tipo,resumen,estado,propuesto_por,propuesto_en,confirmado_por,confirmado_en,resultado_id
+      FROM ia_acciones WHERE ${cond.join(' AND ')} ORDER BY propuesto_en DESC LIMIT 200`).all(...args);
+    /* El payload NO se manda: puede traer costos y precios, y esto lo ve quien tenga
+       'ver_registros' aunque no vea dinero. El resumen ya dice de qué iba. */
+    // Con la HORA: en un rastro de auditoría "quién y cuándo" incluye la hora (iaFecha la tira).
+    const fh=s=>{ const m=/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(s||''));
+      return m?`${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`:(s?iaFecha(s):''); };
+    res.json(filas.map(f=>({...f,
+      propuesto_en:fh(f.propuesto_en),
+      confirmado_en:f.confirmado_en?fh(f.confirmado_en):''})));
+  }catch(e){ logError('GET /api/ia/acciones',e); res.status(500).json({error:e.message}); }
+});
+
 // ── INFORMACIÓN DE LA APP (estática, no es dato por workspace) ──
 const APP_INFO={
   nombre:'GRAFÍA Studio',
