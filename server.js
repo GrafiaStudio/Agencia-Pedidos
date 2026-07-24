@@ -1940,6 +1940,19 @@ app.get('/api/clientes/:id',(req,res)=>{
     p.encargosResumen=encs.map(e=>({categorias:e.categorias,subcategorias:e.subcategorias}));
     return p;
   });
+  /* PRINCIPIO CERO · lo que hay que saber ANTES de tomarle otro pedido a este cliente.
+     El dato ya existía; nadie lo veía en el momento en que importa. Se calcula aquí y no en
+     el navegador porque el SALDO es dinero: se recorta en los datos (iaVeDinero), igual que
+     en el resto de la app — este endpoint no tiene guard y lo consulta cualquier usuario. */
+  if(iaVeDinero(req.permisos)){
+    const vivos=c.pedidos.filter(p=>!p.cancelado&&!p.es_cotizacion);
+    const conSaldo=vivos.map(p=>{
+      const pag=db.prepare('SELECT COALESCE(SUM(CAST(monto_calc AS REAL)),0) s FROM pagos WHERE pedido_id=? AND workspace_id=?').get(p.id,req.wsId).s||0;
+      return {ref:p.ref,saldo:Math.max(0,(p.valor_total||0)-pag)};
+    }).filter(x=>x.saldo>0);
+    c.saldo_pendiente=conSaldo.reduce((a,x)=>a+x.saldo,0);
+    c.pedidos_con_saldo=conSaldo.length;
+  }
   res.json(c);
 });
 // v3.0 Fase 7 — editar la ficha del cliente (solo roles autorizados, desde el módulo Clientes)

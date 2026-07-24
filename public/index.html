@@ -1970,6 +1970,8 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
       </div>
       <div><label>Teléfono / WhatsApp</label><input type="text" id="f-tel" placeholder="310 000 0000"></div>
     </div>
+    <!-- Principio Cero: lo que este cliente ya te dijo, en el momento en que importa -->
+    <div id="cli-aviso" style="display:none"></div>
     <!-- v3.0 Fase 7 — datos secundarios del cliente, plegados -->
     <div style="display:flex;align-items:center;gap:10px;margin:-4px 0 10px">
       <button type="button" class="cli-more-toggle" id="cli-more-toggle" onclick="toggleCliMore()"><i class="ti ti-chevron-right" id="cli-more-chev"></i>Más datos del cliente<span class="cmt-hint">NIT · contacto · dirección · correo</span></button>
@@ -5694,6 +5696,31 @@ function selCli(i){
   document.getElementById('f-tel').value=c.tel||'';
   document.getElementById('ac-drop').style.display='none';
   editCliId=c.id;
+  pintarAvisoCliente(c.id);
+}
+/* PRINCIPIO CERO · "la info encuentra al usuario". El acuerdo con el cliente ("pide aprobación
+   antes de imprimir") y lo que debe ya estaban guardados; nadie los leía al tomarle otro
+   pedido. No llama a la IA ni gasta un token: es un dato que ya existe, puesto donde toca.
+   Solo se pinta si hay algo que decir — un recuadro vacío en cada pedido sería ruido. */
+async function pintarAvisoCliente(id){
+  const el=document.getElementById('cli-aviso'); if(!el)return;
+  el.style.display='none'; el.innerHTML='';
+  if(!id)return;
+  let c=null;
+  try{ c=await api('GET','/clientes/'+id); }catch(e){ return; }
+  if(!c)return;
+  const partes=[];
+  const nota=String(c.notas||'').trim();
+  if(nota)partes.push(`<div style="display:flex;gap:7px;align-items:flex-start">
+    <i class="ti ti-notes" style="margin-top:1px"></i>
+    <div><b>Lo que acordaste con ${pesc(c.nombre)}:</b> ${pesc(nota.slice(0,400))}${nota.length>400?'…':''}</div></div>`);
+  // El saldo solo llega si quien mira ve dinero: el servidor no lo manda si no (iaVeDinero).
+  if(c.saldo_pendiente>0)partes.push(`<div style="display:flex;gap:7px;align-items:flex-start;margin-top:${nota?'7px':'0'}">
+    <i class="ti ti-cash" style="margin-top:1px"></i>
+    <div>Tiene <b>${fCOP(c.saldo_pendiente)}</b> sin pagar de ${c.pedidos_con_saldo} pedido${c.pedidos_con_saldo===1?'':'s'}.</div></div>`);
+  if(!partes.length)return;
+  el.innerHTML=`<div class="ia-prop-ojo" style="margin:-2px 0 10px">${partes.join('')}</div>`;
+  el.style.display='block';
 }
 document.addEventListener('click',e=>{
   if(!e.target.closest('.ac-wrap'))
@@ -8351,6 +8378,8 @@ function aplicarBloqueoCliente(bloquear){
 }
 function resetForm(){
   fEnc=[];fPag=[];fArch=[];fCostos=[];fCostosManual=false;encCounter=0;editCliId=null;fValorFinalRaw='';_pagosNuevos.clear();
+  // El aviso es del cliente anterior: si no se limpia, se queda pegado en el pedido siguiente.
+  const av=document.getElementById('cli-aviso'); if(av){av.style.display='none';av.innerHTML='';}
   ['f-nom','f-tel','f-fecha','f-notas','f-valor-final','f-cli-nit','f-cli-contacto','f-cli-direccion','f-cli-email'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});
   ['ck-urg'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false});
   document.getElementById('f-estado-ciclo').value='nuevo';
@@ -8394,10 +8423,12 @@ function abrirNuevoParaCli(id,nombre,tel){
   document.getElementById('f-nom').value=nombre;
   document.getElementById('f-tel').value=tel;
   editCliId=id;
+  pintarAvisoCliente(id);
 }
 async function abrirEditar(id){
   const p=await api('GET',`/pedidos/${id}`);
   editId=id;editCliId=p.cliente_id||null;
+  pintarAvisoCliente(editCliId); // también al editar: el acuerdo sigue aplicando
   fEnc=JSON.parse(JSON.stringify(p.encargos||[]));
   // Asegurar items en cada encargo
   fEnc.forEach(e=>{if(!e.items||!e.items.length)e.items=[{id:uid(),cantidad:'',detalle:'',valor_unitario:''}]});
