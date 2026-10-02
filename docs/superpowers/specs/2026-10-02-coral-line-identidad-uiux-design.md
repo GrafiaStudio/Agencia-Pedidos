@@ -33,6 +33,7 @@ estética, y **distinta de los dashboards convencionales**.
 | Filtros rápidos del menú | **Se eliminan** del menú. El Dashboard los muestra y en Pedidos se filtra. |
 | Método | El Dashboard es la base; el resto se construye a partir de él. Lo que se pueda mejorar, se mejora. |
 | Escala y adaptación a pantallas | Libertad para mejorarlas. |
+| Intensidad del color | **Ajuste del negocio**, junto a sus dos colores: un deslizante que gradúa cuánta presencia tiene el color en el fondo. Nació como control de la hoja de muestra y el usuario pidió conservarlo. Por defecto 60. |
 
 Decisiones que tomo yo y quedan aquí escritas para que el usuario las corrija si no le sirven:
 - **Coral Line es el tema de fábrica**, no un color fijo. Los dos colores por negocio siguen

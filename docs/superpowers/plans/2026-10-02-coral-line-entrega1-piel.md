@@ -16,6 +16,7 @@
 
 - Paleta oficial: `#E9FFFE` · `#92F3F1` · `#23D0D2` · `#118AA0` · `#0A2E3B`. Acentos solo en datos y avisos: `#FDA968` · `#FD518B` · `#5F309B`. Contadores: `#E20613` (día), `#FF5F6B` (noche).
 - Fábrica nueva: `color_primario = #0A2E3B`, `color_acento = #118AA0`. Fábrica vieja: `#222B46` / `#5B7FA6`.
+- **Intensidad** (añadido 2026-10-02, pedido por el usuario): ajuste por negocio `piel_intensidad`, entero, por defecto 60; el rango se fija tras medir contraste en los extremos. `aplicarTemaColor()` lee `CFG.piel_intensidad` en vez de una constante.
 - Los colores por negocio siguen siendo configurables. **Nunca fijar un color de texto sobre una superficie de marca**: la tinta se calcula.
 - Todo texto ≥ 4,5:1; texto grande e iconos ≥ 3:1. Sobre cian y bruma, tinta oscura.
 - Tamaño mínimo de letra: **11 px**. La negrita es la excepción.
@@ -317,6 +318,11 @@ console.log(db.prepare('SELECT workspace_id,color_primario,color_acento FROM con
 ```
 
 Anotar el estado. Poner un workspace de prueba con `'#222B46','#5B7FA6'` y otro con `'#7A1F3D','#C24D2C'`; arrancar y parar el servidor; repetir la consulta. Expected: el primero queda en `''/''`, el segundo intacto. `GET /api/configuracion` del primero devuelve `#0A2E3B`/`#118AA0`. Restaurar los valores anotados.
+
+- [ ] **Step 5: Intensidad como ajuste del negocio.**
+  - `server.js`: `ALTER TABLE configuracion_negocio ADD COLUMN piel_intensidad INTEGER` (protegido); `CFG_DEFAULTS.piel_intensidad=60`; `getConfiguracion` la devuelve acotada al rango; el `PUT` la valida (entero dentro del rango) y la guarda.
+  - `public/index.html`: en el panel de colores de Configuración, un deslizante `#cfg-intensidad` con su valor al lado; al moverlo cambia `CFG.piel_intensidad` y llama a `aplicarTemaColor()` (vista previa en vivo, se guarda con «Guardar»); `guardarConfiguracion()` lo envía; «Volver a los colores de fábrica» lo devuelve a 60.
+  - Comprobar: mover → el fondo cambia; guardar → recargar → se conserva; un valor fuera de rango por API → 400.
 
 - [ ] **Step 5: Commit** — `git commit -m "Coral Line: colores de fábrica nuevos y migración de los viejos"`
 
