@@ -694,15 +694,73 @@ app.use((req,res,next)=>{
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('Referrer-Policy','same-origin');
+  res.setHeader('X-Robots-Tag','noindex, nofollow');   // app privada: ningún buscador debe indexarla
+  if(String(req.headers['x-forwarded-proto']||'')==='https') res.setHeader('Strict-Transport-Security','max-age=15552000');
   next();
 });
 app.use(express.json({limit:'10mb'}));
-app.use(express.static(path.join(__dirname,'public')));
-app.use('/uploads',express.static(UP_DIR));
+
+// ── COMPRESIÓN (sin dependencias) ──
+// La app es un solo archivo grande: se comprime una vez y se guarda en memoria (se rehace si el
+// archivo cambia). Las respuestas JSON grandes se comprimen al vuelo.
+const zlib=require('zlib');
+const INDEX_HTML=path.join(__dirname,'public','index.html');
+let _idx={mtime:-1};
+function indexComprimido(){
+  const st=fs.statSync(INDEX_HTML);
+  if(st.mtimeMs!==_idx.mtime){
+    const raw=fs.readFileSync(INDEX_HTML);
+    _idx={mtime:st.mtimeMs,raw,
+      gz:zlib.gzipSync(raw,{level:9}),
+      br:zlib.brotliCompressSync(raw,{params:{[zlib.constants.BROTLI_PARAM_QUALITY]:9}}),
+      etag:'W/"'+require('crypto').createHash('sha1').update(raw).digest('hex').slice(0,20)+'"'};
+  }
+  return _idx;
+}
+function enviarApp(req,res){
+  let i; try{ i=indexComprimido(); }catch(e){ return res.status(500).type('text/plain').send('No se pudo cargar la aplicación'); }
+  const ae=String(req.headers['accept-encoding']||'');
+  res.setHeader('Content-Type','text/html; charset=utf-8');
+  res.setHeader('Cache-Control','no-cache');           // siempre revalida: un despliegue se ve al instante
+  res.setHeader('Vary','Accept-Encoding');
+  res.setHeader('ETag',i.etag);
+  if(req.headers['if-none-match']===i.etag) return res.status(304).end();
+  if(/\bbr\b/.test(ae)){ res.setHeader('Content-Encoding','br'); return res.end(i.br); }
+  if(/\bgzip\b/.test(ae)){ res.setHeader('Content-Encoding','gzip'); return res.end(i.gz); }
+  res.end(i.raw);
+}
+app.use((req,res,next)=>{
+  const json=res.json.bind(res);
+  res.json=obj=>{
+    try{
+      if(/\bgzip\b/.test(String(req.headers['accept-encoding']||''))){
+        const txt=JSON.stringify(obj);
+        if(typeof txt==='string'&&txt.length>1400){
+          res.setHeader('Content-Type','application/json; charset=utf-8');
+          res.setHeader('Content-Encoding','gzip'); res.setHeader('Vary','Accept-Encoding');
+          return res.end(zlib.gzipSync(txt,{level:6}));
+        }
+      }
+    }catch(e){}
+    return json(obj);
+  };
+  next();
+});
+app.get(['/','/index.html'],enviarApp);
+app.get('/robots.txt',(req,res)=>res.type('text/plain').send('User-agent: *\nDisallow: /\n'));
+app.use(express.static(path.join(__dirname,'public'),{index:false,maxAge:'7d'}));
+// Archivos subidos: nombre único → se pueden guardar en caché mucho tiempo. Y nunca deben poder
+// ejecutar código con la sesión de quien los abre (un .html o .svg subido corre en este mismo dominio).
+const EXT_VISIBLES=/^\.(png|jpe?g|webp|gif|avif|bmp|ico|svg|pdf|mp3|m4a|ogg|wav|webm|mp4)$/;
+app.use('/uploads',express.static(UP_DIR,{maxAge:'30d',immutable:true,setHeaders:(res,fp)=>{
+  const ext=path.extname(fp).toLowerCase();
+  if(ext!=='.pdf') res.setHeader('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src data:; media-src 'self'; sandbox");
+  if(!EXT_VISIBLES.test(ext)) res.setHeader('Content-Disposition','attachment');
+}}));
 
 const storage=multer.diskStorage({
   destination:(req,file,cb)=>cb(null,UP_DIR),
-  filename:(req,file,cb)=>{const ext=path.extname(file.originalname);cb(null,`${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`)}
+  filename:(req,file,cb)=>{const ext=path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g,'').slice(0,10);cb(null,`${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`)}
 });
 const upload=multer({storage,limits:{fileSize:8*1024*1024}});
 
@@ -1317,12 +1375,40 @@ function validarPedido(b){
 function firmarUsuario(u){ return jwt.sign({wsId:u.workspace_id,userId:u.id,rolId:u.rol_id},JWT_SECRET,{expiresIn:'90d'}); }
 // Seguridad: rate-limit del login en memoria (frena fuerza bruta de PIN/contraseñas).
 // 8 intentos fallidos por IP en 10 min → bloqueo temporal. Se limpia al acertar.
-const _loginFails=new Map(); // ip -> {n, hasta}
-function loginBloqueado(ip){ const r=_loginFails.get(ip); if(!r)return false; if(Date.now()>r.hasta){_loginFails.delete(ip);return false;} return r.n>=8; }
-function loginFallo(ip){ const r=_loginFails.get(ip)||{n:0,hasta:0}; r.n++; r.hasta=Date.now()+10*60*1000; _loginFails.set(ip,r); }
+// Límite de intentos de ingreso. Dos frenos:
+//  1) por origen: 8 fallos → 10 min. Las llaves salen de lo que escribe el PROXY (x-real-ip y el último
+//     salto de x-forwarded-for), no del encabezado completo: lo que el cliente escribe delante se puede falsear.
+//  2) global: si llueven fallos desde muchos orígenes, el ingreso se pausa, y cada pausa dura el doble
+//     que la anterior (15 min → 12 h). Las sesiones ya abiertas no se ven afectadas.
+const _loginFails=new Map(); // llave -> {n, hasta}
+function llavesLogin(req){
+  const xff=String(req.headers['x-forwarded-for']||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const k=new Set([String(req.headers['x-real-ip']||'').trim(), xff[xff.length-1]||'', req.socket.remoteAddress||'']);
+  k.delete(''); if(!k.size)k.add('?');
+  // tras un proxy, la dirección del socket es la del proxy (igual para todos): no sirve como llave
+  if(k.size>1) k.delete(req.socket.remoteAddress||'');
+  return [...k];
+}
+function unoBloqueado(k){ const r=_loginFails.get(k); if(!r)return false; if(Date.now()>r.hasta){_loginFails.delete(k);return false;} return r.n>=8; }
+const _freno={fallos:[],hasta:0,nivel:0,ultimo:0};
+function frenoActivo(){ return Date.now()<_freno.hasta; }
+function loginBloqueado(ks){ return frenoActivo()||ks.some(unoBloqueado); }
+function loginFallo(ks){
+  const ahora=Date.now();
+  ks.forEach(k=>{ const r=_loginFails.get(k)||{n:0,hasta:0}; r.n++; r.hasta=ahora+10*60*1000; _loginFails.set(k,r); });
+  _freno.fallos=_freno.fallos.filter(t=>ahora-t<15*60*1000); _freno.fallos.push(ahora);
+  if(_freno.fallos.length>=25){
+    if(ahora-_freno.ultimo>24*60*60*1000)_freno.nivel=0;
+    const min=Math.min(15*Math.pow(2,_freno.nivel),720);
+    _freno.hasta=ahora+min*60*1000; _freno.nivel++; _freno.ultimo=ahora; _freno.fallos=[];
+    console.warn(`[seguridad] ${new Date().toISOString()} · demasiados ingresos fallidos: ingreso pausado ${min} min`);
+  }
+  if(_loginFails.size>5000) for(const [k,r] of _loginFails) if(ahora>r.hasta)_loginFails.delete(k);
+}
+function loginOk(ks){ ks.forEach(k=>_loginFails.delete(k)); }
 function marcarLogin(u){ try{ db.prepare("UPDATE usuarios SET ultimo_login=datetime('now','localtime') WHERE id=?").run(u.id); }catch(e){} }
 app.post('/api/auth/login',(req,res)=>{
-  const ip=req.headers['x-forwarded-for']||req.socket.remoteAddress||'?';
+  const ip=llavesLogin(req);
   if(loginBloqueado(ip)) return res.status(429).json({error:'Demasiados intentos. Espera unos minutos e intenta de nuevo.'});
   const{usuario,pass,pin}=req.body||{};
   // 1) Login por usuario + contraseña
@@ -1330,7 +1416,7 @@ app.post('/api/auth/login',(req,res)=>{
     const cands=db.prepare('SELECT * FROM usuarios WHERE usuario=? AND activo=1').all(String(usuario).trim());
     const u=cands.find(c=>{ try{ return bcrypt.compareSync(String(pass),c.pass_hash); }catch(e){ return false; } });
     if(!u){ loginFallo(ip); return res.status(401).json({error:'Usuario o contraseña incorrectos'}); }
-    _loginFails.delete(ip); marcarLogin(u);
+    loginOk(ip); marcarLogin(u);
     return res.json({token:firmarUsuario(u)});
   }
   // 2) Login por PIN (compat) → entra como el usuario admin de ese workspace
@@ -1339,7 +1425,7 @@ app.post('/api/auth/login',(req,res)=>{
     if(!ws){ loginFallo(ip); return res.status(401).json({error:'PIN incorrecto'}); }
     const adm=db.prepare('SELECT * FROM usuarios WHERE workspace_id=? AND activo=1 ORDER BY (rol_id IN (SELECT id FROM roles WHERE es_admin=1)) DESC, creado ASC').get(ws.id);
     if(!adm){ loginFallo(ip); return res.status(401).json({error:'PIN incorrecto'}); }
-    _loginFails.delete(ip); marcarLogin(adm);
+    loginOk(ip); marcarLogin(adm);
     return res.json({token:firmarUsuario(adm)});
   }
   return res.status(401).json({error:'Ingresa usuario y contraseña'});
@@ -1368,6 +1454,7 @@ app.use('/api',(req,res,next)=>{
   }
 });
 // Middleware de permiso: corta con 403 si el rol no lo tiene (admin siempre pasa).
+function tiene(req,clave){ const p=req.permisos||{}; return !!(p.__admin||p[clave]===true); }
 function requiere(clave){ return (req,res,next)=>{ const p=req.permisos||{}; if(p.__admin||p[clave]===true) return next(); return res.status(403).json({error:'No tienes permiso para esta acción'}); }; }
 
 // ── IDENTIDAD, USUARIOS Y ROLES (v3.0 Fase 1) ──
@@ -1508,6 +1595,7 @@ app.post('/api/pedidos',requiere('crear_pedidos'),(req,res)=>{
   try{
     const b=req.body;
     if(!b.nombre)return res.status(400).json({error:'Nombre requerido'});
+    if(!tiene(req,'registrar_pagos')){ b.pagos=[]; b.pagos_nuevos=[]; }   // sin el permiso, el pedido nace sin abonos
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const id=uid(); const ref=nextRef();
@@ -1544,6 +1632,7 @@ app.put('/api/pedidos/:id',requiere('editar_pedidos'),(req,res)=>{
     const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(pid,req.wsId);
     if(!p)return res.status(404).json({error:'No encontrado'});
     if(p.cerrado)return res.status(409).json({error:'Este pedido está cerrado. Reábrelo para poder editarlo.'}); // v3.0 Fase 3
+    if(!tiene(req,'registrar_pagos')){ b.pagos=undefined; b.pagos_nuevos=[]; }   // sin el permiso, los abonos quedan como estaban
     const errores=validarPedido(b);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const act=actorDe(req);
@@ -2336,6 +2425,7 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
 app.post('/api/configuracion/logo',requiere('configurar_sistema'),upload.single('logo'),(req,res)=>{
   try{
     if(!req.file)return res.status(400).json({error:'No se recibió ningún archivo'});
+    if(!/^image\//.test(req.file.mimetype||'')){ try{fs.unlinkSync(req.file.path)}catch(e){} return res.status(400).json({error:'El logo debe ser una imagen'}); }
     const ruta='/uploads/'+req.file.filename;
     db.prepare(`INSERT INTO configuracion_negocio(workspace_id,logo_ruta) VALUES(?,?)
       ON CONFLICT(workspace_id) DO UPDATE SET logo_ruta=excluded.logo_ruta`).run(req.wsId,ruta);
@@ -2346,7 +2436,7 @@ app.post('/api/configuracion/logo',requiere('configurar_sistema'),upload.single(
 app.post('/api/configuracion/banner',requiere('configurar_sistema'),upload.single('banner'),(req,res)=>{
   try{
     if(!req.file)return res.status(400).json({error:'No se recibió ningún archivo'});
-    if(!/^image\//.test(req.file.mimetype||''))return res.status(400).json({error:'El banner debe ser una imagen'});
+    if(!/^image\//.test(req.file.mimetype||'')){ try{fs.unlinkSync(req.file.path)}catch(e){} return res.status(400).json({error:'El banner debe ser una imagen'}); }
     const ruta='/uploads/'+req.file.filename;
     db.prepare(`INSERT INTO configuracion_negocio(workspace_id,banner_ruta) VALUES(?,?)
       ON CONFLICT(workspace_id) DO UPDATE SET banner_ruta=excluded.banner_ruta`).run(req.wsId,ruta);
@@ -4466,9 +4556,12 @@ app.delete('/api/clientes/:id',requiere('editar_clientes'),(req,res)=>{ // Fase 
 });
 // ── ARCHIVO (Archivar en vez de eliminar) ──
 const ARCH_TABLAS={pedido:'pedidos',cliente:'clientes',producto:'fichas_producto'};
+// Archivar o restaurar pide el mismo permiso que editar eso mismo (antes no pedía ninguno)
+const ARCH_PERMISO={pedido:'editar_pedidos',cliente:'editar_clientes',producto:'gestionar_productos'};
 app.post('/api/archivar',(req,res)=>{
   const{tipo,id}=req.body||{}; const tabla=ARCH_TABLAS[tipo];
   if(!tabla||!id)return res.status(400).json({error:'Tipo o id inválido'});
+  if(!tiene(req,ARCH_PERMISO[tipo]))return res.status(403).json({error:'No tienes permiso para esta acción'});
   if(tipo==='pedido'){const p=db.prepare('SELECT stock_consumido FROM pedidos WHERE id=? AND workspace_id=?').get(id,req.wsId);if(p&&p.stock_consumido){restaurarStock(p.stock_consumido,req.wsId);db.prepare('UPDATE pedidos SET stock_consumido=NULL WHERE id=?').run(id);}}
   const r=db.prepare(`UPDATE ${tabla} SET archivado=1 WHERE id=? AND workspace_id=?`).run(id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});
@@ -4477,6 +4570,7 @@ app.post('/api/archivar',(req,res)=>{
 app.post('/api/restaurar',(req,res)=>{
   const{tipo,id}=req.body||{}; const tabla=ARCH_TABLAS[tipo];
   if(!tabla||!id)return res.status(400).json({error:'Tipo o id inválido'});
+  if(!tiene(req,ARCH_PERMISO[tipo]))return res.status(403).json({error:'No tienes permiso para esta acción'});
   const r=db.prepare(`UPDATE ${tabla} SET archivado=0 WHERE id=? AND workspace_id=?`).run(id,req.wsId);
   if(r.changes===0)return res.status(404).json({error:'No encontrado'});
   if(tipo==='pedido'){const p=db.prepare('SELECT * FROM pedidos WHERE id=? AND workspace_id=?').get(id,req.wsId);if(p&&!p.es_cotizacion&&!p.cancelado){const consumo=descontarStock(id,req.wsId);db.prepare('UPDATE pedidos SET stock_consumido=? WHERE id=?').run(JSON.stringify(consumo),id);}}
@@ -4490,5 +4584,11 @@ app.get('/api/archivo',(req,res)=>{
   });
 });
 
-app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
+// Lo que no existe NO devuelve la app: una ruta de API o un archivo que falta responden 404
+// (antes cada imagen rota descargaba la app entera). Solo las rutas de navegación cargan la app.
+app.get('*',(req,res)=>{
+  if(req.path.startsWith('/api/')) return res.status(404).json({error:'Ruta no encontrada'});
+  if(req.path.startsWith('/uploads/')||/\.[a-z0-9]{2,5}$/i.test(req.path)) return res.status(404).type('text/plain').send('No encontrado');
+  enviarApp(req,res);
+});
 app.listen(PORT,()=>console.log(`✅ CORAL LINE en http://localhost:${PORT}`));
