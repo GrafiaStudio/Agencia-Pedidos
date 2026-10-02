@@ -8,6 +8,8 @@ const apiN = async (tk, m, p, b) => {
 };
 (async () => {
   const res = [], ok = (n, c, d) => { res.push((c ? '  ok   ' : ' FALLA ') + n + (d !== undefined && d !== '' ? '  → ' + d : '')); return c; };
+  // La prueba cambia colores e intensidad del negocio: se guarda lo que había y se restaura al final
+  const tk0 = await token(); const CFG0 = (await apiN(tk0, 'GET', '/configuracion')).j;
   const { b, page, errores } = await abrir();
   page.on('dialog', d => d.accept());
   const NOM = 'ZZ prueba piel ' + Date.now().toString().slice(-5);
@@ -74,6 +76,8 @@ const apiN = async (tk, m, p, b) => {
   await vista(page, 'configuracion'); await page.evaluate(() => cfgColoresFabrica()); await page.evaluate(() => guardarConfiguracion()); await page.waitForTimeout(900);
   const c2 = (await apiN(tk, 'GET', '/configuracion')).j;
   ok('volver a fábrica: Coral Line', c2.color_primario === '#0A2E3B' && c2.color_acento === '#118AA0' && c2.piel_intensidad === 60);
+  const rest = await apiN(tk, 'PUT', '/configuracion', { color_primario: CFG0.color_primario, color_acento: CFG0.color_acento, piel_intensidad: CFG0.piel_intensidad, banner_texto: CFG0.banner_texto });
+  ok('configuración del negocio restaurada como estaba', rest.st === 200 && rest.j.color_primario === CFG0.color_primario && rest.j.piel_intensidad === CFG0.piel_intensidad, CFG0.color_primario + ' ' + CFG0.color_acento + ' ' + CFG0.piel_intensidad);
   // 7 · archivar el pedido de prueba (por la interfaz)
   await page.evaluate(id => abrirEditar(id), ped.id); await page.waitForTimeout(1100);
   await page.evaluate(() => archivarPed()); await page.waitForTimeout(1200);

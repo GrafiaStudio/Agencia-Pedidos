@@ -12,9 +12,10 @@ Las capturas van a `cap/` (o a `CAP_DIR` si se define). `cap/` no se sube al rep
 | `t9.js` | Recorrido funcional por la interfaz: crear pedido con 2 ítems, editar, abono, PDF, mover en Producción, asistente, colores y fábrica, archivar, rol limitado. **Crea datos `ZZ …`: barrerlos al terminar.** |
 | `ciclo.js` + `compara.py` | Ciclo de diseño: `node ciclo.js c1 1920 950` captura el Dashboard y `python compara.py c1` lo pone debajo del diseño del usuario (`marca y referencias/REAL diseño-dashboard-UI-UX.jpg`). |
 | `tban.js` | Banner propio: sube `fondo.png` por la interfaz, comprueba que llega como WebP reducido, lo ve en el Dashboard y lo quita. |
+| `limpia_zz.js` | Borra de la BD LOCAL los pedidos/clientes «ZZ …» y usuarios «zzpiel…» que dejan las pruebas. Correr tras `t9.js`. |
 | `t9b.js` | Tablet (768) y móvil (390), día y noche: sin scroll horizontal, sin errores, barra móvil. |
 | `../muestras/medir_contraste.py` | Versión simple: mide puntos sueltos sobre una captura. |
 
 **Trampas conocidas de la medición:** un elemento tapado por la burbuja del dock puede salir como «ilegible» (comprobar con un recorte); y `compara.py` necesita Pillow.
 
-**⚠️ Pruebas que GUARDAN configuración** (`t9.js`, `tban.js`, y `t3.js` si se recupera): cambian colores, intensidad o banner del negocio `main` y luego vuelven a fábrica. **No correrlas mientras el usuario esté probando la app local**: le borrarían lo que configuró. `legible.js` no guarda nada; con `FABRICA=1` mide con los colores de fábrica solo en la página de prueba.
+**⚠️ Pruebas que GUARDAN configuración**: `t9.js` cambia colores e intensidad del negocio `main` pero **guarda lo que había y lo restaura al final**; `tban.js` sube y quita un banner (no restaura uno previo). **No correrlas mientras el usuario esté probando la app local**: le borrarían lo que configuró. `legible.js` no guarda nada; con `FABRICA=1` mide con los colores de fábrica solo en la página de prueba.
