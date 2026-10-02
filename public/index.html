@@ -1404,6 +1404,272 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 .pin-box p{font-size:12px;color:var(--slate);margin-bottom:20px}
 .pin-input{font-size:28px;letter-spacing:14px;text-align:center;font-family:'DM Mono',monospace;padding:12px 11px}
 .pin-err{color:var(--rojo-tinta);font-size:11px;font-weight:600;min-height:16px;margin-top:10px}
+
+/* ══ CORAL LINE · ARMAZÓN Y DASHBOARD (Entregas 2–3) ══════════════════════════════════════ */
+:root{--dock-h:86px;--gut:clamp(18px,4.4vw,92px)}
+.sidebar{display:none}
+.main{margin-left:0;padding-bottom:calc(var(--dock-h) + 34px)}
+#ovP,#ovProd{left:0}
+.content{padding:4px var(--gut) 20px}
+.toast{bottom:calc(var(--dock-h) + 22px)}
+/* barra superior */
+.topbar{position:sticky;top:0;z-index:40;height:auto;min-height:94px;padding:20px var(--gut) 14px;background:transparent;border:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;gap:24px;transition:background .25s,box-shadow .25s,min-height .25s,padding .25s}
+.topbar::after{display:none}
+.topbar.scrolled{background:var(--v2);-webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2);box-shadow:0 8px 24px var(--sombra);min-height:74px;padding-top:12px;padding-bottom:12px}
+.tb-izq{display:flex;align-items:center;gap:16px;min-width:0}
+.tb-logo{height:46px;max-width:120px;object-fit:contain}
+.tb-title{font-size:clamp(20px,1.95vw,38px);font-weight:700;text-transform:uppercase;letter-spacing:.01em;line-height:1.05;color:var(--tinta);margin:0}
+.tb-sub{font-size:clamp(13px,.95vw,18px);color:var(--tinta-2);margin-top:4px;line-height:1.3}
+.tb-sub:empty{display:none}
+.tb-right{gap:12px;flex-shrink:0}
+.search-b{width:clamp(200px,25vw,500px)}
+.search-b>i{left:16px;font-size:16px;color:var(--tinta-3)}
+.search-b input{max-width:none;width:100%;height:48px;padding:0 16px 0 42px;border-radius:14px;font-size:13px}
+.tecla{position:relative;width:48px;height:48px;border-radius:14px;border:1.5px solid var(--v1-borde);background:var(--campo);color:var(--acento-ink);display:grid;place-items:center;cursor:pointer;transition:transform .2s,background .2s,box-shadow .2s;flex-shrink:0;padding:0}
+.tecla:hover{transform:translateY(-1px);background:var(--v2-opaco)}
+.tecla .ic{width:23px;height:23px}
+.tecla.luz{background:var(--luz);border-color:transparent;color:var(--luz-tinta);box-shadow:0 6px 18px var(--luz-halo)}
+.tecla .cont{position:absolute;top:-10px;right:-6px;font-family:'Ostrich Sans',sans-serif;font-weight:900;font-size:24px;line-height:1;color:var(--contador)}
+.btn-new{height:48px;padding:0 28px;border-radius:999px;background:var(--pri);color:var(--pri-tinta);font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 8px 22px var(--luz-halo);white-space:nowrap}
+.btn-new:hover{filter:brightness(1.06);transform:translateY(-1px)}
+/* dock */
+.dock{position:fixed;left:0;right:0;bottom:0;height:var(--dock-h);z-index:60;background:var(--dock);border-top:1px solid var(--dock-borde);border-radius:46px 46px 0 0;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 -10px 34px var(--sombra-2)}
+.dock-in{max-width:1640px;height:100%;margin:0 auto;padding:0 clamp(14px,3vw,60px);display:flex;align-items:center;justify-content:space-between}
+.dk{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;flex:1;min-width:0;height:100%;border:none;background:none;cursor:pointer;color:var(--dock-tinta);font:500 11px/1 'Montserrat',sans-serif;letter-spacing:.07em;text-transform:uppercase;transition:color .2s,transform .2s;padding:0}
+.dk .ic{width:32px;height:32px}
+.dk:hover{color:var(--dock-luz);transform:translateY(-2px)}
+.dk.active{color:var(--dock-luz)}
+.dk.active:not(.dk-centro)::after{content:'';position:absolute;bottom:9px;width:20px;height:2px;border-radius:2px;background:var(--luz)}
+.dk-centro{flex:0 0 112px;height:112px;margin:-30px 10px 0;border-radius:50%;background:var(--burbuja);color:var(--burbuja-tinta);border:1.5px solid var(--dock-borde);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 10px 26px var(--sombra-2);font-weight:600;letter-spacing:.05em}
+.dk-centro:hover,.dk-centro.active{color:var(--burbuja-tinta)}
+.dk-nb{position:absolute;top:12px;left:calc(50% + 12px);font-family:'Ostrich Sans',sans-serif;font-weight:900;font-size:18px;letter-spacing:0;color:var(--luz)}
+/* perfil = centro personal */
+.pf-accesos{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.pf-acc{display:flex;align-items:center;gap:8px;padding:11px 13px;border-radius:14px;border:1.5px solid var(--v1-borde);background:var(--campo);color:var(--tinta);font:500 12px 'Montserrat',sans-serif;cursor:pointer}
+.pf-acc i{font-size:17px;color:var(--acento-ink)}
+.pf-acc:hover{background:var(--v2-opaco)}
+.pf-salir,.pf-salir i{color:var(--rojo-tinta)}
+/* Coralyne (flotante y fija) */
+.ia-panel{background:var(--white)}
+.ia-head{border-bottom:none;padding:20px 22px 6px}
+.ia-head-t{font-size:14px;font-weight:700;font-style:italic;text-transform:uppercase;letter-spacing:.03em;gap:9px}
+.ia-head-t .ic{width:20px;height:20px;color:var(--acento-ink);font-style:normal}
+.ia-chat{padding:12px 20px;position:relative}
+.ia-burbuja{border-radius:22px;padding:13px 18px;font-size:13px;line-height:1.5}
+.ia-msg.usuario .ia-burbuja{background:var(--campo-solido);color:var(--tinta);font-style:italic;border:1px solid var(--v1-borde);border-bottom-right-radius:8px}
+.ia-msg.asistente .ia-burbuja{background:var(--campo);color:var(--tinta);border:1px solid var(--v1-borde);border-bottom-left-radius:8px}
+.ia-vacio{margin:0;text-align:left;padding:4px 0 0;color:var(--tinta);display:flex;flex-direction:column;gap:12px;flex:1;min-height:100%}
+.ia-vacio .ia-burbuja{font-style:italic}
+.ia-nota{display:block;margin-top:4px;font-size:11px;font-style:normal;color:var(--tinta-2)}
+.ia-sugs{flex-direction:row;flex-wrap:wrap;gap:7px}
+.ia-sug{border-radius:999px;background:var(--campo);border:1px solid var(--v1-borde);color:var(--tinta);font-size:12px;padding:7px 13px}
+.ia-estrella{display:block;width:min(62%,250px);height:auto;aspect-ratio:1;margin:auto;stroke-width:9px;color:color-mix(in srgb,var(--teal) 42%,var(--hielo))}
+html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
+.ia-input{border-top:none;padding:12px 18px 20px;gap:8px}
+.ia-input textarea{border-radius:999px;background:var(--campo-solido);border:1.5px solid var(--v1-borde);padding:15px 20px;font-size:13px;min-height:52px}
+.ia-input textarea::placeholder{font-style:italic}
+.ia-enviar{width:44px;height:44px;background:var(--luz);color:var(--luz-tinta);box-shadow:0 6px 16px var(--luz-halo)}
+.ia-panel.ia-fija{position:relative;inset:auto;width:100%;height:100%;border-radius:24px;background:var(--v1);border:1.5px solid var(--v1-borde);box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh);animation:none;overflow:hidden}
+.ia-panel.ia-fija .ia-cerrar{display:none}
+/* ── DASHBOARD ── */
+.db{display:grid;gap:clamp(14px,1.05vw,22px);grid-template-columns:minmax(220px,270px) repeat(4,minmax(0,1fr)) minmax(300px,370px);
+  grid-template-rows:clamp(104px,14vh,134px) minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas:"kpi ban ban ban ban ia" "kpi cha cha rec mar ia" "kpi bit eta cal act ia";
+  height:max(690px,calc(100dvh - 94px - var(--dock-h) - 58px))}
+.db.db-sinfin{grid-template-areas:"kpi ban ban ban ban ia" "kpi rec rec rec mar ia" "kpi bit eta cal act ia"}
+.db.db-sinfin .db-chart,.db.db-sinfin .db-margen{display:none}
+.db-kpis{grid-area:kpi;display:flex;flex-direction:column;gap:inherit;min-height:0}
+.db-banner{grid-area:ban}.db-chart{grid-area:cha}.db-rec{grid-area:rec}.db-stack{grid-area:mar;display:flex;flex-direction:column;gap:inherit;min-height:0}
+.db-bit{grid-area:bit}.db-etapas{grid-area:eta}.db-cal{grid-area:cal}.db-act{grid-area:act}.db-ia{grid-area:ia;min-height:0;display:flex}
+.db-card{background:var(--v1);border:1.5px solid var(--v1-borde);border-radius:24px;box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh);padding:clamp(16px,1.15vw,24px) clamp(16px,1.3vw,26px);min-width:0;min-height:0;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.db-t{font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta);margin:0 0 12px;line-height:1.2}
+.db-mas{display:flex;justify-content:center;gap:4px;margin-top:auto;padding:6px 10px 0;flex-shrink:0;border:none;background:none;cursor:pointer;align-self:center}
+.db-mas i{width:5px;height:5px;border-radius:50%;background:var(--tinta)}
+.db-vacio{font-size:12px;color:var(--tinta-2);padding:8px 0}
+/* indicadores */
+.db-kpi{flex:1;min-height:0;display:grid;grid-template-columns:minmax(76px,1fr) 1.15fr;align-items:center;gap:12px;padding:6px 20px 6px 18px;border-radius:24px;background:var(--v1);border:1.5px solid var(--v1-borde);box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh);color:var(--tinta);cursor:pointer;text-align:left;font-family:inherit;transition:transform .2s,box-shadow .2s;overflow:hidden}
+.db-kpi:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh-lg)}
+.db-kpi.fuerte{background:var(--vf);border-color:var(--vf-borde);color:var(--vf-tinta)}
+.db-kpi-n{font-weight:100;font-size:clamp(54px,4.7vw,94px);line-height:.88;text-align:center;letter-spacing:-.03em}
+.db-kpi-d{display:flex;flex-direction:column;gap:8px;min-width:0}
+.db-kpi-d .ic{width:30px;height:30px;stroke-width:1.4px}
+.db-kpi-l{font-size:12.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;line-height:1.28}
+/* banner */
+.db-banner{position:relative;overflow:hidden;border-radius:24px;border:1.5px solid var(--vf-borde);color:var(--ban-tinta);display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 clamp(26px,2.6vw,52px) 0 clamp(26px,3.2vw,64px);
+  background:linear-gradient(100deg,var(--ban-a) 0%,color-mix(in srgb,var(--ban-a) 82%,transparent) 32%,transparent 74%),var(--banner-img,none) center/cover no-repeat,linear-gradient(100deg,var(--ban-a) 0%,var(--ban-b) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),var(--sh)}
+.db-ban-arcos{position:absolute;right:13%;top:50%;width:min(46%,380px);aspect-ratio:122/105;height:auto;transform:translateY(-50%);fill:var(--ban-logo);opacity:.10;pointer-events:none}
+.db-banner.con-imagen .db-ban-arcos{display:none}
+.db-ban-txt{position:relative;font-size:clamp(12px,.85vw,15px);font-weight:500;letter-spacing:.06em;text-transform:uppercase;align-self:flex-end;margin-bottom:clamp(22px,3vh,38px);max-width:56%}
+.db-ban-logo{position:relative;width:clamp(150px,13vw,236px);height:auto;aspect-ratio:136/33;fill:var(--ban-logo);flex-shrink:0}
+.db-banner.con-imagen .db-ban-logo{fill:#FFFFFF;filter:drop-shadow(0 2px 8px rgba(0,0,0,.35))}
+/* reporte */
+.db-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative}
+.db-cab .db-t{margin:0}
+.db-desp{display:inline-flex;align-items:center;gap:8px;border:none;background:none;cursor:pointer;color:var(--tinta);font:300 clamp(17px,1.15vw,22px)/1 'Montserrat',sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:4px 2px}
+.db-desp i{font-size:15px}
+.db-menu{position:absolute;right:0;top:36px;z-index:5;display:flex;flex-direction:column;min-width:140px;padding:7px;border-radius:16px;background:var(--v2-opaco);border:1px solid var(--v1-borde);box-shadow:var(--sh-lg)}
+.db-menu[hidden]{display:none}
+.db-menu button{text-align:left;padding:9px 13px;border-radius:11px;border:none;background:none;cursor:pointer;font:400 12.5px 'Montserrat',sans-serif;color:var(--tinta-2)}
+.db-menu button:hover{background:var(--campo);color:var(--tinta)}
+.db-menu button.act{background:var(--sel);color:var(--sel-tinta)}
+.db-graf{flex:1;width:100%;min-height:0;margin-top:10px;overflow:visible;display:block}
+.db-graf .eje{font-size:11px;fill:var(--tinta-2);letter-spacing:.03em}
+.db-graf .eje.hoy{fill:var(--acento-ink);font-weight:600}
+.db-graf .eje.vacio{font-size:12px;font-style:italic}
+.db-graf .guia{stroke:var(--line);stroke-width:1}
+.db-graf .pt-u{fill:var(--v2-opaco);stroke:var(--violeta);stroke-width:1.6}
+.db-leyenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--tinta-2)}
+.db-leyenda span{display:inline-flex;align-items:center;gap:6px}
+.db-leyenda b{display:inline-block;width:14px;height:8px;border-radius:3px;background:var(--luz)}
+.db-leyenda b.l1{height:3px;background:linear-gradient(90deg,#FDA968,#FD518B)}
+.db-leyenda b.l2{height:3px;background:var(--violeta)}
+/* recientes */
+.db-rec-lista{display:flex;flex-direction:column;flex:1;min-height:0;justify-content:space-between;overflow:hidden}
+.db-ped{display:flex;align-items:center;gap:8px;padding:3px 0;border:none;background:none;text-align:left;cursor:pointer;font-family:inherit;color:var(--tinta);border-top:1px solid var(--line);width:100%}
+.db-ped:first-child{border-top:none}
+.db-ped-i{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.db-ped-c{display:flex;align-items:baseline;gap:9px;min-width:0}
+.db-ped-c .ref{font-size:11.5px;font-style:italic;font-weight:300;color:var(--tinta-2);flex-shrink:0}
+.db-ped-c .nom{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db-ped-v{font-size:11px;font-style:italic;color:var(--tinta-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db-ped-v b{font-weight:600;color:var(--tinta)}
+.db-chips{display:flex;gap:5px;flex-wrap:wrap;max-height:19px;overflow:hidden}
+.db-chips .ttag{text-transform:none;font-style:italic;font-weight:400;letter-spacing:0;padding:1px 10px;white-space:nowrap;line-height:17px}
+.db-anillo{flex-shrink:0}
+.db-anillo .an-p{fill:none;stroke:var(--tinta);stroke-width:1;opacity:.24}
+.db-anillo .an-v{fill:none;stroke:var(--tinta);stroke-width:1.7;stroke-linecap:round}
+.db-anillo .an-ini{fill:var(--v2-opaco);stroke:var(--tinta);stroke-width:1}
+.db-anillo .an-fin{fill:var(--tinta)}
+.db-anillo .an-t{font:500 13px 'Montserrat',sans-serif;fill:var(--tinta);text-anchor:middle;dominant-baseline:central}
+/* margen y recordatorios */
+.db-margen{flex:1.05;flex-direction:row;align-items:center;gap:clamp(8px,.8vw,16px);padding-right:14px}
+.db-mg-anillo{width:clamp(70px,5vw,98px);height:auto;flex-shrink:0}
+.db-mg-anillo .mg-pista{stroke:var(--tinta);stroke-opacity:.18}
+.db-mg-n{font:100 34px 'Montserrat',sans-serif;fill:var(--tinta);text-anchor:middle;dominant-baseline:central}
+.db-mg-s{font:300 13px 'Montserrat',sans-serif;fill:var(--tinta-2)}
+.db-mg-filas{display:flex;flex-direction:column;gap:5px;min-width:0}
+.db-mg-filas .v{font-size:clamp(13px,.86vw,17px);font-weight:300;line-height:1.1;white-space:nowrap}
+.db-mg-filas .l{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase}
+.db-recor{flex:1;flex-direction:row;gap:14px;align-items:flex-start}
+.db-rc-ic{display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:4px;color:var(--tinta)}
+.db-rc-ic .ic{width:30px;height:30px;stroke-width:1.8px}
+.db-rc-ic b{font-family:'Ostrich Sans',sans-serif;font-weight:900;font-size:40px;line-height:1;color:var(--contador)}
+.db-rc-ic b.cero{color:var(--tinta-3)}
+.db-rc-l{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.db-rc-it{display:flex;flex-direction:column;gap:2px;border:none;background:none;padding:0;text-align:left;cursor:pointer;font-family:inherit;color:var(--tinta)}
+.db-rc-it .t{font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.db-rc-it .t span{font-weight:400;font-size:11px;color:var(--tinta-2);white-space:nowrap}
+.db-rc-it .s{font-size:11.5px;font-style:italic;font-weight:300;color:var(--tinta-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* bitácora */
+.db-bit-c{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1;align-items:center}
+.db-bit-logo{width:min(70%,150px);height:auto;aspect-ratio:136/33;fill:var(--tinta)}
+.db-bit-tit{font-size:13.5px;font-weight:600;align-self:stretch}
+.db-bit-pal{display:flex;gap:9px;align-self:stretch;justify-content:space-between}
+.db-bit-pal i{flex:1;height:18px;border-radius:999px;border:1px solid var(--v1-borde)}
+.db-bit-img{width:100%;flex:1;min-height:0;max-height:110px;object-fit:cover;border-radius:18px}
+.db-bit-x{font-size:11.5px;font-style:italic;font-weight:300;color:var(--tinta-2);line-height:1.45;text-align:center;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+/* etapas */
+.db-et{margin-bottom:6px}
+.db-et-c{font-size:12.5px;color:var(--tinta);margin-bottom:3px}
+.db-et-f{display:flex;align-items:center;gap:12px}
+.db-et-f span{font-size:12px;color:var(--tinta);min-width:34px;text-align:right}
+.db-et-p{flex:1;height:11px;border-radius:999px;background:var(--pista);overflow:hidden}
+.db-et-p i{display:block;height:100%;border-radius:999px;background:var(--barra);transition:width .8s cubic-bezier(.22,.9,.3,1)}
+.db-et-tot{font-size:11px;color:var(--tinta-2);margin-top:auto}
+/* calendario y reloj */
+.db-cal{align-items:stretch}
+.db-cal-cab{display:flex;align-items:center;justify-content:center;gap:16px;font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--tinta);margin-bottom:6px}
+.db-cal-cab button{border:none;background:none;cursor:pointer;color:var(--tinta);font-size:13px;padding:2px 4px}
+.db-cal-sem,.db-cal-dias{display:grid;grid-template-columns:repeat(7,1fr);text-align:center}
+.db-cal-sem span{font-size:11px;font-weight:600;color:var(--tinta);padding:2px 0}
+.db-dia{border:none;background:none;font:400 12px 'Montserrat',sans-serif;color:var(--acento-ink);padding:1px 0;margin:0 auto;width:24px;height:20px;border-radius:999px;cursor:pointer;position:relative}
+.db-dia.hoy{background:var(--sel);color:var(--sel-tinta);font-weight:600}
+.db-dia.con::after{content:'';position:absolute;left:50%;bottom:-1px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--luz)}
+.db-dia.tarde::after{background:var(--contador)}
+.db-reloj{display:flex;align-items:center;justify-content:space-around;gap:10px;margin-top:auto;padding-top:8px;color:var(--tinta)}
+.db-reloj>i{width:1px;align-self:stretch;background:var(--tinta);opacity:.4}
+.db-reloj .h,.db-reloj .f{font-weight:200;font-size:clamp(32px,2.6vw,52px);line-height:.9;display:flex;flex-direction:column;align-items:flex-start}
+.db-reloj small{font-size:.62em;font-weight:200;line-height:1}
+/* actividad */
+.db-ac-it{padding:7px 0;border-top:1px solid var(--line)}
+.db-ac-it:first-child{border-top:none;padding-top:0}
+.db-ac-it .t{display:flex;justify-content:space-between;gap:10px;font-size:12.5px}
+.db-ac-it .t b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db-ac-it .t span{font-size:11px;color:var(--tinta-2);white-space:nowrap}
+.db-ac-it .s{font-size:11.5px;font-style:italic;font-weight:300;color:var(--tinta-2);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.view.active .db>*{animation:fadeUp .45s ease both}
+/* ── adaptación ── */
+@media (max-width:1759px){
+  .db{grid-template-columns:minmax(196px,248px) repeat(4,minmax(0,1fr));grid-template-areas:"kpi ban ban ban ban" "kpi cha cha rec mar" "kpi bit eta cal act";height:max(640px,calc(100dvh - 94px - var(--dock-h) - 58px))}
+  .db.db-sinfin{grid-template-areas:"kpi ban ban ban ban" "kpi rec rec rec mar" "kpi bit eta cal act"}
+  .db-ia{display:none}
+}
+@media (max-width:1279px){
+  .db{height:auto;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:auto 140px minmax(300px,auto) minmax(300px,auto);grid-template-areas:"kpi kpi kpi kpi" "ban ban ban ban" "cha cha rec mar" "bit eta cal act"}
+  .db.db-sinfin{grid-template-areas:"kpi kpi kpi kpi" "ban ban ban ban" "rec rec rec mar" "bit eta cal act"}
+  .db-kpis{flex-direction:row}
+  .db-kpi{min-height:118px}
+  .db-ia{display:none}
+}
+@media (max-width:1099px){
+  .db{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none;grid-auto-rows:auto;grid-template-areas:"kpi kpi" "ban ban" "cha cha" "rec mar" "bit eta" "cal act"}
+  .db.db-sinfin{grid-template-areas:"kpi kpi" "ban ban" "rec mar" "bit eta" "cal act"}
+  .db-kpis{flex-wrap:wrap}
+  .db-kpi{flex:1 1 calc(33% - 16px)}
+  .db-card{min-height:280px}
+  .db-chart{min-height:320px}
+  .db-banner{min-height:130px}
+  .search-b{width:clamp(160px,22vw,300px)}
+}
+@media (max-width:768px){
+  :root{--dock-h:0px}
+  .dock{display:none}
+  .main{padding-bottom:110px}
+  .content{padding:4px 14px 16px}
+  .topbar{min-height:0;padding:14px 14px 10px;flex-wrap:wrap;gap:10px}
+  .topbar.scrolled{min-height:0}
+  .tb-title{font-size:18px}.tb-sub{font-size:12.5px}
+  .tb-logo{height:34px}
+  .tb-right{width:100%;flex-shrink:1}
+  .tb-right .tecla:not(.ia-btn),.tb-right .btn-new{display:none!important}
+  .search-b{width:auto;flex:1}
+  .search-b input{height:44px}
+  .db{grid-template-columns:minmax(0,1fr);grid-template-areas:"kpi" "ban" "rec" "mar" "cha" "eta" "cal" "bit" "act"}
+  .db.db-sinfin{grid-template-areas:"kpi" "ban" "rec" "mar" "eta" "cal" "bit" "act"}
+  .db-kpi{flex:1 1 calc(50% - 8px);min-height:104px;grid-template-columns:auto 1fr;padding:6px 14px}
+  .db-kpi.fuerte{flex-basis:100%}
+  .db-kpi-n{font-size:58px}
+  .db-card{min-height:0}
+  .db-chart{min-height:280px}
+  .db-banner{min-height:116px;padding:0 20px}
+  .db-ban-txt{max-width:52%;font-size:11px}
+  .toast{bottom:104px}
+  /* barra móvil y hoja «Todo» */
+  .mob-nav{background:var(--dock);border-top:1px solid var(--dock-borde);border-radius:26px 26px 0 0;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 26px var(--sombra-2)}
+  .mob-inner{align-items:flex-end}
+  .mob-btn{color:var(--dock-tinta);font-size:11px;font-weight:500;letter-spacing:.04em;gap:4px;flex:1;padding:6px 2px;justify-content:flex-end}
+  .mob-btn .ic{width:24px;height:24px}
+  .mob-btn i{font-size:23px}
+  .mob-btn.active{color:var(--dock-luz)}
+  .mob-btn.mob-centro{flex:0 0 76px;height:76px;margin-top:-28px;border-radius:50%;background:var(--burbuja);color:var(--burbuja-tinta);justify-content:center;border:1.5px solid var(--dock-borde);box-shadow:0 8px 20px var(--sombra-2)}
+}
+#ovMas{align-items:flex-end;justify-content:center;padding:0;overflow:hidden}
+#ovMas .modal.hoja{width:100%;max-width:640px;margin:0;border-radius:28px 28px 0 0;max-height:88dvh;display:flex;flex-direction:column;animation:hojaSube .28s cubic-bezier(.22,.9,.3,1)}
+#ovMas .mbody{padding:6px 16px calc(18px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+@keyframes hojaSube{from{transform:translateY(40%);opacity:.5}to{transform:none;opacity:1}}
+.hoja-asa{width:46px;height:5px;border-radius:5px;background:var(--tinta-3);opacity:.5;margin:10px auto 8px;cursor:pointer}
+.todo-rapidos{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+.todo-r{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:999px;border:1.5px solid var(--v1-borde);background:var(--campo);color:var(--tinta);font:500 12px 'Montserrat',sans-serif;cursor:pointer}
+.todo-r .ic{width:18px;height:18px;color:var(--acento-ink)}
+.todo-r i{font-size:17px;color:var(--acento-ink)}
+.todo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.todo-it{display:flex;flex-direction:column;align-items:center;gap:5px;padding:14px 6px 12px;border-radius:18px;border:1.5px solid var(--v1-borde);background:var(--campo);color:var(--tinta);cursor:pointer;text-align:center;font-family:inherit}
+.todo-it .ic{width:28px;height:28px;color:var(--acento-ink)}
+.todo-it>i{font-size:26px;color:var(--acento-ink)}
+.todo-it b{font-size:12.5px;font-weight:600}
+.todo-it small{font-size:11px;color:var(--tinta-2);line-height:1.25}
+.todo-salir{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;padding:12px;border-radius:14px;border:1.5px solid var(--v1-borde);background:none;color:var(--rojo-tinta);font:500 12.5px 'Montserrat',sans-serif;cursor:pointer}
 </style>
 </head>
 <body>
@@ -1502,66 +1768,57 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 <!-- MAIN -->
 <div class="main">
   <div class="topbar">
-    <div class="tb-title" id="tb-title">Pedidos</div>
+    <div class="tb-izq">
+      <img id="tbLogo" class="tb-logo" alt="" hidden onerror="this.hidden=true">
+      <div>
+        <h1 class="tb-title" id="tb-title">Pedidos</h1>
+        <div class="tb-sub" id="tb-sub"></div>
+      </div>
+    </div>
     <div class="tb-right">
       <div class="search-b" style="position:relative">
         <i class="ti ti-search"></i>
-        <input type="text" id="s-inp" placeholder="Buscar en todo…" autocomplete="off" oninput="buscar(this.value)" onkeydown="gbTecla(event)" onfocus="gbAbrirSiHay()">
+        <input type="text" id="s-inp" placeholder="Buscar en todo…" autocomplete="off" oninput="buscar(this.value)" onkeydown="gbTecla(event)" onfocus="gbAbrirSiHay()" aria-label="Buscar en todo">
         <div class="gb-panel" id="gb-panel" onclick="event.stopPropagation()"></div>
       </div>
+      <button class="tecla" id="btnTema" onclick="alternarModoTema()" title="Cambiar a modo noche" aria-label="Cambiar modo día o noche"><svg class="ic"><use href="#ci-luna"/></svg></button>
+      <button class="tecla" data-perm="ver_registros" onclick="abrirExp()" title="Exportar" aria-label="Exportar"><svg class="ic"><use href="#ci-descargar"/></svg></button>
       <div style="position:relative">
-        <button class="icon-btn" id="bell-btn" onclick="toggleCampana(event)" title="Recordatorios"><i class="ti ti-bell"></i><span class="bell-badge" id="bell-badge" style="display:none"></span></button>
+        <button class="tecla" id="bell-btn" onclick="toggleCampana(event)" title="Recordatorios" aria-label="Recordatorios"><svg class="ic"><use href="#ci-campana"/></svg><span class="cont" id="bell-badge" style="display:none"></span></button>
         <div class="bell-panel" id="bell-panel" onclick="event.stopPropagation()"></div>
       </div>
-      <button class="icon-btn" data-perm="gestionar_productos" onclick="showView('productos')"><i class="ti ti-box"></i></button>
-      <button class="icon-btn" data-perm="configurar_sistema" onclick="showView('configuracion')"><i class="ti ti-settings"></i></button>
-      <button class="icon-btn" data-perm="ver_registros" onclick="abrirExp()"><i class="ti ti-download"></i></button>
-      <button class="icon-btn ia-btn" onclick="iaAbrir()" title="Preguntarle al asistente"><i class="ti ti-sparkles"></i></button>
-      <button class="icon-btn" id="btnTema" onclick="alternarModoTema()" title="Cambiar a modo noche"><i class="ti ti-moon"></i></button>
-      <button class="btn-new" data-perm="crear_pedidos" onclick="abrirNuevo()"><span class="tri"></span> Nuevo pedido</button>
+      <button class="tecla luz ia-btn" onclick="iaAbrir()" title="Pregúntale a Coralyne" aria-label="Abrir Coralyne"><svg class="ic"><use href="#ci-coralyne"/></svg></button>
+      <button class="btn-new" data-perm="crear_pedidos" onclick="abrirNuevo()">Nuevo pedido</button>
     </div>
   </div>
   <div class="content">
 
     <!-- PEDIDOS -->
-    <!-- DASHBOARD (Fase 6) -->
+    <!-- DASHBOARD · CORAL LINE (diseño del usuario) -->
     <div id="view-dashboard" class="view">
-      <div class="dash-hello">
-        <div>
-          <div class="dash-hi" id="dash-hi">¡Hola!</div>
-          <div class="dash-sub">Aquí tienes un resumen de lo que ocurre hoy en tu negocio.</div>
+      <div class="db" id="db">
+        <div class="db-kpis" id="db-kpis"></div>
+        <section class="db-banner" id="db-banner" aria-label="Banner del negocio"></section>
+        <section class="db-card db-chart">
+          <div class="db-cab"><h2 class="db-t">Reporte de registro</h2>
+            <button class="db-desp" id="db-desp" onclick="event.stopPropagation();dbMenu()" aria-haspopup="true"><i class="ti ti-caret-down-filled"></i><span id="db-per-lbl">Año</span></button>
+            <div class="db-menu" id="db-menu" hidden onclick="event.stopPropagation()">
+              <button data-per="hoy" onclick="dashSetPeriodo('hoy')">Hoy</button><button data-per="semana" onclick="dashSetPeriodo('semana')">7 días</button><button data-per="mes" onclick="dashSetPeriodo('mes')">Mes</button><button data-per="anio" onclick="dashSetPeriodo('anio')">Año</button>
+            </div>
+          </div>
+          <svg class="db-graf" id="db-graf" role="img" aria-label="Ingresos, costos y utilidad"></svg>
+          <div class="db-leyenda"><span><b class="l0"></b>Ingresos</span><span><b class="l1"></b>Costos</span><span><b class="l2"></b>Utilidad</span></div>
+        </section>
+        <section class="db-card db-rec"><h2 class="db-t">Pedidos recientes</h2><div class="db-rec-lista" id="db-rec"></div><button class="db-mas" onclick="showView('pedidos')" title="Ver todos los pedidos"><i></i><i></i><i></i><i></i></button></section>
+        <div class="db-stack">
+          <section class="db-card db-margen" id="db-margen"></section>
+          <section class="db-card db-recor" id="db-recor"></section>
         </div>
-        <div class="dash-periodo">
-          <button class="pill" data-per="hoy" onclick="dashSetPeriodo('hoy')">Hoy</button>
-          <button class="pill" data-per="semana" onclick="dashSetPeriodo('semana')">7 días</button>
-          <button class="pill" data-per="mes" onclick="dashSetPeriodo('mes')">Mes</button>
-        </div>
-      </div>
-      <div id="dash-kpis" class="dash-kpis"></div>
-      <div id="dash-fin" class="dash-fin"></div>
-      <div class="dash-charts" id="dash-charts">
-        <div class="ped-side-card dchart" style="margin:0">
-          <div class="msec" style="margin-top:0"><span class="tri"></span>Ingresos · últimos 7 días</div>
-          <div id="dash-chart-ing"></div>
-        </div>
-        <div class="ped-side-card dchart" style="margin:0">
-          <div class="msec" style="margin-top:0"><span class="tri"></span>Producción por etapa</div>
-          <div id="dash-chart-prod"></div>
-        </div>
-      </div>
-      <div class="dash-grid">
-        <div class="ped-side-card" style="margin:0">
-          <div class="msec" style="margin-top:0"><span class="tri"></span>Pedidos recientes</div>
-          <div id="dash-recientes"></div>
-        </div>
-        <div class="ped-side-card" style="margin:0">
-          <div class="msec" style="margin-top:0"><span class="tri"></span>Entregas próximas</div>
-          <div id="dash-entregas"></div>
-        </div>
-        <div class="ped-side-card" style="margin:0">
-          <div class="msec" style="margin-top:0"><span class="tri"></span>Actividad reciente</div>
-          <div id="dash-actividad"></div>
-        </div>
+        <section class="db-card db-bit"><h2 class="db-t">Bitácora</h2><div class="db-bit-c" id="db-bit"></div><button class="db-mas" onclick="showView('bitacora')" title="Abrir la Bitácora"><i></i><i></i><i></i><i></i></button></section>
+        <section class="db-card db-etapas"><h2 class="db-t">Etapas de producción</h2><div id="db-etapas"></div></section>
+        <section class="db-card db-cal" id="db-cal"></section>
+        <section class="db-card db-act"><h2 class="db-t">Actividad reciente</h2><div id="db-act"></div><button class="db-mas" onclick="showView('pedidos')" title="Ver pedidos"><i></i><i></i><i></i><i></i></button></section>
+        <aside class="db-ia" id="dash-ia-slot" aria-label="Coralyne"></aside>
       </div>
     </div>
 
@@ -1957,31 +2214,55 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 </div>
 
 <!-- MOBILE NAV -->
-<nav class="mob-nav"><div class="mob-inner">
-  <button class="mob-btn active" onclick="showView('pedidos')"><i class="ti ti-clipboard-list"></i>Pedidos</button>
-  <button class="mob-btn" onclick="abrirNuevo()"><i class="ti ti-plus"></i>Nuevo</button>
-  <button class="mob-btn" onclick="showView('clientes')"><i class="ti ti-users"></i>Clientes</button>
-  <button class="mob-btn" onclick="showView('registros')"><i class="ti ti-chart-bar"></i>Registros</button>
-  <button class="mob-btn" onclick="abrirMas()"><i class="ti ti-dots"></i>Más</button>
+<!-- DOCK · navegación principal (escritorio) -->
+<nav class="dock" aria-label="Navegación principal"><div class="dock-in">
+  <button class="dk" data-view="productos" data-perm="gestionar_productos" onclick="showView('productos')"><svg class="ic"><use href="#ci-productos"/></svg>Productos</button>
+  <button class="dk" data-view="pedidos" onclick="showView('pedidos')"><svg class="ic"><use href="#ci-pedidos"/></svg>Pedidos<span class="dk-nb" id="dk-act" style="display:none"></span></button>
+  <button class="dk" data-view="clientes" onclick="showView('clientes')"><svg class="ic"><use href="#ci-clientes"/></svg>Clientes</button>
+  <button class="dk" data-view="registros" data-perm="ver_registros" onclick="showView('registros')"><svg class="ic"><use href="#ci-registros"/></svg>Registros</button>
+  <button class="dk" data-view="costos" data-perm="ver_costos" onclick="showView('costos')"><svg class="ic"><use href="#ci-costos"/></svg>Costos</button>
+  <button class="dk dk-centro" data-view="dashboard" data-perm="ver_dashboard" onclick="showView('dashboard')"><svg class="ic"><use href="#ci-dashboard"/></svg>Dashboard</button>
+  <button class="dk" data-view="inventario" data-perm="gestionar_inventario" onclick="showView('inventario')"><svg class="ic"><use href="#ci-inventario"/></svg>Inventario</button>
+  <button class="dk" data-view="produccion" data-perm="ver_produccion" onclick="showView('produccion')"><svg class="ic"><use href="#ci-produccion"/></svg>Producción</button>
+  <button class="dk" data-view="bitacora" onclick="showView('bitacora')"><svg class="ic"><use href="#ci-bitacora"/></svg>Bitácora</button>
+  <button class="dk" data-view="perfil" onclick="abrirPerfil()"><svg class="ic"><use href="#ci-perfil"/></svg>Perfil</button>
+  <button class="dk" data-view="configuracion" data-perm="configurar_sistema" onclick="showView('configuracion')"><svg class="ic"><use href="#ci-ajustes"/></svg>Ajustes</button>
 </div></nav>
 
-<!-- MODAL MÁS (destinos sin botón propio en la barra móvil) -->
-<div class="overlay" id="ovMas">
-<div class="modal" style="max-width:340px">
-  <div class="mhead"><div class="mhead-l"><div class="mtitle">Más</div></div><button class="mclose" onclick="cerrarMas()"><i class="ti ti-x"></i></button></div>
+<nav class="mob-nav" aria-label="Navegación"><div class="mob-inner">
+  <button class="mob-btn" data-view="pedidos" onclick="showView('pedidos')"><svg class="ic"><use href="#ci-pedidos"/></svg>Pedidos</button>
+  <button class="mob-btn" data-perm="crear_pedidos" onclick="abrirNuevo()"><i class="ti ti-plus"></i>Nuevo</button>
+  <button class="mob-btn mob-centro" data-view="dashboard" data-perm="ver_dashboard" onclick="showView('dashboard')"><svg class="ic"><use href="#ci-dashboard"/></svg>Inicio</button>
+  <button class="mob-btn" data-view="clientes" onclick="showView('clientes')"><svg class="ic"><use href="#ci-clientes"/></svg>Clientes</button>
+  <button class="mob-btn" onclick="abrirMas()"><i class="ti ti-grid-dots"></i>Todo</button>
+</div></nav>
+
+<!-- HOJA «TODO»: todos los destinos (móvil). Se abre con «Todo» o deslizando la barra hacia arriba -->
+<div class="overlay" id="ovMas" onclick="if(event.target===this)cerrarMas()">
+<div class="modal hoja" role="dialog" aria-label="Todos los destinos">
+  <div class="hoja-asa" onclick="cerrarMas()"></div>
   <div class="mbody">
-    <button class="mas-item" data-perm="ver_dashboard" onclick="irDesdeMas('dashboard')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
-    <button class="mas-item" data-perm="ver_produccion" onclick="irDesdeMas('produccion')"><i class="ti ti-tools"></i>Producción</button>
-    <button class="mas-item" data-perm="gestionar_productos" onclick="irDesdeMas('productos')"><i class="ti ti-box"></i>Productos</button>
-      <button class="mas-item" data-perm="ver_costos" onclick="irDesdeMas('costos')"><i class="ti ti-calculator"></i>Costos</button>
-    <button class="mas-item" data-perm="gestionar_inventario" onclick="irDesdeMas('inventario')"><i class="ti ti-packages"></i>Inventario</button>
-    <button class="mas-item" onclick="irDesdeMas('archivo')"><i class="ti ti-archive"></i>Archivo</button>
-    <button class="mas-item" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><i class="ti ti-download"></i>Exportar CSV</button>
-    <button class="mas-item" id="masTema" onclick="alternarModoTema()"><i class="ti ti-moon"></i>Modo noche</button>
-    <button class="mas-item" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
-    <button class="mas-item" data-perm="configurar_sistema" onclick="irDesdeMas('configuracion')"><i class="ti ti-settings"></i>Configuración</button>
-    <button class="mas-item" onclick="cerrarMas();abrirPerfil()"><i class="ti ti-user-circle"></i>Mi perfil</button>
-    <button class="mas-item" style="color:var(--rojo-tinta)" onclick="cerrarMas();cerrarSesion()"><i class="ti ti-logout" style="color:var(--rojo-tinta)"></i>Cerrar sesión</button>
+    <div class="todo-rapidos">
+      <button class="todo-r" onclick="cerrarMas();iaAbrir()"><svg class="ic"><use href="#ci-coralyne"/></svg>Coralyne</button>
+      <button class="todo-r" onclick="cerrarMas();abrirPerfil()"><svg class="ic"><use href="#ci-perfil"/></svg>Perfil</button>
+      <button class="todo-r" id="masTema" onclick="alternarModoTema()"><i class="ti ti-moon"></i>Modo noche</button>
+      <button class="todo-r" data-perm="ver_registros" onclick="cerrarMas();abrirExp()"><svg class="ic"><use href="#ci-descargar"/></svg>Exportar</button>
+    </div>
+    <div class="todo-grid">
+      <button class="todo-it" data-perm="ver_dashboard" onclick="irDesdeMas('dashboard')"><svg class="ic"><use href="#ci-dashboard"/></svg><b>Dashboard</b><small>Tu día de un vistazo</small></button>
+      <button class="todo-it" onclick="irDesdeMas('pedidos')"><svg class="ic"><use href="#ci-pedidos"/></svg><b>Pedidos</b><small>Crear, cobrar y entregar</small></button>
+      <button class="todo-it" onclick="irDesdeMas('clientes')"><svg class="ic"><use href="#ci-clientes"/></svg><b>Clientes</b><small>Datos e historial</small></button>
+      <button class="todo-it" data-perm="ver_produccion" onclick="irDesdeMas('produccion')"><svg class="ic"><use href="#ci-produccion"/></svg><b>Producción</b><small>El tablero del taller</small></button>
+      <button class="todo-it" data-perm="gestionar_productos" onclick="irDesdeMas('productos')"><svg class="ic"><use href="#ci-productos"/></svg><b>Productos</b><small>Catálogo y precios</small></button>
+      <button class="todo-it" data-perm="ver_registros" onclick="irDesdeMas('registros')"><svg class="ic"><use href="#ci-registros"/></svg><b>Registros</b><small>Ventas y utilidades</small></button>
+      <button class="todo-it" data-perm="ver_costos" onclick="irDesdeMas('costos')"><svg class="ic"><use href="#ci-costos"/></svg><b>Costos</b><small>Listas de costos</small></button>
+      <button class="todo-it" data-perm="gestionar_inventario" onclick="irDesdeMas('inventario')"><svg class="ic"><use href="#ci-inventario"/></svg><b>Inventario</b><small>Existencias</small></button>
+      <button class="todo-it" onclick="irDesdeMas('bitacora')"><svg class="ic"><use href="#ci-bitacora"/></svg><b>Bitácora</b><small>Notas y pendientes</small></button>
+      <button class="todo-it" data-perm="configurar_sistema" onclick="irDesdeMas('configuracion')"><svg class="ic"><use href="#ci-ajustes"/></svg><b>Ajustes</b><small>Tu negocio</small></button>
+      <button class="todo-it" onclick="irDesdeMas('archivo')"><i class="ti ti-archive"></i><b>Archivo</b><small>Lo archivado</small></button>
+      <button class="todo-it" onclick="irDesdeMas('ayuda')"><i class="ti ti-help-circle"></i><b>Ayuda</b><small>Manual y soporte</small></button>
+    </div>
+    <button class="todo-salir" onclick="cerrarMas();cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
   </div>
 </div>
 </div>
@@ -2163,13 +2444,13 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 <div class="ia-ov" id="ovIA" onclick="if(event.target===this)iaCerrar()">
   <div class="ia-panel">
     <div class="ia-head">
-      <div class="ia-head-t"><i class="ti ti-sparkles"></i>Asistente</div>
+      <div class="ia-head-t"><svg class="ic"><use href="#ci-coralyne"/></svg>IA Coralyne</div>
       <button class="mclose" title="Empezar de nuevo" onclick="iaLimpiar()"><i class="ti ti-refresh"></i></button>
-      <button class="mclose" onclick="iaCerrar()"><i class="ti ti-x"></i></button>
+      <button class="mclose ia-cerrar" onclick="iaCerrar()" title="Cerrar"><i class="ti ti-x"></i></button>
     </div>
     <div class="ia-chat" id="ia-chat"></div>
     <div class="ia-input">
-      <textarea id="ia-pregunta" rows="1" placeholder="Pregunta algo sobre tu negocio…" onkeydown="iaTeclaChat(event)" oninput="autoTA(this)"></textarea>
+      <textarea id="ia-pregunta" rows="1" placeholder="¿Qué hacemos hoy?" onkeydown="iaTeclaChat(event)" oninput="autoTA(this)"></textarea>
       <button class="ia-enviar" onclick="iaPreguntar()" title="Preguntar"><i class="ti ti-arrow-up"></i></button>
     </div>
   </div>
@@ -2633,12 +2914,14 @@ function alternarModoTema(){
 function pintarBotonTema(){
   const b=document.getElementById('btnTema');
   if(b){
-    b.innerHTML=`<i class="ti ti-${esNoche()?'sun':'moon'}"></i>`;
+    b.innerHTML=esNoche()?'<i class="ti ti-sun" style="font-size:21px"></i>':'<svg class="ic"><use href="#ci-luna"/></svg>';
     b.title=esNoche()?'Cambiar a modo día':'Cambiar a modo noche';
   }
   // C5 · en móvil la barra superior se oculta, así que el cambio vive en el menú "Más"
   const m=document.getElementById('masTema');
   if(m)m.innerHTML=`<i class="ti ti-${esNoche()?'sun':'moon'}"></i>${esNoche()?'Modo día':'Modo noche'}`;
+  const pf=document.getElementById('pfTema');
+  if(pf)pf.innerHTML=`<i class="ti ti-${esNoche()?'sun':'moon'}"></i>${esNoche()?'Modo día':'Modo noche'}`;
 }
 // Cambio en vivo desde el selector o el campo de texto (se ve al instante, se guarda al Guardar)
 function cfgColorCambio(cual,val,desdeTexto){
@@ -2724,7 +3007,8 @@ function aplicarTemaColor(){
     t['v2']='rgba(255,255,255,.66)'; t['v2-borde']='rgba(255,255,255,.75)'; t['v2-opaco']=t['white'];
     const f1=mezcla(A,OSC,.12),f2=mezcla(A,OSC,.30),f3=mezcla(A,OSC,.50);
     t['vf']=`linear-gradient(140deg,${f1},${f2} 55%,${f3})`; t['vf-tinta']=tintaMejor(f1,OSC,'#FFFFFF'); t['vf-borde']=alfa(BRUMA,.45);
-    t['campo']='rgba(255,255,255,.62)'; t['pista']='rgba(255,255,255,.66)';
+    t['campo']='rgba(255,255,255,.62)'; t['pista']='rgba(255,255,255,.66)'; t['campo-solido']='#FFFFFF';
+    t['ban-a']=mezcla(A,OSC,.18); t['ban-b']=mezcla(A,CIAN,.6);
     t['barra']=`linear-gradient(90deg,${A},${mezcla(A,P,.55)})`;
     t['sel']=P; t['sel-tinta']=tintaP; t['contador']='#E20613'; t['boton']=P; t['boton-tinta']=tintaP;
     t['sombra']=alfa(OSC,.07); t['sombra-2']=alfa(OSC,.16); t['velo']=alfa(OSC,.46);
@@ -2751,7 +3035,8 @@ function aplicarTemaColor(){
     t['v2']=alfa(mezcla(n0,'#FFFFFF',.06),.72); t['v2-borde']=alfa(BRUMA,.2); t['v2-opaco']=t['white'];
     const f1=mezcla(A,n0,.28),f2=mezcla(A,n0,.5),f3=mezcla(A,n0,.68);
     t['vf']=`linear-gradient(140deg,${f1},${f2} 55%,${f3})`; t['vf-tinta']=tintaMejor(f1,OSC,HIELO); t['vf-borde']=alfa(BRUMA,.22);
-    t['campo']='rgba(255,255,255,.065)'; t['pista']='rgba(255,255,255,.10)';
+    t['campo']='rgba(255,255,255,.065)'; t['pista']='rgba(255,255,255,.10)'; t['campo-solido']=mezcla(n0,'#FFFFFF',.12);
+    t['ban-a']=mezcla(A,'#000000',.42); t['ban-b']=mezcla(A,'#000000',.12);
     t['barra']=`linear-gradient(90deg,${mezcla(A,CIAN,.5)},${A})`;
     t['sel']=mezcla(A,n0,.22); t['sel-tinta']=tintaMejor(t['sel'],OSC,HIELO); t['contador']='#FF5F6B'; t['boton']=mezcla(A,n0,.12); t['boton-tinta']=tintaMejor(t['boton'],OSC,HIELO);
     t['sombra']='rgba(0,0,0,.22)'; t['sombra-2']='rgba(0,0,0,.38)'; t['velo']='rgba(0,0,0,.58)';
@@ -2760,6 +3045,14 @@ function aplicarTemaColor(){
     t['purple']='#B48BEA'; t['purple-lt']='rgba(150,110,220,.24)';
     t['amber-lt']='rgba(245,166,35,.22)'; t['red-lt']='rgba(229,72,77,.24)'; t['green-lt']='rgba(43,173,114,.22)'; t['orange-lt']='rgba(240,113,64,.22)';
   }
+  // --- dock, burbuja central y banner (Entregas 2–3) ---
+  const fdk=noche?apagar(mezcla(P,'#000000',.5),.35):P;
+  t['dock']=noche?`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,fdk,.6),.75)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(fdk,'#FFFFFF',.05),.94)},${alfa(fdk,.98)})`
+                 :`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,P,.35),.9)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(P,A,.22),.95)},${alfa(P,.98)})`;
+  t['dock-tinta']=tintaMejor(fdk,OSC,mezcla(CIAN,HIELO,.15)); t['dock-luz']=tintaMejor(fdk,OSC,HIELO); t['dock-borde']=alfa(BRUMA,.22);
+  const burb=mezcla(CIAN,A,.35);
+  t['burbuja']=`radial-gradient(120% 120% at 30% 12%,${mezcla(CIAN,'#FFFFFF',.35)},${burb} 70%)`; t['burbuja-tinta']=tintaMejor(burb,OSC,'#FFFFFF');
+  t['ban-tinta']=tintaMejor(t['ban-a'],OSC,'#FFFFFF'); t['ban-logo']=tintaMejor(t['ban-b'],OSC,'#FFFFFF');
   t['atmosfera']=atm.join(','); t['body-bg']=t['atmosfera'];
   t['sh']=`0 14px 34px ${t['sombra']}`; t['sh-lg']=`0 18px 44px ${t['sombra-2']}`;
   const s=raiz.style; Object.entries(t).forEach(([k,v])=>s.setProperty('--'+k,v));
@@ -2807,6 +3100,9 @@ function aplicarPerfilNegocio(){
   const img=document.getElementById('sbLogoImg'), cl=document.getElementById('sbLogoCL');
   if(CFG.logo_ruta){ img.src=CFG.logo_ruta; img.style.display='block'; cl.style.display='none'; }
   else sbLogoFallo();
+  // logo del negocio junto al título (si lo hay)
+  const tl=document.getElementById('tbLogo');
+  if(tl){ if(CFG.logo_ruta){ tl.src=CFG.logo_ruta; tl.hidden=false; } else tl.hidden=true; }
   const elN=document.getElementById('sbBizName');
   if(CFG.nombre_negocio){elN.textContent=CFG.nombre_negocio;elN.style.display='block'}
   else{elN.style.display='none'}
@@ -3941,12 +4237,13 @@ function showView(v){
   if(VIEW_PERM[v]&&!puede(VIEW_PERM[v])){ toast('No tienes permiso para ver esa sección',false); v='pedidos'; }
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.mob-btn').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.mob-btn,.dk').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
   document.getElementById('view-'+v).classList.add('active');
   const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',costos:'Centro de Costos',produccion:'Producción',inventario:'Inventario',bitacora:'Bitácora',ayuda:'Ayuda y About',archivo:'Archivo'};
-  document.getElementById('tb-title').textContent=titles[v]||'';
+  document.getElementById('tb-title').textContent=v==='dashboard'?dashSaludo():(titles[v]||'');
+  document.getElementById('tb-sub').textContent='';
+  document.body.dataset.vista=v; window.scrollTo(0,0);
   document.querySelector(`.nav-item[data-view="${v}"]`)?.classList.add('active');
-  document.querySelectorAll('.mob-btn')[{pedidos:0,clientes:2,registros:3,dashboard:4,produccion:4,productos:4,costos:4,inventario:4,ayuda:4,configuracion:4,archivo:4}[v]??0]?.classList.add('active');
   if(v==='clientes')cargarClientes();
   if(v==='registros'){renderRegistros();showReg('ingresos');}
   if(v==='configuracion')pintarConfiguracion();
@@ -3957,6 +4254,7 @@ function showView(v){
   if(v==='inventario')cargarInventario();
   if(v==='bitacora')cargarBitacora();
   if(v==='archivo')cargarArchivo();
+  iaUbicar();
 }
 
 /* ══ BITÁCORA (segundo cerebro) · Fase 1 MVP: capturar + tableros + lista ══ */
@@ -4205,7 +4503,7 @@ async function bitCargarRelacionadas(tipo,id,contId){
 async function cargarStats(){
   const s=await api('GET','/stats');
   const setNB=(id,n,urg)=>{const el=document.getElementById(id);if(!el)return;n=n||0;el.textContent=n;el.style.display=n>0?'':'none';el.classList.toggle('urg',!!urg&&n>0);};
-  setNB('sb-act',s.activos);
+  setNB('sb-act',s.activos); setNB('dk-act',s.activos);
   setNB('sb-urg',s.urgentes,true);
   setNB('sb-cot',s.cotizaciones);
   document.getElementById('stats').innerHTML=`
@@ -4302,7 +4600,16 @@ async function iaProbar(){
    en qué se estaba trabajando (asistencia discreta, no un chatbot que secuestra la app). */
 let IA_HIST=[], iaPensando=false, iaEspera='';
 function iaPanel(){ return document.getElementById('ovIA'); }
+// CORAL LINE · en el Dashboard con ventana ancha Coralyne vive fija a la derecha (el MISMO panel, reubicado)
+function iaUbicar(){
+  const panel=document.querySelector('.ia-panel'), slot=document.getElementById('dash-ia-slot'), ov=iaPanel();
+  if(!panel||!slot||!ov)return;
+  const fija=document.getElementById('view-dashboard').classList.contains('active')&&innerWidth>=1760;
+  if(fija&&panel.parentElement!==slot){ ov.classList.remove('open'); slot.appendChild(panel); panel.classList.add('ia-fija'); renderIaChat(); }
+  else if(!fija&&panel.parentElement!==ov){ ov.appendChild(panel); panel.classList.remove('ia-fija'); }
+}
 function iaAbrir(){
+  if(document.querySelector('.ia-panel.ia-fija')){ renderIaChat(); const i=document.getElementById('ia-pregunta'); if(i)i.focus(); return; }
   iaPanel().classList.add('open');
   renderIaChat();
   setTimeout(()=>{const i=document.getElementById('ia-pregunta');if(i)i.focus()},120);
@@ -4314,10 +4621,11 @@ function renderIaChat(){
   const c=document.getElementById('ia-chat'); if(!c)return;
   const esc=s=>String(s||'').replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x]));
   if(!IA_HIST.length&&!iaPensando){
+    const nom=(ME&&(ME.nombre||ME.usuario)||'').split(' ')[0];
     c.innerHTML=`<div class="ia-vacio">
-      <i class="ti ti-sparkles"></i>
-      <p>Pregúntame sobre tus pedidos, clientes, productos o lo que tengas en la Bitácora.<br><b>Solo respondo con datos reales de tu sistema.</b></p>
+      <div class="ia-msg asistente"><div class="ia-burbuja">¡Hola${nom?', '+esc(nom):''}! ¿Qué hacemos hoy?<br><span class="ia-nota">Respondo solo con datos reales de tu negocio.</span></div></div>
       <div class="ia-sugs">${IA_SUGERENCIAS.map(s=>`<button class="ia-sug" onclick="iaPreguntar('${s.replace(/'/g,"\\'")}')">${esc(s)}</button>`).join('')}</div>
+      <svg class="ic ia-estrella" aria-hidden="true"><use href="#ci-estrella"/></svg>
     </div>`;
     return;
   }
@@ -4708,14 +5016,7 @@ function buildEncSummary(encs){
 }
 
 /* ══ DASHBOARD (Fase 6) ══ */
-let DASH_PER='hoy';
-function dashSetPeriodo(p){ DASH_PER=p; cargarDashboard(); }
-function dashSaludo(){
-  const h=new Date().getHours();
-  const s=h<12?'¡Buenos días':h<19?'¡Buenas tardes':'¡Buenas noches';
-  const n=(ME&&(ME.nombre||ME.usuario))||'';
-  return `${s}${n?', '+n.split(' ')[0]:''}!`;
-}
+let DASH_PER='anio';
 function dashEstadoPed(p){
   if(p.cancelado)return['Cancelado','#bbb'];
   if(p.cerrado)return['Cerrado','#118AA0'];
@@ -4747,45 +5048,212 @@ function dashActIcon(t){
   if(t.includes('creado'))return'ti-plus';
   return'ti-point';
 }
+/* ══ DASHBOARD · CORAL LINE ══════════════════════════════════════════════════════════
+   La rejilla del diseño del usuario: indicadores · banner · reporte · recientes · margen ·
+   recordatorios · bitácora · etapas · calendario y reloj · actividad · Coralyne fija. */
+let DB_DATA=null, DB_CAL=null, DB_RELOJ=null;
+const DB_MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DB_PER_LBL={hoy:'Hoy',semana:'7 días',mes:'Mes',anio:'Año'};
+function dashSaludo(){
+  const h=new Date().getHours();
+  const s=h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
+  const n=((ME&&(ME.nombre||ME.usuario))||'').split(' ')[0];
+  return `${s}${n?', '+n:''}`;
+}
+function dbResumen(d){
+  const k=d.kpis, a=k.activos||0;
+  let s=`Hoy tienes ${a} pedido${a===1?'':'s'} activo${a===1?'':'s'}`;
+  s+=k.entregasHoy?`, ${k.entregasHoy} entrega${k.entregasHoy===1?'':'s'} para hoy`:' y ninguna entrega para hoy';
+  if(k.urgentes)s+=` · ${k.urgentes} urgente${k.urgentes===1?'':'s'}`;
+  return s+'.';
+}
+function dashSetPeriodo(p){ DASH_PER=p; dbMenu(false); cargarDashboard(); }
+function dbMenu(abrir){ const m=document.getElementById('db-menu'); if(!m)return; m.hidden=abrir===undefined?!m.hidden:!abrir; }
+document.addEventListener('click',()=>dbMenu(false));
 async function cargarDashboard(){
-  document.getElementById('dash-hi').textContent=dashSaludo();
-  document.querySelectorAll('.dash-periodo .pill').forEach(b=>b.classList.toggle('active',b.dataset.per===DASH_PER));
   let d;
   try{ d=await api('GET',`/dashboard?periodo=${DASH_PER}`); }
-  catch(e){ toast('Error cargando dashboard: '+e.message,false); return; }
-  const k=d.kpis;
-  document.getElementById('dash-kpis').innerHTML=`
-    <div class="dash-kpi k-nav" onclick="showView('pedidos')"><div class="ico" style="background:rgba(255,255,255,.14);color:var(--vf-tinta)"><i class="ti ti-clipboard-list"></i></div><div class="num">${k.activos}</div><div class="lbl">Pedidos activos</div></div>
-    <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--red-lt);color:var(--rojo-tinta)"><i class="ti ti-bolt"></i></div><div class="num">${k.urgentes}</div><div class="lbl">Urgentes</div>${k.urgentes?'<div class="sub" style="color:var(--rojo-tinta)">requieren atención</div>':''}</div>
-    <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--green-lt);color:var(--verde-tinta)"><i class="ti ti-truck-delivery"></i></div><div class="num">${k.entregasHoy}</div><div class="lbl">Entregas para hoy</div></div>
-    <div class="dash-kpi" onclick="showView('pedidos')"><div class="ico" style="background:var(--purple-lt);color:var(--violeta-tinta)"><i class="ti ti-file-invoice"></i></div><div class="num">${k.cotizaciones}</div><div class="lbl">Cotizaciones</div>${k.cotValor?`<div class="sub">Valor: ${fCOP(k.cotValor)}</div>`:''}</div>
-    ${(()=>{const fin=ENC_ESTS[ENC_ESTS.length-1]||'Listo';const enProceso=Object.entries(d.produccion||{}).reduce((a,[s,n])=>s===fin?a:a+n,0);const listos=d.produccion?d.produccion[fin]||0:0;
-      return `<div class="dash-kpi" onclick="showView('produccion')" ${puede('ver_produccion')?'':'style="display:none"'}><div class="ico" style="background:var(--teal-lt);color:var(--teal-dk)"><i class="ti ti-tools"></i></div><div class="num">${enProceso}</div><div class="lbl">Ítems en proceso</div><div class="sub">${listos} en ${pesc(fin.toLowerCase())}</div></div>`;})()}`;
-  const f=d.finanzas;
-  const perLbl={hoy:'Hoy',semana:'Últimos 7 días',mes:'Este mes'}[d.periodo]||'';
+  catch(e){ toast('Error cargando el Dashboard: '+e.message,false); return; }
+  DB_DATA=d;
+  if(document.getElementById('view-dashboard').classList.contains('active')){
+    document.getElementById('tb-title').textContent=dashSaludo();
+    document.getElementById('tb-sub').textContent=dbResumen(d);
+  }
   const verFin=puede('ver_utilidad')||ES_ADMIN;
-  document.getElementById('dash-fin').style.display=verFin?'flex':'none';
-  if(verFin)document.getElementById('dash-fin').innerHTML=`
-    <div class="tit"><i class="ti ti-chart-line" style="color:var(--teal-dk)"></i>Resumen financiero · ${perLbl}</div>
-    <div class="fm"><div class="fico" style="background:var(--green-lt);color:var(--verde-tinta)"><i class="ti ti-arrow-down-left"></i></div><div><div class="fv">${fCOP(f.ingresos)}</div><div class="fl">Ingresos</div></div></div>
-    <div class="fm"><div class="fico" style="background:var(--red-lt);color:var(--rojo-tinta)"><i class="ti ti-arrow-up-right"></i></div><div><div class="fv">${fCOP(f.costos)}</div><div class="fl">Costos</div></div></div>
-    <div class="fm"><div class="fico" style="background:var(--teal-lt);color:var(--teal-dk)"><i class="ti ti-wallet"></i></div><div><div class="fv" style="color:${f.utilidad>=0?'var(--verde-tinta)':'var(--rojo-tinta)'}">${fCOP(f.utilidad)}</div><div class="fl">Utilidad</div></div></div>
-    <div class="marg">${dashDonut(f.margen)}<div><div class="fv" style="color:${f.margen>=0?'var(--teal-dk)':'var(--rojo-tinta)'}">${f.margen}%</div><div class="fl">Margen</div></div></div>`;
-  // Gráficos (SVG/CSS puros)
-  document.getElementById('dash-charts').style.display=verFin?'grid':'none';
-  if(verFin){ dashChartIngresos(d.serie7||[],d.hoy); dashChartProduccion(d.produccion||{}); }
-  document.getElementById('dash-recientes').innerHTML=(d.recientes||[]).map(p=>{
-    const[eg,col]=dashEstadoPed(p);
-    const pagP=p.valor_total>0&&p.pagado>=p.valor_total?'<span class="badge b-ok">Pagado</span>':(p.pagado>0?'<span class="badge b-par">Abono</span>':'<span class="badge b-no">Sin pago</span>');
-    return`<div class="dash-row" onclick="abrirEditar('${p.id}')"><span class="rref">#${p.ref}</span><span class="rnom">${pesc(p.nombre)}</span>${pagP}<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--slate)"><span class="pt-dot" style="background:${col};margin:0"></span>${pesc(eg)}</span><span class="rval">${p.valor_total?fCOP(p.valor_total):'—'}</span></div>`;
-  }).join('')||'<div class="dash-empty">Aún no hay pedidos</div>';
-  document.getElementById('dash-entregas').innerHTML=(d.entregas||[]).map(p=>{
-    const[lbl,col]=dashEntregaLbl(p.fecha_entrega,d.hoy);
-    return`<div class="dash-row" onclick="abrirEditar('${p.id}')"><span class="rref">#${p.ref}</span><span class="rnom">${p.urgente?'<i class="ti ti-bolt" style="color:var(--rojo-tinta)"></i> ':''}${pesc(p.nombre)}</span><span style="font-size:11px;font-weight:600;color:${col};white-space:nowrap"><i class="ti ti-calendar" style="font-size:11px"></i> ${lbl}</span></div>`;
-  }).join('')||'<div class="dash-empty">Sin entregas en los próximos 7 días</div>';
-  document.getElementById('dash-actividad').innerHTML=(d.actividad||[]).map(a=>`
-    <div class="dash-act"><div class="aico"><i class="ti ${dashActIcon(a.texto)}"></i></div><div class="atxt"><b>#${a.ref}</b> · ${pesc(a.texto)}<div class="asub">${pesc(a.usuario_nombre||'')}${a.usuario_nombre?' · ':''}${pesc((a.creado||'').slice(0,16))}</div></div></div>`).join('')||'<div class="dash-empty">Sin actividad todavía</div>';
+  document.getElementById('db').classList.toggle('db-sinfin',!verFin);
+  document.getElementById('db-per-lbl').textContent=DB_PER_LBL[DASH_PER]||'';
+  document.querySelectorAll('#db-menu button').forEach(b=>b.classList.toggle('act',b.dataset.per===DASH_PER));
+  dbKpis(d); dbBanner(); dbRecientes(d); dbRecordatorios(d); dbEtapas(d); dbActividad(d); dbCalendario(); dbReloj();
+  if(verFin){ dbMargen(d); requestAnimationFrame(()=>dbGrafica(d)); }
+  dbBitacora();
+  iaUbicar();
 }
+function dbKpis(d){
+  const k=d.kpis, fin=ENC_ESTS[ENC_ESTS.length-1];
+  const enProceso=Object.entries(d.produccion||{}).reduce((a,[s,n])=>s===fin?a:a+n,0);
+  const K=[{n:k.activos,ic:'kpi-activos',l:'Pedidos<br>activos',go:"filtroRapido('todos')",f:1},
+    {n:k.urgentes,ic:'kpi-urgentes',l:'Pedidos<br>urgentes',go:"filtroRapido('urgente')"},
+    {n:k.entregasHoy,ic:'kpi-entregas',l:'Entregas<br>hoy',go:"showView('pedidos')"},
+    {n:k.cotizaciones,ic:'kpi-cotizacion',l:'Cotización<br>activa',go:"filtroRapido('cotizacion')"},
+    {n:enProceso,ic:'kpi-items',l:'Ítems en<br>proceso',go:"showView('produccion')",perm:'ver_produccion'}];
+  document.getElementById('db-kpis').innerHTML=K.filter(x=>!x.perm||puede(x.perm)).map(x=>`
+    <button class="db-kpi${x.f?' fuerte':''}" onclick="${x.go}"><span class="db-kpi-n">${x.n||0}</span>
+      <span class="db-kpi-d"><svg class="ic"><use href="#ci-${x.ic}"/></svg><span class="db-kpi-l">${x.l}</span></span></button>`).join('');
+}
+function dbBanner(){
+  const el=document.getElementById('db-banner'); if(!el)return;
+  const img=CFG.banner_ruta||'';
+  el.classList.toggle('con-imagen',!!img);
+  el.style.setProperty('--banner-img',img?`url("${img}")`:'none');
+  el.innerHTML=`<svg class="db-ban-arcos" aria-hidden="true"><use href="#cl-isotipo" width="100%" height="100%"/></svg>
+    <div class="db-ban-txt">${pesc(CFG.banner_texto||'Gestión y sistema interno empresarial')}</div>
+    <svg class="db-ban-logo" viewBox="0 0 136 33" role="img" aria-label="Coral Line"><use href="#cl-imagotipo" width="136" height="33"/></svg>`;
+}
+function dbAnillo(p,tam){
+  tam=tam||60; const c=tam/2, r=c-6, L=2*Math.PI*r, a=(p/100)*2*Math.PI-Math.PI/2;
+  return `<svg class="db-anillo" width="${tam}" height="${tam}" viewBox="0 0 ${tam} ${tam}" role="img" aria-label="Avance ${p}%">
+    <circle class="an-p" cx="${c}" cy="${c}" r="${r}"/>
+    <circle class="an-v" cx="${c}" cy="${c}" r="${r}" stroke-dasharray="${(L*p/100).toFixed(1)} ${L.toFixed(1)}" transform="rotate(-90 ${c} ${c})"/>
+    <circle class="an-ini" cx="${c}" cy="6" r="3"/>${p>0?`<circle class="an-fin" cx="${(c+r*Math.cos(a)).toFixed(1)}" cy="${(c+r*Math.sin(a)).toFixed(1)}" r="3.6"/>`:''}
+    <text class="an-t" x="${c}" y="${c+1}">${p}%</text></svg>`;
+}
+function dbRecientes(d){
+  const el=document.getElementById('db-rec'); if(!el)return;
+  const lista=(d.recientes||[]).slice(0,3);
+  el.innerHTML=lista.map(p=>{
+    const prog=calcProg(p.encargos||[]);
+    const ids=[...new Set((p.encargos||[]).flatMap(e=>[...(e.items||[]).flatMap(itemCats),...(e.categorias||[])]))];
+    const cats=ids.map(id=>CATS.find(c=>c.id===id)).filter(Boolean).slice(0,3);
+    const pago=p.valor_total>0&&p.pagado>=p.valor_total?'Pagado':(p.pagado>0?`Abono ${fCOP(p.pagado)}`:'Sin abono');
+    return `<button class="db-ped" onclick="abrirEditar('${p.id}')" title="${pesc(p.nombre)}">
+      <span class="db-ped-i"><span class="db-ped-c"><span class="ref">#${p.ref}</span><span class="nom">${pesc(p.nombre)}</span></span>
+      <span class="db-ped-v"><b>${p.valor_total?fCOP(p.valor_total):'—'}</b> · ${pago}</span>
+      <span class="db-chips">${cats.map(c=>`<span class="ttag ${c.tc}">${pesc(c.label)}</span>`).join('')}</span></span>${dbAnillo(prog,50)}</button>`;
+  }).join('')||'<div class="db-vacio">Aún no hay pedidos.</div>';
+}
+function dbMargen(d){
+  const el=document.getElementById('db-margen'); if(!el)return;
+  const f=d.finanzas, p=Math.max(0,Math.min(100,f.margen||0)), r=50, L=2*Math.PI*r;
+  el.innerHTML=`<svg class="db-mg-anillo" viewBox="0 0 120 120" role="img" aria-label="Margen ${f.margen}%">
+      <defs><linearGradient id="dbGCal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FDA968"/><stop offset=".5" stop-color="#FD518B"/><stop offset="1" stop-color="#5F309B"/></linearGradient>
+      <mask id="dbMTic"><circle cx="60" cy="60" r="${r}" fill="none" stroke="#fff" stroke-width="8" stroke-dasharray="1.8 3.4"/></mask></defs>
+      <g mask="url(#dbMTic)"><circle cx="60" cy="60" r="${r}" fill="none" class="mg-pista" stroke-width="8"/>
+      <circle cx="60" cy="60" r="${r}" fill="none" stroke="url(#dbGCal)" stroke-width="8" stroke-dasharray="${(L*p/100).toFixed(1)} ${L.toFixed(1)}" transform="rotate(-90 60 60)"/></g>
+      <text class="db-mg-n" x="55" y="62">${f.margen||0}</text><text class="db-mg-s" x="${(f.margen||0)>=10?83:74}" y="46">%</text></svg>
+    <div class="db-mg-filas">
+      <div><div class="v">${fCOP(f.ingresos)}</div><div class="l">Ingresos</div></div>
+      <div><div class="v">${fCOP(f.costos)}</div><div class="l">Costos</div></div>
+      <div><div class="v">${fCOP(f.utilidad)}</div><div class="l">Utilidad</div></div>
+    </div>`;
+}
+function dbRecordatorios(d){
+  const el=document.getElementById('db-recor'); if(!el)return;
+  const ev=(typeof EV_PEND!=='undefined'&&EV_PEND)||[];
+  const items=ev.slice(0,2).map(e=>{ const m=EV_META[e.tipo]||EV_META.otro;
+    return `<button class="db-rc-it" onclick="irAEvento('${e.fecha}')"><span class="t">${pesc(e.titulo)}<span>${e.hora||''} ${fd(e.fecha)}</span></span>
+      <span class="s">${pesc(m.l)}${e.pedido_ref?' · #'+e.pedido_ref:''}${e.notas?' · '+pesc(String(e.notas).slice(0,70)):''}</span></button>`; }).join('');
+  const prox=(d.entregas||[])[0];
+  el.innerHTML=`<div class="db-rc-ic"><svg class="ic"><use href="#ci-campana-tarjeta"/></svg><b class="${ev.length?'':'cero'}">${ev.length}</b></div>
+    <div class="db-rc-l">${items||`<div class="db-rc-it"><span class="t">Nada pendiente</span>
+      <span class="s">${prox?`Próxima entrega: #${prox.ref} · ${pesc(prox.nombre)} · ${fd(prox.fecha_entrega)}`:'Sin recordatorios ni entregas cercanas.'}</span></div>`}</div>`;
+}
+async function dbBitacora(){
+  const el=document.getElementById('db-bit'); if(!el)return;
+  let n=null; try{ n=(await api('GET','/bitacora/notas'))[0]||null; }catch(e){}
+  const paleta=['var(--cl-profundo)','var(--cl-oceano)','var(--cl-cian)','var(--cl-bruma)','var(--cl-hielo)'].map(c=>`<i style="background:${c}"></i>`).join('');
+  if(!n){ el.innerHTML=`<svg class="db-bit-logo" viewBox="0 0 136 33" role="img" aria-label="Coral Line"><use href="#cl-imagotipo" width="136" height="33"/></svg>
+      <div class="db-bit-pal">${paleta}</div><p class="db-bit-x">Tu bitácora está vacía. Captura tu primera nota: una idea, un pendiente, un dato.</p>`; return; }
+  const img=(n.adjuntos||[]).find(a=>/^image\//.test(a.tipo||''));
+  const txt=String(n.contenido||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+  el.innerHTML=`<div class="db-bit-tit">${pesc(n.titulo||'Nota')}</div>
+    ${img?`<img class="db-bit-img" src="${img.ruta}" alt="" onerror="this.remove()">`:`<div class="db-bit-pal">${paleta}</div>`}
+    <p class="db-bit-x">${pesc(txt.slice(0,150))}${txt.length>150?'…':''}</p>`;
+}
+function dbEtapas(d){
+  const el=document.getElementById('db-etapas'); if(!el)return;
+  const tot=ENC_ESTS.reduce((a,e)=>a+((d.produccion||{})[e]||0),0);
+  el.innerHTML=ENC_ESTS.map(e=>{ const n=(d.produccion||{})[e]||0, p=tot?Math.round(n*100/tot):0;
+    return `<div class="db-et"><div class="db-et-c"><span>${pesc(e)}</span></div><div class="db-et-f"><div class="db-et-p"><i style="width:${p}%"></i></div><span>${p}%</span></div></div>`; }).join('')
+    ;
+}
+function dbActividad(d){
+  const el=document.getElementById('db-act'); if(!el)return;
+  el.innerHTML=(d.actividad||[]).slice(0,3).map(a=>{
+    const partes=String(a.texto||'').split(' · '), t=partes.shift(), resto=partes.join(' · ');
+    const f=String(a.creado||''), hora=f.slice(11,16), dia=f?`${f.slice(8,10)}/${f.slice(5,7)}/${f.slice(2,4)}`:'';
+    return `<div class="db-ac-it"><div class="t"><b>#${a.ref} ${pesc(t)}</b><span>${hora} ${dia}</span></div>
+      <div class="s">${pesc(resto||a.usuario_nombre||'')}</div></div>`; }).join('')||'<div class="db-vacio">Sin actividad todavía.</div>';
+}
+async function dbCalendario(paso){
+  const el=document.getElementById('db-cal'); if(!el)return;
+  const base=(DB_DATA&&DB_DATA.hoy)||hoy();
+  if(!DB_CAL)DB_CAL={y:+base.slice(0,4),m:+base.slice(5,7)};
+  if(paso){ DB_CAL.m+=paso; if(DB_CAL.m<1){DB_CAL.m=12;DB_CAL.y--;} if(DB_CAL.m>12){DB_CAL.m=1;DB_CAL.y++;} }
+  const mes=`${DB_CAL.y}-${String(DB_CAL.m).padStart(2,'0')}`;
+  let dias={}; try{ dias=(await api('GET',`/dashboard/entregas?mes=${mes}`)).dias||{}; }catch(e){}
+  const primero=new Date(DB_CAL.y,DB_CAL.m-1,1).getDay(), total=new Date(DB_CAL.y,DB_CAL.m,0).getDate();
+  const ir=puede('ver_produccion');
+  let celdas='';
+  for(let i=0;i<primero;i++)celdas+='<span></span>';
+  for(let dd=1;dd<=total;dd++){
+    const f=`${mes}-${String(dd).padStart(2,'0')}`, e=dias[f], esHoy=f===base;
+    celdas+=`<button class="db-dia${esHoy?' hoy':''}${e?' con':''}${e&&e.pend&&f<base?' tarde':''}" ${ir?`onclick="irAEvento('${f}')"`:'tabindex="-1"'} title="${e?e.n+' entrega'+(e.n===1?'':'s'):''}">${dd}</button>`;
+  }
+  el.innerHTML=`<div class="db-cal-cab"><button onclick="dbCalendario(-1)" aria-label="Mes anterior"><i class="ti ti-caret-left-filled"></i></button>
+      <span>${DB_MESES[DB_CAL.m-1]} ${DB_CAL.y}</span><button onclick="dbCalendario(1)" aria-label="Mes siguiente"><i class="ti ti-caret-right-filled"></i></button></div>
+    <div class="db-cal-sem">${['D','L','M','M','J','V','S'].map(x=>`<span>${x}</span>`).join('')}</div>
+    <div class="db-cal-dias">${celdas}</div>
+    <div class="db-reloj" id="db-reloj"></div>`;
+  dbReloj();
+}
+function dbReloj(){
+  const el=document.getElementById('db-reloj'); if(!el)return;
+  let tz; try{ tz=CFG.zona_horaria||undefined; new Intl.DateTimeFormat('es-CO',{timeZone:tz}); }catch(e){ tz=undefined; }
+  const p=Object.fromEntries(new Intl.DateTimeFormat('es-CO',{timeZone:tz,hour:'numeric',minute:'2-digit',hour12:true,day:'numeric',month:'short'}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+  const ampm=/p/i.test(p.dayPeriod||'')?'pm':'am', mes=String(p.month||'').replace('.','');
+  el.innerHTML=`<div class="h">${p.hour}:${p.minute}<small>${ampm}</small></div><i></i><div class="f">${p.day}<small>${mes.charAt(0).toUpperCase()+mes.slice(1)}</small></div>`;
+  clearTimeout(DB_RELOJ); DB_RELOJ=setTimeout(dbReloj,20000);
+}
+function dbFmtCorto(v){ const a=Math.abs(v), s=v<0?'-':''; if(a>=1e6)return s+(a/1e6).toFixed(a>=1e7?0:1).replace('.',',')+'M'; if(a>=1e3)return s+Math.round(a/1e3)+'k'; return s+Math.round(a); }
+function dbRedondo(v){ if(v<=0)return 1; const p=Math.pow(10,Math.floor(Math.log10(v))), f=v/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
+function dbSuave(pts){
+  if(!pts.length)return''; let d=`M${pts[0][0]},${pts[0][1]}`;
+  for(let i=0;i<pts.length-1;i++){ const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+    d+=` C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0]},${p2[1]}`; }
+  return d;
+}
+function dbGrafica(d){
+  const el=document.getElementById('db-graf'); if(!el||!d)return;
+  const caja=el.getBoundingClientRect(); if(!caja.width)return;
+  const W=Math.max(260,Math.round(caja.width)), H=Math.max(140,Math.round(caja.height));
+  el.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const S=d.serie||[], n=Math.max(1,S.length), vivos=S.filter(s=>!s.futuro);
+  const vals=vivos.flatMap(s=>[s.ingresos,s.costos,s.utilidad]);
+  const max=dbRedondo(Math.max(1,...vals)), mn=Math.min(0,...vals), min=mn<0?-dbRedondo(-mn):0;
+  const x0=44,x1=W-4,y0=8,y1=H-22,paso=(x1-x0)/n,Y=v=>y1-((v-min)/(max-min))*(y1-y0);
+  let h=`<defs><linearGradient id="dbGBar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--luz)"/><stop offset="1" stop-color="var(--teal)" stop-opacity=".85"/></linearGradient>
+    <linearGradient id="dbGLin" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FDA968"/><stop offset="1" stop-color="#FD518B"/></linearGradient></defs>`;
+  for(let k=0;k<=4;k++){ const v=min+(max-min)*k/4; h+=`<line class="guia" x1="${x0}" x2="${x1}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="eje" x="${x0-8}" y="${(Y(v)+3.5).toFixed(1)}" text-anchor="end">${dbFmtCorto(v)}</text>`; }
+  const MC=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'], DC=['dom','lun','mar','mié','jue','vie','sáb'];
+  const pc=[],pu=[], w=Math.min(28,paso*.5), base=d.hoy, corto=paso<34;
+  S.forEach((s,i)=>{ const cx=x0+paso*i+paso/2;
+    let et; if(DASH_PER==='anio')et=corto?MC[i][0]:MC[i]; else if(DASH_PER==='mes')et=(i%5===0||i===n-1)?String(+s.d.slice(8)):''; else et=s.d===base?'hoy':DC[new Date(s.d+'T00:00:00').getDay()];
+    if(!s.futuro&&s.ingresos>0)h+=`<rect x="${(cx-w/2).toFixed(1)}" y="${Y(s.ingresos).toFixed(1)}" width="${w.toFixed(1)}" height="${(Y(0)-Y(s.ingresos)).toFixed(1)}" rx="${Math.min(6,w/3).toFixed(1)}" fill="url(#dbGBar)"><title>${fCOP(s.ingresos)}</title></rect>`;
+    if(et)h+=`<text class="eje${s.d===base||s.d===base.slice(0,7)?' hoy':''}" x="${cx.toFixed(1)}" y="${y1+16}" text-anchor="middle">${et}</text>`;
+    if(!s.futuro){ pc.push([+cx.toFixed(1),+Y(s.costos).toFixed(1)]); pu.push([+cx.toFixed(1),+Y(s.utilidad).toFixed(1)]); } });
+  if(vals.some(v=>v)){
+    h+=`<path d="${dbSuave(pu)}" fill="none" stroke="var(--violeta)" stroke-width="2" stroke-linecap="round"/>
+        <path d="${dbSuave(pc)}" fill="none" stroke="url(#dbGLin)" stroke-width="2" stroke-linecap="round"/>`;
+    pu.forEach((p,i)=>{ if(n<=12||i%4===0)h+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.6" class="pt-u"/>`; });
+  }else h+=`<text class="eje vacio" x="${(x0+x1)/2}" y="${(y0+y1)/2}" text-anchor="middle">Sin movimientos en este período</text>`;
+  el.innerHTML=h;
+}
+let _dbRz; addEventListener('resize',()=>{ clearTimeout(_dbRz); _dbRz=setTimeout(()=>{ iaUbicar(); if(DB_DATA&&document.getElementById('view-dashboard').classList.contains('active'))dbGrafica(DB_DATA); },140); });
+addEventListener('scroll',()=>{ const t=document.querySelector('.topbar'); if(t)t.classList.toggle('scrolled',scrollY>8); },{passive:true});
+// Barra móvil: deslizar hacia arriba abre la hoja con todos los destinos
+(function(){ let y0=null; const n=document.querySelector('.mob-nav'); if(!n)return;
+  n.addEventListener('touchstart',e=>{ y0=e.touches[0].clientY; },{passive:true});
+  n.addEventListener('touchmove',e=>{ if(y0!==null&&y0-e.touches[0].clientY>36){ y0=null; abrirMas(); } },{passive:true}); })();
 
 /* Ayuda: buscador del manual — filtra pasos y abre las coincidencias */
 function buscarAyuda(q){
@@ -4824,7 +5292,15 @@ function abrirPerfil(){
       <div><label>Actual</label><input class="item-inp" id="pf-pass-act" type="password" autocomplete="current-password"></div>
       <div><label>Nueva (mín. 4)</label><input class="item-inp" id="pf-pass-new" type="password" autocomplete="new-password"></div>
     </div>
-    <button class="btn-pri" onclick="cambiarMiPass()"><i class="ti ti-lock"></i> Actualizar contraseña</button>`;
+    <button class="btn-pri" onclick="cambiarMiPass()"><i class="ti ti-lock"></i> Actualizar contraseña</button>
+    <div class="msec"><span class="tri"></span>Accesos</div>
+    <div class="pf-accesos">
+      <button class="pf-acc" onclick="cerrarPerfil();showView('archivo')"><i class="ti ti-archive"></i>Archivo</button>
+      <button class="pf-acc" onclick="cerrarPerfil();showView('ayuda')"><i class="ti ti-help-circle"></i>Ayuda</button>
+      ${puede('ver_registros')?'<button class="pf-acc" onclick="cerrarPerfil();abrirExp()"><i class="ti ti-download"></i>Exportar</button>':''}
+      <button class="pf-acc" id="pfTema" onclick="alternarModoTema()"><i class="ti ti-${esNoche()?'sun':'moon'}"></i>${esNoche()?'Modo día':'Modo noche'}</button>
+      <button class="pf-acc pf-salir" onclick="cerrarSesion()"><i class="ti ti-logout"></i>Cerrar sesión</button>
+    </div>`;
   document.getElementById('ovPerfil').classList.add('open');
 }
 function cerrarPerfil(){document.getElementById('ovPerfil').classList.remove('open')}
@@ -9056,6 +9532,8 @@ async function init(){
     console.warn('Pedidos:',e.message);
     document.getElementById('lista').innerHTML='<div class="empty"><i class="ti ti-plug-x"></i><p>'+e.message+'</p></div>';
   }
+  // CORAL LINE · se entra al Dashboard (si el rol lo puede ver)
+  if(puede('ver_dashboard'))showView('dashboard');
 }
 if(getToken()){init()}else{showPinScreen()}
 </script>
