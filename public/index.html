@@ -47,7 +47,7 @@
   --pri:linear-gradient(135deg,#23D0D2,#1BB3BD);--pri-tinta:#0A2E3B;--boton:#0A2E3B;--boton-tinta:#E9FFFE;--sel:#0A2E3B;--sel-tinta:#E9FFFE;--contador:#E20613;
   --sombra:rgba(10,46,59,.07);--sombra-2:rgba(10,46,59,.16);--velo:rgba(10,46,59,.46);
   --violeta:#5F309B;--violeta-tinta:#46217A;--violeta-suave:rgba(95,48,155,.13);--violeta-borde:rgba(95,48,155,.28);
-  --ambar-tinta:#764C00;--verde-tinta:#0F5D38;--rojo-tinta:#A41E25;
+  --ambar-tinta:#6A4400;--verde-tinta:#0F5D38;--rojo-tinta:#A41E25;
   /* Forma: tarjeta 24 · interior 12–16 · píldoras 999. Sombras difusas, casi imperceptibles. */
   --r:16px;--r-sm:12px;--r-lg:24px;
   --sh:0 14px 34px rgba(10,46,59,.07);--sh-lg:0 18px 44px rgba(10,46,59,.16);
@@ -2701,7 +2701,7 @@ function aplicarTemaColor(){
 
   let atm;
   if(!noche){
-    const c1=mezcla(HIELO,A,lim(.07*f)),c2=mezcla(HIELO,A,lim(.24*f)),c3=mezcla(HIELO,A,lim(.52*f));
+    const c1=mezcla(HIELO,A,lim(.07*f)),c2=mezcla(HIELO,A,lim(.24*f)),c3=mezcla(HIELO,A,Math.min(.74,.52*f));   // tope: la tinta principal siempre se lee sobre la zona más honda
     atm=[`linear-gradient(120deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 30%)`,
       `linear-gradient(112deg,transparent 40%,rgba(255,255,255,.20) 46%,transparent 55%)`,
       `linear-gradient(112deg,transparent 63%,rgba(255,255,255,.12) 69%,transparent 78%)`,
@@ -2709,11 +2709,14 @@ function aplicarTemaColor(){
       `radial-gradient(78% 88% at 100% 100%,${c3},transparent 70%)`,
       `linear-gradient(155deg,${c1} 0%,${c2} 55%,${mezcla(c2,c3,.55)} 100%)`];
     t['bg']=c2;
-    t['tinta']=OSC; t['tinta-2']=mezcla(OSC,'#FFFFFF',.16); t['tinta-3']=mezcla(OSC,'#FFFFFF',.18);
+    // las tintas secundarias se oscurecen lo justo para leerse (4,6:1) incluso sobre la zona más profunda del fondo,
+    // así se cumple con cualquier intensidad y con cualquier color de negocio
+    const piso=c=>{ let k=c,i=0; while(contraste(k,c3)<4.6&&i++<20)k=mezcla(k,OSC,.15); return k; };
+    t['tinta']=OSC; t['tinta-2']=piso(mezcla(OSC,'#FFFFFF',.16)); t['tinta-3']=piso(mezcla(OSC,'#FFFFFF',.18));
     t['navy']=OSC; t['navy2']=mezcla(OSC,'#FFFFFF',.10); t['slate']=t['tinta-2']; t['muted']=t['tinta-3'];
     t['white']=mezcla(HIELO,'#FFFFFF',.5);                 // superficie OPACA (ventanas, paneles que flotan)
     t['line']=alfa(OSC,.10); t['line-lt']=alfa(OSC,.05);
-    t['teal-dk']=contraste(A,'#FFFFFF')>=3.6?mezcla(A,OSC,.36):mezcla(A,OSC,.55); t['acento-ink']=t['teal-dk'];
+    t['teal-dk']=piso(contraste(A,'#FFFFFF')>=3.6?mezcla(A,OSC,.42):mezcla(A,OSC,.58)); t['acento-ink']=t['teal-dk'];
     t['teal-lt']=mezcla(HIELO,A,.14);
     const mas=Math.max(0,f-1);   // con más intensidad el fondo se hace profundo: la tarjeta gana cuerpo para que el texto se siga leyendo
     t['v1']=`linear-gradient(150deg,rgba(255,255,255,${Math.min(.86,.62+.20*mas).toFixed(2)}),rgba(255,255,255,${Math.min(.72,.40+.38*mas).toFixed(2)}))`;
@@ -2726,7 +2729,7 @@ function aplicarTemaColor(){
     t['sel']=P; t['sel-tinta']=tintaP; t['contador']='#E20613'; t['boton']=P; t['boton-tinta']=tintaP;
     t['sombra']=alfa(OSC,.07); t['sombra-2']=alfa(OSC,.16); t['velo']=alfa(OSC,.46);
     t['violeta']='#5F309B'; t['violeta-tinta']='#46217A'; t['violeta-suave']='rgba(95,48,155,.13)'; t['violeta-borde']='rgba(95,48,155,.28)';
-    t['ambar-tinta']='#764C00'; t['verde-tinta']='#0F5D38'; t['rojo-tinta']='#A41E25';
+    t['ambar-tinta']='#6A4400'; t['verde-tinta']='#0F5D38'; t['rojo-tinta']='#A41E25';
     t['purple']='#5F309B'; t['purple-lt']='rgba(95,48,155,.13)';
     t['amber-lt']='rgba(245,166,35,.24)'; t['red-lt']='rgba(229,72,77,.15)'; t['green-lt']='rgba(43,173,114,.19)'; t['orange-lt']='rgba(240,113,64,.16)';
   }else{
