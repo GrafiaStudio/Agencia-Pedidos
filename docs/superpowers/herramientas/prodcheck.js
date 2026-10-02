@@ -20,6 +20,15 @@ const ok = (n, c, d) => { c ? bien++ : mal++; console.log((c ? '  ok   ' : ' FAL
   const fav = await fetch(BASE + '/favicon.svg');
   ok('favicon', /svg/.test(fav.headers.get('content-type') || ''), fav.headers.get('content-type'));
 
+  // barrido de octubre: compresión, rutas inexistentes, robots, iconos
+  const cr = (ruta, hd = {}) => new Promise((res, rej) => require('https').get(BASE + ruta, { headers: hd }, r => { const b = []; r.on('data', c => b.push(c)); r.on('end', () => res({ st: r.statusCode, h: r.headers, n: Buffer.concat(b).length })); }).on('error', rej));
+  const comp = await cr('/', { 'accept-encoding': 'gzip, br' });
+  ok('la app viaja comprimida', /br|gzip/.test(comp.h['content-encoding'] || '') && comp.n < 260000, (comp.h['content-encoding'] || 'sin comprimir') + ' · ' + Math.round(comp.n / 1024) + ' KB');
+  ok('cabeceras: noindex y HSTS', /noindex/.test(comp.h['x-robots-tag'] || '') && !!comp.h['strict-transport-security'], comp.h['x-robots-tag'] + ' · ' + comp.h['strict-transport-security']);
+  const rob = await cr('/robots.txt'); ok('robots.txt real', rob.st === 200 && /text\/plain/.test(rob.h['content-type']), rob.st + ' ' + rob.h['content-type']);
+  const nx = await cr('/uploads/no-existe.png'); ok('una imagen que falta responde 404 (no la app entera)', nx.st === 404 && nx.n < 200, nx.st + ' ' + nx.n + 'b');
+  const man = await cr('/manifest.webmanifest'), ico = await cr('/apple-touch-icon.png'); ok('manifiesto e icono de la app', man.st === 200 && ico.st === 200 && /png/.test(ico.h['content-type']), man.h['content-type']);
+  const ne = await get('/no-existe'); ok('ruta de API inexistente → 404', ne.st === 404, ne.st);
   const cfg = await get('/configuracion');
   ok('configuración responde con los campos nuevos', cfg.st === 200 && 'piel_intensidad' in cfg.j && 'banner_ruta' in cfg.j && 'banner_texto' in cfg.j,
     `${cfg.j.color_primario} ${cfg.j.color_acento} · intensidad ${cfg.j.piel_intensidad} · banner «${cfg.j.banner_ruta}»`);
@@ -44,7 +53,7 @@ const ok = (n, c, d) => { c ? bien++ : mal++; console.log((c ? '  ok   ' : ' FAL
     await page.goto(BASE, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => typeof ME !== 'undefined' && ME && document.querySelector('.view.active'), null, { timeout: 20000 });
     await page.evaluate(() => document.fonts.ready); await page.waitForTimeout(1500);
-    const s = await page.evaluate(() => ({ vista: document.querySelector('.view.active').id, luz: !!document.querySelector('.con-luz'), kpis: document.querySelectorAll('#db-kpis .db-kpi').length,
+    const s = await page.evaluate(() => ({ hash: location.hash, vista: document.querySelector('.view.active').id, luz: !!document.querySelector('.con-luz'), kpis: document.querySelectorAll('#db-kpis .db-kpi').length,
       fuente: document.fonts.check("12px 'Ostrich Sans'") }));
     ok(`${nom}: abre en el Dashboard, con la luz del dock y sin errores`, s.vista === 'view-dashboard' && s.luz && s.kpis >= 4 && err.length === 0, JSON.stringify(s) + ' ' + err.join(' | '));
     await page.screenshot({ path: path.join(CAP, nom + '.png') });
