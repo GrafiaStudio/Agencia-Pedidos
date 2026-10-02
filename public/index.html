@@ -105,7 +105,7 @@ label{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-bot
 /* STATS minimal */
 .stats{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
 .sc-mini{display:flex;align-items:center;gap:13px;background:var(--v1);border:1.5px solid var(--v1-borde);border-radius:var(--r-lg);padding:20px 24px;position:relative;overflow:hidden;flex:0 0 auto;min-width:220px;box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh)}
-.sc-mini::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--grad)}
+.sc-mini::before{content:none}
 .sc-mini .ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
 .sc-mini.dark{background:var(--vf);border-color:var(--vf-borde)}
 .sc-mini.dark .ico{background:rgba(255,255,255,.14);color:var(--vf-tinta)}
@@ -163,20 +163,21 @@ label{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-bot
 .sc{background:var(--v1);border-radius:var(--r-lg);padding:24px 26px;border:1.5px solid var(--v1-borde);position:relative;overflow:hidden;box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh);transition:box-shadow .15s,transform .15s}
 .sc:hover{box-shadow:var(--sh-lg);transform:translateY(-2px)}
 .sc.dk{background:var(--vf);border-color:var(--vf-borde)}
-.sc.tl{background:var(--teal-lt);border-color:transparent}
-.sc.am{background:var(--amber-lt);border-color:color-mix(in srgb,var(--amber) 45%,transparent)}
-.sc.rd{background:var(--red-lt);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
-.sc.gn{background:var(--green-lt);border-color:color-mix(in srgb,var(--green) 45%,transparent)}
-.sc::after{content:'';position:absolute;right:-8px;bottom:-8px;width:44px;height:44px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%);opacity:.07}
-.sc-l{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.sc.tl{background:radial-gradient(130% 120% at 0% 0%,var(--teal-lt),transparent 66%),var(--v1)}
+.sc.am{background:radial-gradient(130% 120% at 0% 0%,var(--amber-lt),transparent 66%),var(--v1)}
+.sc.rd{background:radial-gradient(130% 120% at 0% 0%,var(--red-lt),transparent 66%),var(--v1)}
+.sc.gn{background:radial-gradient(130% 120% at 0% 0%,var(--green-lt),transparent 66%),var(--v1)}
+.sc::after{content:none}
+.sc-l{font-size:12px;font-weight:500;color:var(--tinta);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
 .sc.dk .sc-l{color:var(--vf-tinta);opacity:.9}
-.sc-n{font-size:38px;font-weight:200;color:var(--navy);line-height:1}
+.sc-n{font-size:clamp(28px,2.25vw,44px);font-weight:200;color:var(--navy);line-height:1.05;letter-spacing:-.01em;margin-top:6px;white-space:nowrap}
+.sc-n.sc-dato{font-size:16px;font-weight:400}
 .sc.dk .sc-n{color:var(--vf-tinta)}
 .sc.tl .sc-n{color:var(--teal-dk)}
 .sc.am .sc-n{color:var(--ambar-tinta)}
 .sc.rd .sc-n{color:var(--rojo-tinta)}
 .sc.gn .sc-n{color:var(--verde-tinta)}
-.sc-s{font-size:11px;color:var(--muted);margin-top:3px}
+.sc-s{font-size:12px;color:var(--tinta-2);margin-top:6px}
 .sc.dk .sc-s{color:var(--vf-tinta);opacity:.85}
 
 /* FILTROS / TOOLBAR */
@@ -1045,7 +1046,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 /* Divisor sección */
 .msec{display:flex;align-items:center;gap:8px;margin:22px 0 12px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
 .msec::before,.msec::after{content:'';flex:1;height:1px;background:var(--line)}
-.msec .tri{display:inline-block;width:7px;height:7px;background:var(--grad);clip-path:polygon(50% 0%,0% 100%,100% 100%)}
+.msec .tri{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--luz);box-shadow:0 0 0 3px var(--foco);flex-shrink:0}
 .msec:first-child{margin-top:0}
 
 /* Checkboxes especiales */
@@ -1442,7 +1443,7 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 .dk.active:not(.dk-centro)::after{content:'';position:absolute;bottom:9px;width:20px;height:2px;border-radius:2px;background:var(--luz)}
 .dk-centro{flex:0 0 112px;height:112px;margin:-30px 10px 0;border-radius:50%;background:var(--burbuja);color:var(--burbuja-tinta);border:1.5px solid var(--dock-borde);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 10px 26px var(--sombra-2);font-weight:600;letter-spacing:.05em}
 .dk-centro:hover,.dk-centro.active{color:var(--burbuja-tinta)}
-.dk-nb{position:absolute;top:12px;left:calc(50% + 12px);font-family:'Ostrich Sans',sans-serif;font-weight:900;font-size:18px;letter-spacing:0;color:var(--luz)}
+.dk-nb{position:absolute;top:9px;left:calc(50% + 11px);min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:grid;place-items:center;font:600 11px/1 'Montserrat',sans-serif;letter-spacing:0;background:var(--luz);color:var(--luz-tinta);box-shadow:0 0 0 2px var(--dock-borde)}
 /* perfil = centro personal */
 .pf-accesos{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .pf-acc{display:flex;align-items:center;gap:8px;padding:11px 13px;border-radius:14px;border:1.5px solid var(--v1-borde);background:var(--campo);color:var(--tinta);font:500 12px 'Montserrat',sans-serif;cursor:pointer}
@@ -1671,6 +1672,46 @@ html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
 .todo-it b{font-size:12.5px;font-weight:600}
 .todo-it small{font-size:11px;color:var(--tinta-2);line-height:1.25}
 .todo-salir{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;padding:12px;border-radius:14px;border:1.5px solid var(--v1-borde);background:none;color:var(--rojo-tinta);font:500 12.5px 'Montserrat',sans-serif;cursor:pointer}
+
+/* ══ CORAL LINE · ciclo 4: vidrio 2 en lo que flota + luz de vidrio del dock ══ */
+.modal,.bell-panel,.gb-panel,.ac-drop,.db-menu,.ia-panel:not(.ia-fija),#ovMas .modal.hoja{background:var(--v2);-webkit-backdrop-filter:blur(24px) saturate(1.35);backdrop-filter:blur(24px) saturate(1.35);border:1px solid var(--v2-borde);box-shadow:inset 0 1px 0 var(--v1-brillo),0 24px 60px var(--sombra-2)}
+#ovP .modal,#ovProd .modal{background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;border:none;box-shadow:none}
+.modal .mhead{background:transparent}
+.mfoot{background:transparent}
+#ovP .mhead,#ovP .mfoot,#ovProd .mhead,#ovProd .mfoot{background:var(--v2);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3)}
+.ia-panel.ia-fija{background:var(--v2);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3);border-color:var(--v2-borde);box-shadow:inset 0 1px 0 var(--v1-brillo),0 18px 44px var(--sombra-2)}
+.ia-panel:not(.ia-fija){border-radius:26px 0 0 26px;border-right:none}
+.overlay{-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+@supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+  .modal,.bell-panel,.gb-panel,.ac-drop,.db-menu,.ia-panel,#ovMas .modal.hoja,#ovP .mhead,#ovP .mfoot,#ovProd .mhead,#ovProd .mfoot{background:var(--v2-opaco)}
+}
+@media (prefers-reduced-transparency:reduce){
+  .modal,.bell-panel,.gb-panel,.ac-drop,.db-menu,.ia-panel,#ovMas .modal.hoja,.dock,.mob-nav{background:var(--v2-opaco)}
+}
+/* dock de vidrio y luz que se desplaza a la pestaña activa */
+.dock{-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4)}
+.dock-in,.mob-inner{position:relative}
+.dk,.mob-btn{position:relative;z-index:1}
+.dk-luz{position:absolute;left:0;bottom:0;z-index:0;width:var(--lw,110px);height:calc(100% + 16px);transform:translateX(var(--lx,0px));border-radius:40px 40px 0 0;
+  background:var(--luz-vidrio);border:1.5px solid var(--dock-borde);border-bottom:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 -6px 26px var(--luz-halo),0 0 34px var(--luz-halo);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);opacity:0;pointer-events:none;
+  transition:transform .55s cubic-bezier(.22,.9,.25,1.1),width .45s ease,opacity .3s ease}
+.con-luz>.dk-luz{opacity:1}
+.dk.active,.dk.active:hover,.mob-btn.active{color:var(--luz-vidrio-tinta)}
+.dk.active{font-weight:600}
+.dk.active:not(.dk-centro)::after{content:none}
+.dk-centro{flex:1;height:100%;margin:0;border-radius:0;background:none;border:none;box-shadow:none;font-weight:500;letter-spacing:.07em;color:var(--dock-tinta)}
+.dk-centro:hover{color:var(--dock-luz)}
+.dk.active .dk-nb{background:var(--luz-tinta);color:var(--luz)}
+@media (prefers-reduced-motion:reduce){.dk-luz{transition:opacity .2s}}
+@media (max-width:768px){
+  .mob-nav{-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4)}
+  .mob-inner .dk-luz{height:calc(100% + 12px);border-radius:28px 28px 0 0;bottom:-6px}
+  .mob-btn.mob-centro{flex:1;height:auto;margin-top:0;border-radius:0;background:none;border:none;box-shadow:none;color:var(--dock-tinta);justify-content:flex-end}
+  .mob-btn.mob-centro.active{color:var(--luz-vidrio-tinta)}
+  .sc-n{font-size:26px}
+}
 </style>
 </head>
 <body>
@@ -2229,6 +2270,7 @@ html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
 <!-- MOBILE NAV -->
 <!-- DOCK · navegación principal (escritorio) -->
 <nav class="dock" aria-label="Navegación principal"><div class="dock-in">
+  <span class="dk-luz" aria-hidden="true"></span>
   <button class="dk" data-view="productos" data-perm="gestionar_productos" onclick="showView('productos')"><svg class="ic"><use href="#ci-productos"/></svg>Productos</button>
   <button class="dk" data-view="pedidos" onclick="showView('pedidos')"><svg class="ic"><use href="#ci-pedidos"/></svg>Pedidos<span class="dk-nb" id="dk-act" style="display:none"></span></button>
   <button class="dk" data-view="clientes" onclick="showView('clientes')"><svg class="ic"><use href="#ci-clientes"/></svg>Clientes</button>
@@ -2243,6 +2285,7 @@ html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
 </div></nav>
 
 <nav class="mob-nav" aria-label="Navegación"><div class="mob-inner">
+  <span class="dk-luz" aria-hidden="true"></span>
   <button class="mob-btn" data-view="pedidos" onclick="showView('pedidos')"><svg class="ic"><use href="#ci-pedidos"/></svg>Pedidos</button>
   <button class="mob-btn" data-perm="crear_pedidos" onclick="abrirNuevo()"><i class="ti ti-plus"></i>Nuevo</button>
   <button class="mob-btn mob-centro" data-view="dashboard" data-perm="ver_dashboard" onclick="showView('dashboard')"><svg class="ic"><use href="#ci-dashboard"/></svg>Inicio</button>
@@ -2895,6 +2938,9 @@ function contraste(a,b){ const x=luminancia(a),y=luminancia(b); return (Math.max
 // De dos tintas posibles, la que mejor se lee sobre ese fondo (la app; el PDF sigue con tintaSobre)
 function tintaMejor(fondo,osc,cla){ return contraste(fondo,osc)>=contraste(fondo,cla)?osc:cla; }
 // Quita saturación sin cambiar la luminosidad: el modo noche es teal oscuro pero apagado
+// Aleja un fondo de su tinta (aclarándolo u oscureciéndolo) hasta que se lea a 4,6:1.
+// Lo necesitan los colores de negocio de luminosidad media, donde ni el blanco ni el oscuro alcanzan.
+function alejar(bg,tinta){ let f=bg,i=0; const hacia=luminancia(tinta)>.4?'#000000':'#FFFFFF'; while(contraste(f,tinta)<4.6&&i++<24)f=mezcla(f,hacia,.07); return f; }
 function apagar(hex,t){ const c=hexRgb(hex)||[0,0,0],g=.3*c[0]+.59*c[1]+.11*c[2]; return mezcla(hex,rgbHex([g,g,g]),t); }
 // Luminancia percibida (WCAG). Sirve para decidir si sobre un color va tinta clara u oscura:
 // si el usuario elige un principal blanco o amarillo, las letras NO pueden seguir siendo blancas.
@@ -2987,9 +3033,11 @@ function aplicarTemaColor(){
   t['brand']=P; t['brand-txt']=tintaP; t['brand-txt-dim']=mezcla(tintaP,P,.42);
   t['acento-txt']=tintaMejor(A,OSC,'#FFFFFF');
   t['teal']=A; t['magenta']=A; t['yellow']=CIAN;
-  t['luz']=CIAN; t['luz-tinta']=tintaMejor(CIAN,OSC,'#FFFFFF'); t['luz-halo']=alfa(CIAN,noche?.28:.42); t['foco']=alfa(CIAN,.26);
+  const tLuz=tintaMejor(CIAN,OSC,'#FFFFFF'), LUZ=alejar(CIAN,tLuz);
+  t['luz']=LUZ; t['luz-tinta']=tLuz; t['luz-halo']=alfa(CIAN,noche?.28:.42); t['foco']=alfa(CIAN,.26);
   t['bruma']=BRUMA; t['hielo']=HIELO;
-  t['pri']=`linear-gradient(135deg,${CIAN},${mezcla(CIAN,A,.42)})`; t['pri-tinta']=tintaMejor(mezcla(CIAN,A,.42),OSC,'#FFFFFF');
+  const tPri=tintaMejor(mezcla(CIAN,A,.21),OSC,'#FFFFFF');
+  t['pri']=`linear-gradient(135deg,${alejar(CIAN,tPri)},${alejar(mezcla(CIAN,A,.42),tPri)})`; t['pri-tinta']=tPri;
   // menú lateral: su tinta también se calcula, por si el principal es claro
   t['sb-txt']=tintaP; t['sb-txt-2']=mezcla(tintaP,P,.26); t['sb-txt-3']=mezcla(tintaP,P,.34); t['sb-line']=mezcla(tintaP,P,.88);
   t['sb-activo-bg']=`linear-gradient(90deg,${mezcla(P,tintaP,.22)},${mezcla(P,tintaP,.06)})`; t['sb-activo-barra']=tintaMejor(P,mezcla(CIAN,OSC,.3),CIAN);
@@ -3024,7 +3072,7 @@ function aplicarTemaColor(){
     t['ban-a']=mezcla(A,OSC,.18); t['ban-b']=mezcla(A,CIAN,.6);
     t['barra']=`linear-gradient(90deg,${A},${mezcla(A,P,.55)})`;
     t['sel']=P; t['sel-tinta']=tintaP; t['contador']='#E20613'; t['boton']=P; t['boton-tinta']=tintaP;
-    t['sombra']=alfa(OSC,.07); t['sombra-2']=alfa(OSC,.16); t['velo']=alfa(OSC,.46);
+    t['sombra']=alfa(OSC,.07); t['sombra-2']=alfa(OSC,.16); t['velo']=alfa(OSC,.22);
     t['violeta']='#5F309B'; t['violeta-tinta']='#46217A'; t['violeta-suave']='rgba(95,48,155,.13)'; t['violeta-borde']='rgba(95,48,155,.28)';
     t['ambar-tinta']='#6A4400'; t['verde-tinta']='#0F5D38'; t['rojo-tinta']='#A41E25';
     t['purple']='#5F309B'; t['purple-lt']='rgba(95,48,155,.13)';
@@ -3041,7 +3089,7 @@ function aplicarTemaColor(){
     t['navy']=t['tinta']; t['navy2']=mezcla(HIELO,n0,.05); t['slate']=t['tinta-2']; t['muted']=t['tinta-3'];
     t['white']=mezcla(n0,'#FFFFFF',.07);
     t['line']=alfa(HIELO,.10); t['line-lt']=alfa(HIELO,.05);
-    t['teal-dk']=mezcla(CIAN,HIELO,.25); t['acento-ink']=t['teal-dk'];
+    t['teal-dk']=alejar(mezcla(CIAN,HIELO,.25),mezcla(mezcla(n0,'#FFFFFF',.1),A,.45)); t['acento-ink']=t['teal-dk'];   // legible también sobre el tinte del acento
     t['teal-lt']=alfa(A,.22);
     t['v1']='linear-gradient(150deg,rgba(255,255,255,.085),rgba(255,255,255,.035))';
     t['v1-borde']=alfa(BRUMA,.15); t['v1-brillo']='rgba(255,255,255,.07)';
@@ -3052,7 +3100,7 @@ function aplicarTemaColor(){
     t['ban-a']=mezcla(A,'#000000',.42); t['ban-b']=mezcla(A,'#000000',.12);
     t['barra']=`linear-gradient(90deg,${mezcla(A,CIAN,.5)},${A})`;
     t['sel']=mezcla(A,n0,.22); t['sel-tinta']=tintaMejor(t['sel'],OSC,HIELO); t['contador']='#FF5F6B'; t['boton']=mezcla(A,n0,.12); t['boton-tinta']=tintaMejor(t['boton'],OSC,HIELO);
-    t['sombra']='rgba(0,0,0,.22)'; t['sombra-2']='rgba(0,0,0,.38)'; t['velo']='rgba(0,0,0,.58)';
+    t['sombra']='rgba(0,0,0,.22)'; t['sombra-2']='rgba(0,0,0,.38)'; t['velo']='rgba(0,0,0,.42)';
     t['violeta']='#B48BEA'; t['violeta-tinta']='#CFB4F7'; t['violeta-suave']='rgba(150,110,220,.24)'; t['violeta-borde']='rgba(180,139,234,.34)';
     t['ambar-tinta']='#FFCF85'; t['verde-tinta']='#86E2B4'; t['rojo-tinta']='#FFA3A7';
     t['purple']='#B48BEA'; t['purple-lt']='rgba(150,110,220,.24)';
@@ -3060,11 +3108,19 @@ function aplicarTemaColor(){
   }
   // --- dock, burbuja central y banner (Entregas 2–3) ---
   const fdk=noche?apagar(mezcla(P,'#000000',.5),.35):P;
-  t['dock']=noche?`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,fdk,.6),.75)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(fdk,'#FFFFFF',.05),.94)},${alfa(fdk,.98)})`
-                 :`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,P,.35),.9)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(P,A,.22),.95)},${alfa(P,.98)})`;
-  t['dock-tinta']=tintaMejor(fdk,OSC,mezcla(CIAN,HIELO,.15)); t['dock-luz']=tintaMejor(fdk,OSC,HIELO); t['dock-borde']=alfa(BRUMA,.22);
+  t['dock']=noche?`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,fdk,.6),.6)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(fdk,'#FFFFFF',.05),.82)},${alfa(fdk,.92)})`
+                 :`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,P,.35),.7)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(P,A,.22),.8)},${alfa(P,.9)})`;
+  t['dock-tinta']=tintaMejor(fdk,OSC,mezcla(CIAN,HIELO,.32)); t['dock-luz']=tintaMejor(fdk,OSC,HIELO); t['dock-borde']=alfa(BRUMA,.22);
   const burb=mezcla(CIAN,A,.35);
   t['burbuja']=`radial-gradient(120% 120% at 30% 12%,${mezcla(CIAN,'#FFFFFF',.35)},${burb} 70%)`; t['burbuja-tinta']=tintaMejor(burb,OSC,'#FFFFFF');
+  // luz de vidrio que marca la pestaña activa del dock (se desliza de una a otra)
+  // el color que se VE (vidrio sobre el dock) se asegura legible antes de volverlo vidrio
+  const vidSolido=noche?mezcla(fdk,mezcla(CIAN,A,.5),.55):mezcla(fdk,mezcla(CIAN,A,.36),.92);
+  const tVid=tintaMejor(vidSolido,OSC,HIELO), vidOk=alejar(vidSolido,tVid);
+  const vidA=noche?alfa(mezcla(vidOk,'#FFFFFF',.06),.9):alfa(mezcla(vidOk,'#FFFFFF',.3),.9);
+  const vidB=alfa(vidOk,.94);
+  t['luz-vidrio']=`radial-gradient(90% 75% at 50% 0%,rgba(255,255,255,${noche?.16:.5}),transparent 72%),linear-gradient(180deg,${vidA},${vidB})`;
+  t['luz-vidrio-tinta']=tVid;
   t['ban-tinta']=tintaMejor(t['ban-a'],OSC,'#FFFFFF'); t['ban-logo']=tintaMejor(t['ban-b'],OSC,'#FFFFFF');
   t['atmosfera']=atm.join(','); t['body-bg']=t['atmosfera'];
   t['sh']=`0 14px 34px ${t['sombra']}`; t['sh-lg']=`0 18px 44px ${t['sombra-2']}`;
@@ -4286,6 +4342,7 @@ function showView(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.mob-btn,.dk').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
+  requestAnimationFrame(moverLuz);
   document.getElementById('view-'+v).classList.add('active');
   const titles={dashboard:'Dashboard',pedidos:'Pedidos',clientes:'Clientes',registros:'Registros',configuracion:'Configuración',productos:'Productos',costos:'Centro de Costos',produccion:'Producción',inventario:'Inventario',bitacora:'Bitácora',ayuda:'Ayuda y About',archivo:'Archivo'};
   document.getElementById('tb-title').textContent=v==='dashboard'?dashSaludo():(titles[v]||'');
@@ -5208,7 +5265,7 @@ function dbRecordatorios(d){
 async function dbBitacora(){
   const el=document.getElementById('db-bit'); if(!el)return;
   let n=null; try{ n=(await api('GET','/bitacora/notas'))[0]||null; }catch(e){}
-  const paleta=['var(--cl-profundo)','var(--cl-oceano)','var(--cl-cian)','var(--cl-bruma)','var(--cl-hielo)'].map(c=>`<i style="background:${c}"></i>`).join('');
+  const paleta=['var(--brand)','var(--teal)','var(--luz)','var(--bruma)','var(--hielo)'].map(c=>`<i style="background:${c}"></i>`).join('');
   if(!n){ el.innerHTML=`<svg class="db-bit-logo" viewBox="0 0 136 33" role="img" aria-label="Coral Line"><use href="#cl-imagotipo" width="136" height="33"/></svg>
       <div class="db-bit-pal">${paleta}</div><p class="db-bit-x">Tu bitácora está vacía. Captura tu primera nota: una idea, un pendiente, un dato.</p>`; return; }
   const img=(n.adjuntos||[]).find(a=>/^image\//.test(a.tipo||''));
@@ -5296,7 +5353,21 @@ function dbGrafica(d){
   }else h+=`<text class="eje vacio" x="${(x0+x1)/2}" y="${(y0+y1)/2}" text-anchor="middle">Sin movimientos en este período</text>`;
   el.innerHTML=h;
 }
-let _dbRz; addEventListener('resize',()=>{ clearTimeout(_dbRz); _dbRz=setTimeout(()=>{ iaUbicar(); if(DB_DATA&&document.getElementById('view-dashboard').classList.contains('active'))dbGrafica(DB_DATA); },140); });
+// CORAL LINE · la luz de vidrio del dock se desliza hasta la pestaña activa
+let _luzLista=false;
+function moverLuz(){
+  document.querySelectorAll('.dock-in,.mob-inner').forEach(c=>{
+    const luz=c.querySelector('.dk-luz'); if(!luz)return;
+    const a=c.querySelector('.dk.active,.mob-btn.active');
+    if(!a||!a.offsetParent||!a.offsetWidth){ c.classList.remove('con-luz'); return; }
+    const w=Math.min(a.offsetWidth-6,c.classList.contains('mob-inner')?84:132);
+    if(!_luzLista)luz.style.transition='none';
+    c.style.setProperty('--lw',w+'px'); c.style.setProperty('--lx',(a.offsetLeft+(a.offsetWidth-w)/2)+'px'); c.classList.add('con-luz');
+  });
+  if(!_luzLista){ _luzLista=true; requestAnimationFrame(()=>document.querySelectorAll('.dk-luz').forEach(l=>l.style.transition='')); }
+}
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(moverLuz);
+let _dbRz; addEventListener('resize',()=>{ clearTimeout(_dbRz); _dbRz=setTimeout(()=>{ moverLuz(); iaUbicar(); if(DB_DATA&&document.getElementById('view-dashboard').classList.contains('active'))dbGrafica(DB_DATA); },140); });
 addEventListener('scroll',()=>{ const t=document.querySelector('.topbar'); if(t)t.classList.toggle('scrolled',scrollY>8); },{passive:true});
 // Barra móvil: deslizar hacia arriba abre la hoja con todos los destinos
 (function(){ let y0=null; const n=document.querySelector('.mob-nav'); if(!n)return;
@@ -6265,7 +6336,7 @@ function renderCliModal(editando){
   document.getElementById('cli-body').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
       <div class="sc"><div class="sc-l">Pedidos</div><div class="sc-n">${(c.pedidos||[]).length}</div></div>
-      <div class="sc tl"><div class="sc-l">Tel</div><div class="sc-n" style="font-size:14px">${c.tel||'—'}</div></div>
+      <div class="sc tl"><div class="sc-l">Tel</div><div class="sc-n sc-dato">${c.tel||'—'}</div></div>
     </div>
     ${datos}
     <div id="cli-bit"></div>
@@ -9484,9 +9555,9 @@ function buildRegPanel(tab){
     const recibido=rows.reduce((a,p)=>a+(p.pagos||[]).reduce((s,x)=>s+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0),0),0);
     el.innerHTML=`<div class="reg-nota"><i class="ti ti-info-circle"></i>Ventas = valor de los pedidos del período (facturado). El dinero que realmente entró está en <b>Ingresos</b>.</div>
     <div class="reg-stats">
-      <div class="sc tl"><div class="sc-l">Ventas del período</div><div class="sc-n" style="font-size:18px">${fCOP(total)}</div></div>
-      <div class="sc gn"><div class="sc-l">Ya recibido</div><div class="sc-n" style="font-size:16px">${fCOP(Math.min(recibido,total))}</div></div>
-      <div class="sc am"><div class="sc-l">Por cobrar</div><div class="sc-n" style="font-size:16px">${fCOP(Math.max(0,total-recibido))}</div></div>
+      <div class="sc tl"><div class="sc-l">Ventas del período</div><div class="sc-n">${fCOP(total)}</div></div>
+      <div class="sc gn"><div class="sc-l">Ya recibido</div><div class="sc-n">${fCOP(Math.min(recibido,total))}</div></div>
+      <div class="sc am"><div class="sc-l">Por cobrar</div><div class="sc-n">${fCOP(Math.max(0,total-recibido))}</div></div>
       <div class="sc"><div class="sc-l">Pedidos</div><div class="sc-n">${rows.length}</div><div class="sc-s">Promedio ${fCOP(rows.length?Math.round(total/rows.length):0)}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>#</th><th>Cliente</th><th>F. Pedido</th><th style="text-align:right">Valor</th></tr></thead>
@@ -9496,7 +9567,7 @@ function buildRegPanel(tab){
     const all=[];todos.forEach(p=>(p.costos||[]).forEach(c=>all.push({...c,ref:p.ref,nom:p.nombre})));
     const total=all.reduce((a,c)=>a+(parseInt(String(c.monto_calc||0).replace(/\D/g,''))||0),0);
     el.innerHTML=`<div class="reg-stats">
-      <div class="sc rd"><div class="sc-l">Total costos</div><div class="sc-n" style="font-size:18px">${fCOP(total)}</div></div>
+      <div class="sc rd"><div class="sc-l">Total costos</div><div class="sc-n">${fCOP(total)}</div></div>
       <div class="sc"><div class="sc-l">Registros</div><div class="sc-n">${all.length}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>Pedido</th><th>Descripción</th><th style="text-align:right">Monto</th></tr></thead>
@@ -9511,9 +9582,9 @@ function buildRegPanel(tab){
     const tI=rows.reduce((a,r)=>a+r.ing,0),tC=rows.reduce((a,r)=>a+r.cos,0);
     el.innerHTML=`<div class="reg-nota"><i class="ti ti-info-circle"></i>Utilidad = Ventas del período − Costos de esos pedidos (independiente de si ya te pagaron).</div>
     <div class="reg-stats">
-      <div class="sc tl"><div class="sc-l">Ventas</div><div class="sc-n" style="font-size:16px">${fCOP(tI)}</div></div>
-      <div class="sc rd"><div class="sc-l">Costos</div><div class="sc-n" style="font-size:16px">${fCOP(tC)}</div></div>
-      <div class="sc ${tI-tC>=0?'gn':'rd'}"><div class="sc-l">Utilidad</div><div class="sc-n" style="font-size:16px">${fCOP(tI-tC)}</div><div class="sc-s">Margen ${tI>0?Math.round((tI-tC)*100/tI):0}%</div></div>
+      <div class="sc tl"><div class="sc-l">Ventas</div><div class="sc-n">${fCOP(tI)}</div></div>
+      <div class="sc rd"><div class="sc-l">Costos</div><div class="sc-n">${fCOP(tC)}</div></div>
+      <div class="sc ${tI-tC>=0?'gn':'rd'}"><div class="sc-l">Utilidad</div><div class="sc-n">${fCOP(tI-tC)}</div><div class="sc-s">Margen ${tI>0?Math.round((tI-tC)*100/tI):0}%</div></div>
     </div>
     <table class="rtable"><thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Ventas</th><th style="text-align:right">Costos</th><th style="text-align:right">Ganancia</th></tr></thead>
     <tbody>${rows.map(r=>`<tr><td style="font-family:'DM Mono',monospace;font-size:11px">#${r.ref}</td><td style="font-weight:600">${r.nombre}</td><td style="text-align:right;color:var(--verde-tinta);font-weight:600">${fCOP(r.ing)}</td><td style="text-align:right;color:var(--rojo-tinta);font-weight:600">${fCOP(r.cos)}</td><td style="text-align:right" class="${r.gan>=0?'mpos':'mneg'}">${fCOP(r.gan)}</td></tr>`).join('')}</tbody></table>`;
@@ -9532,7 +9603,7 @@ function buildRegPanel(tab){
     const porForma={};all.forEach(x=>{const k=metodoLabel(x.tipo);porForma[k]=(porForma[k]||0)+(parseInt(String(x.monto_calc||0).replace(/\D/g,''))||0)});
     el.innerHTML=`<div class="reg-nota"><i class="ti ti-info-circle"></i>Ingresos = dinero que <b>realmente entró</b> (abonos y pagos), por la fecha del pago. Lo facturado está en <b>Ventas</b>.</div>
     <div class="reg-stats">
-      <div class="sc gn"><div class="sc-l">Ingresos del período</div><div class="sc-n" style="font-size:16px">${fCOP(total)}</div></div>
+      <div class="sc gn"><div class="sc-l">Ingresos del período</div><div class="sc-n">${fCOP(total)}</div></div>
       <div class="sc"><div class="sc-l">Pagos</div><div class="sc-n">${all.length}</div></div>
       <div class="sc tl"><div class="sc-l">Por forma</div><div class="sc-s" style="margin-top:4px;line-height:1.6">${Object.entries(porForma).map(([k,v])=>`${k}: <b>${fCOP(v)}</b>`).join('<br>')||'—'}</div></div>
     </div>
@@ -9547,7 +9618,7 @@ function buildRegPanel(tab){
     }).filter(r=>r.saldo>0);
     const total=rows.reduce((a,r)=>a+r.saldo,0);
     el.innerHTML=`<div class="reg-stats">
-      <div class="sc am"><div class="sc-l">Total pendiente</div><div class="sc-n" style="font-size:16px">${fCOP(total)}</div></div>
+      <div class="sc am"><div class="sc-l">Total pendiente</div><div class="sc-n">${fCOP(total)}</div></div>
       <div class="sc"><div class="sc-l">Pedidos con saldo</div><div class="sc-n">${rows.length}</div></div>
     </div>
     <table class="rtable"><thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Total</th><th style="text-align:right">Pagado</th><th style="text-align:right">Saldo</th></tr></thead>

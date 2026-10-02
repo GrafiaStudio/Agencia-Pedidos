@@ -16,3 +16,5 @@ Las capturas van a `cap/` (o a `CAP_DIR` si se define). `cap/` no se sube al rep
 | `../muestras/medir_contraste.py` | Versión simple: mide puntos sueltos sobre una captura. |
 
 **Trampas conocidas de la medición:** un elemento tapado por la burbuja del dock puede salir como «ilegible» (comprobar con un recorte); y `compara.py` necesita Pillow.
+
+**⚠️ Pruebas que GUARDAN configuración** (`t9.js`, `tban.js`, y `t3.js` si se recupera): cambian colores, intensidad o banner del negocio `main` y luego vuelven a fábrica. **No correrlas mientras el usuario esté probando la app local**: le borrarían lo que configuró. `legible.js` no guarda nada; con `FABRICA=1` mide con los colores de fábrica solo en la página de prueba.

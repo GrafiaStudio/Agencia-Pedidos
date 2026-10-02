@@ -40,6 +40,8 @@ const RECOGE = `(() => {
 })()`;
 (async () => {
   const { b, page, errores } = await abrir({ ancho, alto, modo });
+  // FABRICA=1 → prueba con los colores de fábrica SIN guardarlos (no toca la configuración del negocio)
+  if (process.env.FABRICA) await page.evaluate(() => { CFG.color_primario = COLOR_FABRICA.primario; CFG.color_acento = COLOR_FABRICA.acento; CFG.piel_intensidad = PIEL_DEF; CFG.banner_ruta = ''; aplicarTemaColor(); });
   const guarda = async nombre => { const f = await foto(page, `leg-${modo}-${nombre}`); fs.writeFileSync(f.replace('.png', '.json'), JSON.stringify(await page.evaluate(RECOGE))); };
   for (const v of VISTAS) { await vista(page, v); await guarda(v); }
   // pestañas de Configuración y de Producción
