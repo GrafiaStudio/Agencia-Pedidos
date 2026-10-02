@@ -2279,11 +2279,13 @@ app.get('/api/ia/acciones',requiere('ver_registros'),(req,res)=>{
 // ── INFORMACIÓN DE LA APP (estática, no es dato por workspace) ──
 const APP_INFO={
   nombre:'CORAL LINE',
-  fecha_actualizacion:'2026-06-26',
+  fecha_actualizacion:'2026-10-02',
   novedades:[
-    'Inventario: stock por producto con descuento y restauración automática.',
-    'Aviso de stock insuficiente al armar un pedido.',
-    'Nueva sección de Ayuda y About.'
+    'Nueva identidad: la app ahora es Coral Line, con piel de vidrio, colores del negocio y modo noche legible.',
+    'Barra inferior, Dashboard nuevo y Coralyne, la asistente, siempre a mano.',
+    'El botón «atrás» del teléfono cierra ventanas y vuelve a la vista anterior; los editores avisan si hay cambios sin guardar.',
+    'Carga más rápida, y se puede añadir a la pantalla de inicio del teléfono.',
+    'Textos con comillas (por ejemplo medidas en pulgadas) ya no se cortan al guardar.'
   ]
 };
 app.get('/api/app-info',(req,res)=>{

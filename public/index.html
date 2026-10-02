@@ -1763,6 +1763,13 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
   input[type="checkbox"],input[type="radio"]{width:20px;height:20px}
   #cli-more-toggle{min-height:36px;display:flex;align-items:center}
 }
+
+/* Ayuda · textos de Quiénes somos, Términos y Privacidad */
+.legal{max-width:760px;font-size:13px;line-height:1.7;color:var(--tinta-2)}
+.legal p{margin:0 0 12px}
+.legal h4{margin:20px 0 6px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta)}
+.legal b{color:var(--tinta);font-weight:600}
+.legal .legal-nota{font-size:12px;font-style:italic;color:var(--tinta-3)}
 </style>
 </head>
 <body>
@@ -2331,16 +2338,53 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
       <div id="help-quienes" class="help-panel">
         <div id="ayuda-quienes-logo" style="margin-bottom:14px;display:none"><img id="ayuda-quienes-logo-img" style="max-height:60px" alt="Logo"></div>
         <div id="ayuda-quienes-nombre" style="font-size:14px;font-weight:600;color:var(--navy);margin-bottom:8px"></div>
-        <p style="font-size:11.5px;color:var(--muted);line-height:1.6;font-style:italic">Pendiente: aquí va una breve historia del negocio — la escribe el dueño cuando la tenga lista.</p>
+        <div class="legal">
+          <p>Este espacio de trabajo funciona con <b>Coral Line</b>, el sistema de gestión creado por <b>GRAFIA Studio</b> para negocios de la industria gráfica: diseño, publicidad, estampados, impresión y personalización.</p>
+          <h4>Por qué existe</h4>
+          <p>En artes gráficas cada trabajo es distinto: medidas, cantidades, acabados, tintas, materiales. Por eso casi todo termina en papelitos sueltos, chats y hojas de cálculo. Coral Line junta en un solo lugar los pedidos, los clientes, los productos con sus costos, la producción y el dinero, para que el negocio deje de depender de la memoria de alguien.</p>
+          <h4>Cómo lo pensamos</h4>
+          <p><b>Una sola fuente de verdad:</b> cada dato se escribe una vez y se usa en todas partes. <b>Primero capturar, después organizar:</b> anotar algo nunca debe ser un trámite. <b>Todo deja rastro:</b> quién cambió qué y cuándo. <b>La información te encuentra:</b> lo urgente aparece sin tener que buscarlo.</p>
+          <p class="legal-nota">El nombre Coral Line viene de los corales: muchas piezas pequeñas que, juntas, construyen algo vivo y resistente.</p>
+        </div>
       </div>
       <div id="help-info" class="help-panel">
         <div id="ayuda-info-body" style="font-size:11.5px;color:var(--slate);line-height:1.7">Cargando…</div>
       </div>
       <div id="help-terminos" class="help-panel">
-        <p style="font-size:11.5px;color:var(--muted);line-height:1.6;font-style:italic">Pendiente: texto legal que proveerá el negocio.</p>
+        <div class="legal">
+          <p class="legal-nota">Versión preliminar · 2 de octubre de 2026 · pendiente de revisión legal.</p>
+          <h4>1. Qué es Coral Line</h4>
+          <p>Coral Line es una herramienta de gestión interna para negocios: pedidos, clientes, productos, costos, producción y registros. Cada negocio trabaja en un espacio propio y aislado de los demás.</p>
+          <h4>2. Acceso</h4>
+          <p>Se entra con usuario y contraseña, o con el PIN del administrador. Cada persona responde por el cuidado de su acceso y no debe compartirlo. El administrador del negocio crea los usuarios y decide qué puede hacer cada rol.</p>
+          <h4>3. La información es del negocio</h4>
+          <p>Los datos que registras pertenecen al negocio que usa el espacio. GRAFIA Studio no los vende ni los usa para fines distintos a prestar el servicio, y hace respaldos periódicos para protegerlos.</p>
+          <h4>4. Cálculos y documentos</h4>
+          <p>Valores, saldos, costos y utilidades se calculan con los datos que se ingresan. Revisa la información antes de enviar una cotización, una orden o un comprobante a un cliente.</p>
+          <h4>5. Asistente con inteligencia artificial</h4>
+          <p>Coralyne responde con los datos del negocio, pero puede equivocarse. Nada de lo que propone se guarda hasta que una persona lo confirma.</p>
+          <h4>6. Disponibilidad y cambios</h4>
+          <p>Procuramos que el servicio esté disponible todo el tiempo; puede haber pausas breves por mantenimiento o mejoras. Estos términos pueden actualizarse; la fecha de arriba indica la versión vigente.</p>
+          <h4>7. Contacto</h4>
+          <p>Cualquier duda sobre estos términos se atiende por la pestaña <b>Soporte</b>.</p>
+        </div>
       </div>
       <div id="help-privacidad" class="help-panel">
-        <p style="font-size:11.5px;color:var(--muted);line-height:1.6;font-style:italic">Pendiente: texto legal que proveerá el negocio.</p>
+        <div class="legal">
+          <p class="legal-nota">Versión preliminar · 2 de octubre de 2026 · pendiente de revisión legal.</p>
+          <h4>Qué datos se guardan</h4>
+          <p><b>De los clientes del negocio:</b> nombre, teléfono y, si se registran, NIT o cédula, correo, dirección y persona de contacto, junto con sus pedidos y pagos. <b>De quienes usan la app:</b> nombre, usuario, contraseña (guardada cifrada, nadie puede leerla) y fecha del último ingreso.</p>
+          <h4>Para qué se usan</h4>
+          <p>Solo para gestionar pedidos, producción, cobros, documentos y reportes del propio negocio.</p>
+          <h4>Cómo se protegen</h4>
+          <p>La conexión va cifrada (HTTPS), cada negocio está aislado de los demás, cada rol ve solo lo que su permiso le deja ver y la base de datos se respalda periódicamente.</p>
+          <h4>Asistente con inteligencia artificial</h4>
+          <p>Cuando alguien le pregunta a Coralyne, la información necesaria para responder se envía al proveedor de inteligencia artificial que el negocio configuró, únicamente para generar esa respuesta.</p>
+          <h4>Con quién se comparten</h4>
+          <p>Con nadie más, salvo que una autoridad lo exija conforme a la ley.</p>
+          <h4>Tus derechos</h4>
+          <p>Según la Ley 1581 de 2012 de Colombia, toda persona puede conocer, actualizar, corregir o pedir que se eliminen sus datos personales. Las solicitudes se hacen por la pestaña <b>Soporte</b> o directamente con el negocio que los registró.</p>
+        </div>
       </div>
       <div id="help-soporte" class="help-panel">
         <p style="font-size:11.5px;color:var(--slate);line-height:1.6;margin-bottom:14px">¿Tienes dudas o problemas usando la app? Escríbenos.</p>
