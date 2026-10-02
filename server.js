@@ -257,6 +257,11 @@ try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN info_pdf TEXT DEFAUL
 // C1 · colores de marca editables: una sola fuente de verdad para la app Y el PDF.
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN color_primario TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN color_acento TEXT DEFAULT ''"); } catch(e){}
+// CORAL LINE · intensidad de la piel por negocio (NULL = la de fábrica).
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN piel_intensidad INTEGER"); } catch(e){}
+// CORAL LINE · banner del Dashboard: imagen propia del negocio + una frase
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN banner_ruta TEXT DEFAULT ''"); } catch(e){}
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN banner_texto TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_actual INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_minimo INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN regla_lleva INTEGER"); } catch(e){}
@@ -575,16 +580,20 @@ const ZONAS_HORARIAS=typeof Intl.supportedValuesOf==='function'
   ?new Set(Intl.supportedValuesOf('timeZone'))
   :new Set(['America/Bogota']);
 const CFG_DEFAULTS={
-  nombre_negocio:'',logo_ruta:'',direccion:'',telefono:'',email:'',nit:'',
+  nombre_negocio:'',logo_ruta:'',banner_ruta:'',banner_texto:'',direccion:'',telefono:'',email:'',nit:'',
   moneda_prefijo:'$',decimales:0,separador_miles:'.',formato_fecha:'DD/MM/AAAA',
   zona_horaria:'America/Bogota',dias_validez_cotizacion:15,estado_default_cotizacion:0,
   metodos_pago:['efectivo','transferencia','nequi','daviplata','otro'],
   info_pdf:'',
   alertas_entrega:1,dias_anticipacion_entrega:3,
   iva_activo:0,iva_porcentaje:19,iva_desglosado:0,
-  // C1 · colores de marca (los de fábrica de GRAFÍA). Alimentan la app y el PDF.
-  color_primario:'#222B46',color_acento:'#5B7FA6'
+  // C1 · colores de marca (los de fábrica de CORAL LINE: Deep Teal + Ocean Teal). Alimentan la app y el PDF.
+  color_primario:'#0A2E3B',color_acento:'#118AA0',
+  // Intensidad de la piel: cuánta presencia tiene el color en el fondo de la app.
+  piel_intensidad:60
 };
+const PIEL_MIN=20, PIEL_MAX=100;
+const pielOk=v=>{ const n=parseInt(v,10); return Number.isInteger(n)?Math.max(PIEL_MIN,Math.min(PIEL_MAX,n)):CFG_DEFAULTS.piel_intensidad; };
 // Solo aceptamos hex #RGB o #RRGGBB (evita inyectar cualquier cosa en el CSS/PDF).
 const HEX_RE=/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const colorOk=(v,porDefecto)=>HEX_RE.test(String(v||'').trim())?String(v).trim():porDefecto;
@@ -597,6 +606,8 @@ function getConfiguracion(wsId){
   return{
     nombre_negocio:row.nombre_negocio||'',
     logo_ruta:row.logo_ruta||'',
+    banner_ruta:row.banner_ruta||'',
+    banner_texto:row.banner_texto||'',
     direccion:row.direccion||'',
     telefono:row.telefono||'',
     email:row.email||'',
@@ -616,7 +627,8 @@ function getConfiguracion(wsId){
     iva_porcentaje:row.iva_porcentaje??CFG_DEFAULTS.iva_porcentaje,
     iva_desglosado:row.iva_desglosado?1:0,
     color_primario:colorOk(row.color_primario,CFG_DEFAULTS.color_primario),
-    color_acento:colorOk(row.color_acento,CFG_DEFAULTS.color_acento)
+    color_acento:colorOk(row.color_acento,CFG_DEFAULTS.color_acento),
+    piel_intensidad:pielOk(row.piel_intensidad)
   };
 }
 
@@ -635,6 +647,18 @@ try {
   if(!yaCorrida){
     db.exec("UPDATE encargos SET valor=NULL WHERE valor='0'");
     db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('encargo_valor_cero_a_null');
+  }
+} catch(e){}
+// Migración única · CORAL LINE: quien nunca eligió colores (o tenía guardados los de la fábrica
+// vieja, #222B46 / #5B7FA6) pasa a la fábrica nueva. Se VACÍAN en vez de escribir el color nuevo:
+// así manda CFG_DEFAULTS. Quien eligió colores propios los conserva. Corre UNA sola vez, para
+// que un negocio pueda volver a elegir a propósito los colores viejos sin que un despliegue se los quite.
+try {
+  const yaCoral=db.prepare("SELECT 1 FROM migraciones WHERE nombre=?").get('coral_line_colores_fabrica_v1');
+  if(!yaCoral){
+    db.prepare(`UPDATE configuracion_negocio SET color_primario='', color_acento=''
+      WHERE UPPER(COALESCE(color_primario,'')) IN ('','#222B46') AND UPPER(COALESCE(color_acento,'')) IN ('','#5B7FA6')`).run();
+    db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('coral_line_colores_fabrica_v1');
   }
 } catch(e){}
 // Migración única: backfill de las nuevas columnas _calc para datos que ya existían
@@ -1996,7 +2020,7 @@ app.get('/api/stats',(req,res)=>{
 // ── DASHBOARD EJECUTIVO (v3.0 Fase 6) — solo lectura, agregaciones ──
 app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
   const wsId=req.wsId; const hoyStr=hoy(wsId);
-  const periodo=['hoy','semana','mes'].includes(req.query.periodo)?req.query.periodo:'hoy';
+  const periodo=['hoy','semana','mes','anio'].includes(req.query.periodo)?req.query.periodo:'hoy';
   // KPIs
   const activos=db.prepare("SELECT COUNT(*) n FROM pedidos WHERE workspace_id=? AND archivado=0 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
   const urgentes=db.prepare("SELECT COUNT(*) n FROM pedidos WHERE workspace_id=? AND archivado=0 AND urgente=1 AND entregado=0 AND cancelado=0 AND es_cotizacion=0").get(wsId).n;
@@ -2006,7 +2030,8 @@ app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
   // Finanzas del período (ingresos = pagos por fecha; costos = por fecha de registro; solo pedidos vivos)
   const desde = periodo==='hoy'?hoyStr : periodo==='semana'
     ? db.prepare("SELECT date(?, '-6 days') d").get(hoyStr).d
-    : db.prepare("SELECT date(?, 'start of month') d").get(hoyStr).d;
+    : periodo==='mes' ? db.prepare("SELECT date(?, 'start of month') d").get(hoyStr).d
+    : db.prepare("SELECT date(?, 'start of year') d").get(hoyStr).d;
   const ingresos=db.prepare(`SELECT COALESCE(SUM(CAST(pg.monto_calc AS INTEGER)),0) s FROM pagos pg JOIN pedidos p ON p.id=pg.pedido_id
     WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND pg.fecha>=? AND pg.fecha<=?`).get(wsId,desde,hoyStr).s;
   // Costos por fecha del pedido (los registros de costos se reescriben al editar → su 'creado' no es confiable)
@@ -2016,7 +2041,7 @@ app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
   const margen=ingresos>0?Math.round(utilidad*100/ingresos):0;
   // Pedidos recientes (últimos 5, con valor oficial)
   const recientes=db.prepare("SELECT * FROM pedidos WHERE workspace_id=? AND archivado=0 ORDER BY creado DESC LIMIT 5").all(wsId)
-    .map(pedidoCompleto).map(p=>({id:p.id,ref:p.ref,nombre:p.nombre,entregado:p.entregado,cancelado:p.cancelado,cerrado:!!p.cerrado,es_cotizacion:p.es_cotizacion,urgente:p.urgente,valor_total:p.valor_total||0,pagado:(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0),encargos:(p.encargos||[]).map(e=>({estado:e.estado})),fecha_pedido:p.fecha_pedido}));
+    .map(pedidoCompleto).map(p=>({id:p.id,ref:p.ref,nombre:p.nombre,entregado:p.entregado,cancelado:p.cancelado,cerrado:!!p.cerrado,es_cotizacion:p.es_cotizacion,urgente:p.urgente,valor_total:p.valor_total||0,pagado:(p.pagos||[]).reduce((a,x)=>a+toNum(x.monto_calc),0),encargos:(p.encargos||[]).map(e=>({estado:e.estado,categorias:e.categorias||[],items:(e.items||[]).map(i=>({estado:i.estado||'',categoria:i.categoria||''}))})),fecha_pedido:p.fecha_pedido}));
   // Entregas próximas (7 días)
   const hasta=db.prepare("SELECT date(?, '+7 days') d").get(hoyStr).d;
   const entregas=db.prepare(`SELECT id,ref,nombre,fecha_entrega,urgente FROM pedidos WHERE workspace_id=? AND archivado=0
@@ -2038,7 +2063,39 @@ app.get('/api/dashboard',requiere('ver_dashboard'),(req,res)=>{
       WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND pg.fecha=?`).get(wsId,dia).s;
     serie7.push({d:dia,v});
   }
-  res.json({hoy:hoyStr,periodo,kpis:{activos,urgentes,entregasHoy,cotizaciones:cotPeds.length,cotValor},finanzas:{desde,ingresos,costos,utilidad,margen},serie7,recientes,entregas,produccion,actividad});
+  // CORAL LINE · serie del reporte según el período: por día (hoy/7 días/mes) o por mes (año).
+  // Mismas reglas que las finanzas: ingresos por fecha del pago, costos por fecha del pedido.
+  const sumIng=(cond,arg)=>db.prepare(`SELECT COALESCE(SUM(CAST(pg.monto_calc AS INTEGER)),0) s FROM pagos pg JOIN pedidos p ON p.id=pg.pedido_id
+      WHERE pg.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND ${cond}`).get(wsId,arg).s;
+  const sumCos=(cond,arg)=>db.prepare(`SELECT COALESCE(SUM(CAST(c.monto_calc AS INTEGER)),0) s FROM costos c JOIN pedidos p ON p.id=c.pedido_id
+      WHERE c.workspace_id=? AND p.archivado=0 AND p.cancelado=0 AND p.es_cotizacion=0 AND ${cond}`).get(wsId,arg).s;
+  const serie=[];
+  if(periodo==='anio'){
+    const anio=hoyStr.slice(0,4);
+    for(let m=1;m<=12;m++){
+      const mes=`${anio}-${String(m).padStart(2,'0')}`;
+      const i=sumIng("substr(pg.fecha,1,7)=?",mes), c=sumCos("substr(p.fecha_pedido,1,7)=?",mes);
+      serie.push({d:mes,ingresos:i,costos:c,utilidad:i-c,futuro:mes>hoyStr.slice(0,7)});
+    }
+  }else{
+    const dias=periodo==='mes'
+      ? db.prepare("SELECT CAST(julianday(?)-julianday(date(?,'start of month')) AS INTEGER) n").get(hoyStr,hoyStr).n
+      : 6;
+    for(let k=dias;k>=0;k--){
+      const dia=db.prepare('SELECT date(?, ?) d').get(hoyStr,`-${k} days`).d;
+      const i=sumIng("pg.fecha=?",dia), c=sumCos("p.fecha_pedido=?",dia);
+      serie.push({d:dia,ingresos:i,costos:c,utilidad:i-c});
+    }
+  }
+  res.json({hoy:hoyStr,periodo,kpis:{activos,urgentes,entregasHoy,cotizaciones:cotPeds.length,cotValor},finanzas:{desde,ingresos,costos,utilidad,margen},serie7,serie,recientes,entregas,produccion,actividad});
+});
+// CORAL LINE · calendario del Dashboard: cuántos pedidos se entregan cada día de un mes
+app.get('/api/dashboard/entregas',requiere('ver_dashboard'),(req,res)=>{
+  const mes=/^\d{4}-\d{2}$/.test(String(req.query.mes||''))?req.query.mes:hoy(req.wsId).slice(0,7);
+  const filas=db.prepare(`SELECT fecha_entrega f, COUNT(*) n, SUM(CASE WHEN entregado=0 THEN 1 ELSE 0 END) pend FROM pedidos
+    WHERE workspace_id=? AND archivado=0 AND cancelado=0 AND es_cotizacion=0 AND substr(fecha_entrega,1,7)=? GROUP BY fecha_entrega`).all(req.wsId,mes);
+  const out={}; filas.forEach(r=>{ out[r.f]={n:r.n,pend:r.pend}; });
+  res.json({mes,dias:out});
 });
 
 // Export CSV
@@ -2129,7 +2186,7 @@ app.get('/api/ia/acciones',requiere('ver_registros'),(req,res)=>{
 
 // ── INFORMACIÓN DE LA APP (estática, no es dato por workspace) ──
 const APP_INFO={
-  nombre:'GRAFÍA Studio',
+  nombre:'CORAL LINE',
   fecha_actualizacion:'2026-06-26',
   novedades:[
     'Inventario: stock por producto con descuento y restauración automática.',
@@ -2231,12 +2288,13 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
     if(b.dias_validez_cotizacion!==undefined&&(!Number.isInteger(b.dias_validez_cotizacion)||b.dias_validez_cotizacion<0))errores.push('Días de validez de cotización no válido');
     if(b.dias_anticipacion_entrega!==undefined&&(!Number.isInteger(b.dias_anticipacion_entrega)||b.dias_anticipacion_entrega<0))errores.push('Días de anticipación no válido');
     if(b.iva_porcentaje!==undefined&&(!Number.isInteger(b.iva_porcentaje)||b.iva_porcentaje<0||b.iva_porcentaje>100))errores.push('Porcentaje de IVA no válido');
+    if(b.piel_intensidad!==undefined&&(!Number.isInteger(b.piel_intensidad)||b.piel_intensidad<PIEL_MIN||b.piel_intensidad>PIEL_MAX))errores.push(`La intensidad del color debe estar entre ${PIEL_MIN} y ${PIEL_MAX}`);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const actual=getConfiguracion(req.wsId);
     const nuevo={...actual,...b};
     db.prepare(`INSERT INTO configuracion_negocio
-        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,info_pdf,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado,color_primario,color_acento)
-      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@info_pdf,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado,@color_primario,@color_acento)
+        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,info_pdf,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado,color_primario,color_acento,piel_intensidad,banner_texto)
+      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@info_pdf,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado,@color_primario,@color_acento,@piel_intensidad,@banner_texto)
       ON CONFLICT(workspace_id) DO UPDATE SET
         nombre_negocio=excluded.nombre_negocio,direccion=excluded.direccion,telefono=excluded.telefono,
         email=excluded.email,nit=excluded.nit,moneda_prefijo=excluded.moneda_prefijo,decimales=excluded.decimales,
@@ -2244,7 +2302,7 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
         dias_validez_cotizacion=excluded.dias_validez_cotizacion,estado_default_cotizacion=excluded.estado_default_cotizacion,
         metodos_pago=excluded.metodos_pago,info_pdf=excluded.info_pdf,alertas_entrega=excluded.alertas_entrega,dias_anticipacion_entrega=excluded.dias_anticipacion_entrega,
         iva_activo=excluded.iva_activo,iva_porcentaje=excluded.iva_porcentaje,iva_desglosado=excluded.iva_desglosado,
-        color_primario=excluded.color_primario,color_acento=excluded.color_acento`)
+        color_primario=excluded.color_primario,color_acento=excluded.color_acento,piel_intensidad=excluded.piel_intensidad,banner_texto=excluded.banner_texto`)
       .run({
         workspace_id:req.wsId,
         nombre_negocio:nuevo.nombre_negocio||'',
@@ -2267,7 +2325,9 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
         iva_porcentaje:Number.isInteger(nuevo.iva_porcentaje)?nuevo.iva_porcentaje:19,
         iva_desglosado:nuevo.iva_desglosado?1:0,
         color_primario:colorOk(nuevo.color_primario,CFG_DEFAULTS.color_primario),
-        color_acento:colorOk(nuevo.color_acento,CFG_DEFAULTS.color_acento)
+        color_acento:colorOk(nuevo.color_acento,CFG_DEFAULTS.color_acento),
+        piel_intensidad:pielOk(nuevo.piel_intensidad),
+        banner_texto:String(nuevo.banner_texto||'').trim().slice(0,90)
       });
     res.json(getConfiguracion(req.wsId));
   }catch(e){logError('PUT /api/configuracion',e);res.status(500).json({error:e.message})}
@@ -2281,6 +2341,21 @@ app.post('/api/configuracion/logo',requiere('configurar_sistema'),upload.single(
       ON CONFLICT(workspace_id) DO UPDATE SET logo_ruta=excluded.logo_ruta`).run(req.wsId,ruta);
     res.json({logo_ruta:ruta});
   }catch(e){logError('POST /api/configuracion/logo',e);res.status(500).json({error:e.message})}
+});
+// CORAL LINE · banner del Dashboard (el navegador ya lo reduce a WebP de 1600 px antes de subirlo)
+app.post('/api/configuracion/banner',requiere('configurar_sistema'),upload.single('banner'),(req,res)=>{
+  try{
+    if(!req.file)return res.status(400).json({error:'No se recibió ningún archivo'});
+    if(!/^image\//.test(req.file.mimetype||''))return res.status(400).json({error:'El banner debe ser una imagen'});
+    const ruta='/uploads/'+req.file.filename;
+    db.prepare(`INSERT INTO configuracion_negocio(workspace_id,banner_ruta) VALUES(?,?)
+      ON CONFLICT(workspace_id) DO UPDATE SET banner_ruta=excluded.banner_ruta`).run(req.wsId,ruta);
+    res.json({banner_ruta:ruta});
+  }catch(e){logError('POST /api/configuracion/banner',e);res.status(500).json({error:e.message})}
+});
+app.delete('/api/configuracion/banner',requiere('configurar_sistema'),(req,res)=>{
+  db.prepare(`UPDATE configuracion_negocio SET banner_ruta='' WHERE workspace_id=?`).run(req.wsId);
+  res.json({banner_ruta:''});
 });
 
 // ── ETIQUETAS DEL NEGOCIO ──
@@ -4416,4 +4491,4 @@ app.get('/api/archivo',(req,res)=>{
 });
 
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
-app.listen(PORT,()=>console.log(`✅ GRAFÍA Studio en http://localhost:${PORT}`));
+app.listen(PORT,()=>console.log(`✅ CORAL LINE en http://localhost:${PORT}`));

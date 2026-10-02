@@ -228,6 +228,65 @@ Spec: `docs/superpowers/specs/2026-07-10-fase7-clientes-design.md`.
 
 ---
 
+---
+
+## 🪸 CORAL LINE · Entrega 1 — Piel (rama `coral-line`, 2026-10-02)
+
+Spec: `docs/superpowers/specs/2026-10-02-coral-line-identidad-uiux-design.md` · Plan: `docs/superpowers/plans/2026-10-02-coral-line-entrega1-piel.md`
+Referencia viva de la piel: `docs/superpowers/muestras/coral-line-piel.html` (abre con doble clic).
+
+### public/index.html (9.063 líneas)
+| Línea aprox | Qué |
+|---|---|
+| 6–11 | título CORAL LINE, favicon, Montserrat 100–700 + itálicas 300–500 |
+| 14 | `@font-face` Ostrich Sans Heavy (`/fonts/OstrichSans-Heavy.woff2`) + clase `.ic` de los iconos propios |
+| 16 | `:root` — primitivos `--cl-*` y **valores de arranque**. Los nombres viejos son alias: `--navy`=TINTA, `--white`=superficie OPACA |
+| ~744 | `.ttag[class*="tc-"]` — etiquetas de categoría en pastel con tinta de su tono |
+| ~969 | bloque de modo noche (casi vacío a propósito: los tokens cambian solos) |
+| ~980 | `.pi-range` — deslizante de intensidad |
+| 1409–1440 | `<svg>` de símbolos tras `<body>`: iconos `#ci-*` (dock, indicadores, barra) y logos `#cl-imagotipo|isotipo|vertical|responsive2|responsive3` |
+| ~1444 | logo vertical del ingreso (`.pin-logo`) · ~1470 imagotipo del menú (`#sbLogoCL`) |
+| ~2580 | `COLOR_FABRICA` (Deep Teal + Ocean Teal), `CL`, `PIEL_DEF/MIN/MAX`, `pielIntensidad()` |
+| ~2600 | ayudantes `alfa`, `contraste`, `tintaMejor`, `apagar` |
+| ~2659 | `cfgIntensidadCambio()` |
+| ~2674 | **`aplicarTemaColor()`** — de 2 colores + modo + intensidad salen TODOS los tokens |
+| ~2816 | `sbLogoFallo()` — sin logo del negocio (o si no carga) se ve el de Coral Line |
+| ~2879 | `rolHex()` — color del rol oscurecido para su texto blanco |
+
+**Tokens nuevos:** `--tinta(-2,-3)` `--luz(-tinta,-halo)` `--foco` `--bruma` `--hielo` `--atmosfera` `--v1 --v1-borde --v1-brillo` (tarjetas) `--v2 --v2-borde --v2-opaco` (lo que flota) `--vf --vf-tinta --vf-borde` (protagonistas) `--campo` `--pista` `--barra` `--pri(-tinta)` `--boton(-tinta)` `--sel(-tinta)` `--contador` `--sombra(-2)` `--velo` `--violeta(-tinta,-suave,-borde)` `--ambar-tinta --verde-tinta --rojo-tinta`.
+**Regla:** un color de estado usado como TEXTO va en su versión `*-tinta`; nunca la tinta (`--navy`) como fondo.
+
+### server.js (4.440 líneas)
+| Línea aprox | Qué |
+|---|---|
+| ~261 | `ALTER TABLE configuracion_negocio ADD COLUMN piel_intensidad` |
+| ~590 | `CFG_DEFAULTS`: colores de fábrica Coral Line + `piel_intensidad:60`; `pielOk()` |
+| ~652 | migración única `coral_line_colores_fabrica_v1` (vacía los colores de la fábrica vieja) |
+| ~2253 | validación de `piel_intensidad` en `PUT /api/configuracion` |
+| ~2151 | `APP_INFO.nombre = 'CORAL LINE'` |
+
+
+### Entregas 2–3 · Armazón y Dashboard (2026-10-02)
+Plan: `docs/superpowers/plans/2026-10-02-coral-line-entregas2-3-armazon-dashboard.md`.
+| Dónde (index.html) | Qué |
+|---|---|
+| `<div class="topbar">` | barra superior nueva: `#tbLogo`, `#tb-title` (saludo en Dashboard), `#tb-sub`, buscador, teclas `.tecla`, `#bell-badge` (contador Ostrich), Coralyne, Nuevo pedido |
+| `#view-dashboard` → `.db` | rejilla del diseño: `#db-kpis`, `#db-banner`, `.db-chart` (`#db-graf`, `#db-menu`), `#db-rec`, `#db-margen`, `#db-recor`, `#db-bit`, `#db-etapas`, `#db-cal`, `#db-act`, `#dash-ia-slot` |
+| `<nav class="dock">` | dock de escritorio (11 destinos, `.dk-centro` = Dashboard) · `#dk-act` contador de pedidos |
+| `<nav class="mob-nav">` + `#ovMas` | barra móvil de 5 y hoja «Todo» (`.todo-grid`) |
+| JS `iaUbicar()` | Coralyne fija en el Dashboard desde 1760 px (reubica el mismo `.ia-panel`) |
+| JS `cargarDashboard()` y `db*()` | `dbKpis dbBanner(el) dbRecientes dbMargen dbRecordatorios dbBitacora dbEtapas dbActividad dbCalendario dbReloj dbGrafica` |
+| JS `subirBannerCfg / quitarBannerCfg / pintarBannerCfg / reducirImagen` | banner propio en Configuración (WebP 1.600 px) |
+| CSS «CORAL LINE · ARMAZÓN Y DASHBOARD» (al final de `<style>`) | cortes: ≥1760 completo con Coralyne · 1280–1759 sin Coralyne fija · <1280 indicadores en fila · <1100 dos columnas · ≤768 móvil |
+
+| server.js | Qué |
+|---|---|
+| `GET /api/dashboard` | `periodo=anio`, `serie` (por día o por mes), `recientes[].encargos[].items` para avance y etiquetas |
+| `GET /api/dashboard/entregas?mes=AAAA-MM` | entregas por día para el calendario |
+| `POST/DELETE /api/configuracion/banner` · columnas `banner_ruta`, `banner_texto` | banner del negocio |
+
+---
+
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)
 
 | Archivo | Peso | Qué contiene |
