@@ -8,6 +8,7 @@ def lum(c):
     return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2])
 def cr(a, b):
     x, y = lum(a), lum(b); return (max(x, y) + .05) / (min(x, y) + .05)
+def esCampo(o): return str(o.get('txt','')).startswith('[ejemplo]') or o.get('k') in ('INPUT','TEXTAREA','SELECT','item-inp','item-ta')
 def mezcla(c, f, a): return tuple(round(c[i] * a + f[i] * (1 - a)) for i in range(3))
 tot = 0; muestras = {}; ileg = []; bajos = collections.Counter(); porpant = collections.Counter()
 for jf in sorted(glob.glob(f'cap/leg-{modo}-*.json')):
@@ -30,7 +31,16 @@ for jf in sorted(glob.glob(f'cap/leg-{modo}-*.json')):
             ins = -2
         x0, y0, x1, y1 = o['x'] + ins, o['y'] + ins, min(W - 1, o['x'] + o['w'] - 1 - ins), min(H - 1, o['y'] + o['h'] - 1 - ins)
         cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-        if o.get('propio'):   # forma con fondo propio (a menudo redondeada): solo los cuatro puntos medios, que siempre caen dentro
+        tb = o.get('tb')
+        if tb and not esCampo(o):   # texto: el fondo a los LADOS de las letras, dentro del elemento
+            ex0, ex1 = o['x'] + o.get('bw', 0), o['x'] + o['w'] - 1 - o.get('bw', 0)
+            for fy in (.3, .5, .7):
+                yy = round(tb['y'] + tb['h'] * fy)
+                lados = [x for x, malo in ((tb['x'] - 3, tb.get('iz')), (tb['x'] + tb['w'] + 2, tb.get('de'))) if not malo] or [tb['x'] + tb['w'] + 2]
+                for xx in lados:
+                    if (not o.get('propio')) or ex0 < xx < ex1: pts.append((xx, yy))
+        if pts: pass
+        elif o.get('propio'):   # forma con fondo propio (a menudo redondeada): solo los cuatro puntos medios, que siempre caen dentro
             for d in (-2, 0, 2):
                 pts += [(x0, cy + d), (x1, cy + d), (cx + d, y0), (cx + d, y1)]
         else:

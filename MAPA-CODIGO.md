@@ -265,6 +265,26 @@ Referencia viva de la piel: `docs/superpowers/muestras/coral-line-piel.html` (ab
 | ~2253 | validación de `piel_intensidad` en `PUT /api/configuracion` |
 | ~2151 | `APP_INFO.nombre = 'CORAL LINE'` |
 
+
+### Entregas 2–3 · Armazón y Dashboard (2026-10-02)
+Plan: `docs/superpowers/plans/2026-10-02-coral-line-entregas2-3-armazon-dashboard.md`.
+| Dónde (index.html) | Qué |
+|---|---|
+| `<div class="topbar">` | barra superior nueva: `#tbLogo`, `#tb-title` (saludo en Dashboard), `#tb-sub`, buscador, teclas `.tecla`, `#bell-badge` (contador Ostrich), Coralyne, Nuevo pedido |
+| `#view-dashboard` → `.db` | rejilla del diseño: `#db-kpis`, `#db-banner`, `.db-chart` (`#db-graf`, `#db-menu`), `#db-rec`, `#db-margen`, `#db-recor`, `#db-bit`, `#db-etapas`, `#db-cal`, `#db-act`, `#dash-ia-slot` |
+| `<nav class="dock">` | dock de escritorio (11 destinos, `.dk-centro` = Dashboard) · `#dk-act` contador de pedidos |
+| `<nav class="mob-nav">` + `#ovMas` | barra móvil de 5 y hoja «Todo» (`.todo-grid`) |
+| JS `iaUbicar()` | Coralyne fija en el Dashboard desde 1760 px (reubica el mismo `.ia-panel`) |
+| JS `cargarDashboard()` y `db*()` | `dbKpis dbBanner(el) dbRecientes dbMargen dbRecordatorios dbBitacora dbEtapas dbActividad dbCalendario dbReloj dbGrafica` |
+| JS `subirBannerCfg / quitarBannerCfg / pintarBannerCfg / reducirImagen` | banner propio en Configuración (WebP 1.600 px) |
+| CSS «CORAL LINE · ARMAZÓN Y DASHBOARD» (al final de `<style>`) | cortes: ≥1760 completo con Coralyne · 1280–1759 sin Coralyne fija · <1280 indicadores en fila · <1100 dos columnas · ≤768 móvil |
+
+| server.js | Qué |
+|---|---|
+| `GET /api/dashboard` | `periodo=anio`, `serie` (por día o por mes), `recientes[].encargos[].items` para avance y etiquetas |
+| `GET /api/dashboard/entregas?mes=AAAA-MM` | entregas por día para el calendario |
+| `POST/DELETE /api/configuracion/banner` · columnas `banner_ruta`, `banner_texto` | banner del negocio |
+
 ---
 
 ## 📚 Documentos de contexto (raíz del proyecto — abrir solo si hace falta)

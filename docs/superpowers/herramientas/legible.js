@@ -10,11 +10,19 @@ const RECOGE = `(() => {
     const r = e.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return t && (t === e || e.contains(t)); };
   document.querySelectorAll('body *').forEach(e => {
     if (e.closest('svg') || e.tagName === 'OPTION' || e.tagName === 'SCRIPT' || e.tagName === 'STYLE') return;
-    const esIcono = e.tagName === 'I';
+    const esIcono = e.tagName === 'I' && /ti/.test(e.className);
     const tieneTexto = [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     const esCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.tagName) && e.type !== 'checkbox' && e.type !== 'radio' && e.type !== 'range' && e.type !== 'color' && e.type !== 'file';
     if (!tieneTexto && !esCampo && !esIcono) return;
     const r = e.getBoundingClientRect();
+    // caja del TEXTO (no del elemento): el fondo real es el que rodea a las letras
+    let tb = null;
+    if (tieneTexto) { const rg = document.createRange(); const nodos = [...e.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim());
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; nodos.forEach(n => { rg.selectNodeContents(n); [...rg.getClientRects()].forEach(q => { if (q.width < 1) return; x0 = Math.min(x0, q.left); y0 = Math.min(y0, q.top); x1 = Math.max(x1, q.right); y1 = Math.max(y1, q.bottom); }); });
+      // ¿hay un elemento visible pegado a la izquierda o a la derecha del texto? (icono, negrita…) → ese lado no sirve para medir el fondo
+      const hijos = [...e.childNodes].filter(n => n.nodeType === 1 ? n.getClientRects().length : n.textContent.trim());
+      const iz = hijos[0] && hijos[0].nodeType === 1, de = hijos[hijos.length - 1] && hijos[hijos.length - 1].nodeType === 1;
+      if (x1 > x0) tb = { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0), iz, de }; }
     if (r.width < 4 || r.height < 4 || r.left < 0 || r.top < 0 || r.right > vw || r.bottom > vh || !e.offsetParent) return;
     const c = getComputedStyle(e); if (c.visibility === 'hidden' || +c.opacity === 0) return;
     if (!tapa(e)) return;
@@ -25,7 +33,7 @@ const RECOGE = `(() => {
     const bgA = (() => { const m = c.backgroundColor.match(/[0-9.]+/g) || []; return m.length === 4 ? +m[3] : (m.length === 3 ? 1 : 0); })();
     const bw = parseFloat(c.borderTopWidth) || 0, propio = bgA > .02 || c.backgroundImage !== 'none' || bw > 0;
     out.push({ k: ((e.className && e.className.toString().split(' ')[0]) || e.tagName).slice(0, 24), txt, color, fs: parseFloat(c.fontSize), fw: parseInt(c.fontWeight, 10), op: +op.toFixed(2), icono: esIcono,
-      propio, bw, pl: parseFloat(c.paddingLeft) || 0, pt: parseFloat(c.paddingTop) || 0,
+      propio, bw, pl: parseFloat(c.paddingLeft) || 0, pt: parseFloat(c.paddingTop) || 0, tb,
       x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   });
   return out;

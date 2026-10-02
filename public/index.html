@@ -1489,7 +1489,7 @@ html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
 /* indicadores */
 .db-kpi{flex:1;min-height:0;display:grid;grid-template-columns:minmax(76px,1fr) 1.15fr;align-items:center;gap:12px;padding:6px 20px 6px 18px;border-radius:24px;background:var(--v1);border:1.5px solid var(--v1-borde);box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh);color:var(--tinta);cursor:pointer;text-align:left;font-family:inherit;transition:transform .2s,box-shadow .2s;overflow:hidden}
 .db-kpi:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 var(--v1-brillo),var(--sh-lg)}
-.db-kpi.fuerte{background:var(--vf);border-color:var(--vf-borde);color:var(--vf-tinta)}
+.db-kpi.fuerte{background:radial-gradient(120% 95% at 0% 0%,rgba(255,255,255,.20),transparent 58%),var(--vf);border-color:var(--vf-borde);color:var(--vf-tinta);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 14px 30px var(--luz-halo)}
 .db-kpi-n{font-weight:100;font-size:clamp(54px,4.7vw,94px);line-height:.88;text-align:center;letter-spacing:-.03em}
 .db-kpi-d{display:flex;flex-direction:column;gap:8px;min-width:0}
 .db-kpi-d .ic{width:30px;height:30px;stroke-width:1.4px}
@@ -1503,6 +1503,7 @@ html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
 .db-ban-txt{position:relative;font-size:clamp(12px,.85vw,15px);font-weight:500;letter-spacing:.06em;text-transform:uppercase;align-self:flex-end;margin-bottom:clamp(22px,3vh,38px);max-width:56%}
 .db-ban-logo{position:relative;width:clamp(150px,13vw,236px);height:auto;aspect-ratio:136/33;fill:var(--ban-logo);flex-shrink:0}
 .db-banner.con-imagen .db-ban-logo{fill:#FFFFFF;filter:drop-shadow(0 2px 8px rgba(0,0,0,.35))}
+.cfg-ban-prev{height:124px;max-width:720px;margin-top:6px}
 /* reporte */
 .db-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative}
 .db-cab .db-t{margin:0}
@@ -1991,11 +1992,23 @@ html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
 
       <div id="cfg-perfil" class="cfg-panel active">
         <div class="msec"><span class="tri"></span>Identidad</div>
-        <img class="cfg-logo-prev" id="cfg-logo-preview">
+        <img class="cfg-logo-prev" id="cfg-logo-preview" alt="Logo del negocio" onerror="this.style.display='none'">
         <div class="fg" style="margin-bottom:12px">
           <label>Logo del negocio</label><br>
           <button class="btn-pri" type="button" onclick="document.getElementById('cfg-logo-inp').click()"><i class="ti ti-upload"></i> Subir logo</button>
           <input type="file" id="cfg-logo-inp" accept="image/*" style="display:none" onchange="subirLogoCfg(event)">
+        </div>
+        <div class="fg cfg-banner">
+          <label>Banner del Dashboard</label>
+          <section class="db-banner cfg-ban-prev" id="cfg-ban-prev" aria-label="Vista previa del banner"></section>
+          <div class="cl-row" style="flex-wrap:wrap;gap:8px;margin-top:10px">
+            <button class="btn-pri" type="button" onclick="document.getElementById('cfg-ban-inp').click()"><i class="ti ti-photo-up"></i> Subir imagen</button>
+            <button class="btn-ghost" type="button" id="cfg-ban-quitar" onclick="quitarBannerCfg()"><i class="ti ti-photo-off"></i> Quitar imagen</button>
+            <input type="file" id="cfg-ban-inp" accept="image/*" style="display:none" onchange="subirBannerCfg(event)">
+          </div>
+          <div style="margin-top:12px;max-width:720px"><label for="cfg-ban-txt">Frase del banner</label>
+            <input type="text" id="cfg-ban-txt" maxlength="90" placeholder="Gestión y sistema interno empresarial" oninput="CFG.banner_texto=this.value;pintarBannerCfg()"></div>
+          <div class="cl-hint">Una imagen ancha de tu negocio: se ajusta sola a 1.600 px antes de subirla. Sin imagen se usa el banner de Coral Line. La frase se guarda con «Guardar».</div>
         </div>
         <div class="fr2 fg">
           <div><label>Nombre del negocio</label><input type="text" id="cfg-nombre" placeholder="Nombre de tu negocio"></div>
@@ -3131,6 +3144,8 @@ function pintarConfiguracion(){
   const prev=document.getElementById('cfg-logo-preview');
   if(CFG.logo_ruta){prev.src=CFG.logo_ruta;prev.style.display='block'}
   else{prev.style.display='none'}
+  const bt=document.getElementById('cfg-ban-txt'); if(bt)bt.value=CFG.banner_texto||'';
+  pintarBannerCfg();
   document.getElementById('cfg-moneda-prefijo').value=CFG.moneda_prefijo;
   document.getElementById('cfg-decimales').checked=!!CFG.decimales;
   document.getElementById('cfg-separador').value=CFG.separador_miles;
@@ -3452,6 +3467,7 @@ async function guardarConfiguracion(){
     telefono:document.getElementById('cfg-telefono').value.trim(),
     email:document.getElementById('cfg-email').value.trim(),
     nit:document.getElementById('cfg-nit').value.trim(),
+    banner_texto:(document.getElementById('cfg-ban-txt')||{value:''}).value.trim(),
     color_primario:colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario,
     color_acento:colorValido(CFG.color_acento)?CFG.color_acento:COLOR_FABRICA.acento,
     piel_intensidad:pielIntensidad(),
@@ -3507,6 +3523,38 @@ async function subirLogoCfg(e){
   document.getElementById('cfg-logo-preview').style.display='block';
   aplicarPerfilNegocio();
   toast('Logo actualizado');
+}
+// CORAL LINE · banner del Dashboard: se reduce en el navegador (WebP, 1.600 px) y se sube
+function reducirImagen(file,ancho,calidad){
+  return new Promise((ok,mal)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{ const k=Math.min(1,ancho/img.naturalWidth), c=document.createElement('canvas');
+      c.width=Math.round(img.naturalWidth*k); c.height=Math.round(img.naturalHeight*k);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+      c.toBlob(b=>b?ok(b):mal(new Error('No se pudo convertir la imagen')),'image/webp',calidad); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); mal(new Error('No se pudo leer la imagen')); };
+    img.src=url;
+  });
+}
+async function subirBannerCfg(e){
+  const file=e.target.files[0]; e.target.value=''; if(!file)return;
+  let blob=file, nombre=file.name;
+  try{ blob=await reducirImagen(file,1600,.84); nombre='banner.webp'; }catch(err){ console.warn('Banner sin reducir:',err.message); }
+  const fd=new FormData(); fd.append('banner',blob,nombre);
+  const tk=getToken();
+  const r=await fetch('/api/configuracion/banner',{method:'POST',body:fd,headers:tk?{'Authorization':'Bearer '+tk}:{}});
+  if(r.status===401){clearToken();showPinScreen('Sesión expirada, ingresa el PIN de nuevo');return}
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok){toast(data.error||'Error al subir el banner',false);return}
+  CFG.banner_ruta=data.banner_ruta; pintarBannerCfg(); toast('Banner actualizado');
+}
+async function quitarBannerCfg(){
+  try{ await api('DELETE','/configuracion/banner'); CFG.banner_ruta=''; pintarBannerCfg(); toast('Banner quitado: se usa el de Coral Line'); }
+  catch(e){ toast(e.message,false); }
+}
+function pintarBannerCfg(){
+  const el=document.getElementById('cfg-ban-prev'); if(el)dbBanner(el);
+  const q=document.getElementById('cfg-ban-quitar'); if(q)q.style.display=CFG.banner_ruta?'':'none';
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
 function toast(msg,ok=true){
@@ -5083,7 +5131,7 @@ async function cargarDashboard(){
   document.getElementById('db').classList.toggle('db-sinfin',!verFin);
   document.getElementById('db-per-lbl').textContent=DB_PER_LBL[DASH_PER]||'';
   document.querySelectorAll('#db-menu button').forEach(b=>b.classList.toggle('act',b.dataset.per===DASH_PER));
-  dbKpis(d); dbBanner(); dbRecientes(d); dbRecordatorios(d); dbEtapas(d); dbActividad(d); dbCalendario(); dbReloj();
+  dbKpis(d); dbBanner(null); dbRecientes(d); dbRecordatorios(d); dbEtapas(d); dbActividad(d); dbCalendario(); dbReloj();
   if(verFin){ dbMargen(d); requestAnimationFrame(()=>dbGrafica(d)); }
   dbBitacora();
   iaUbicar();
@@ -5100,8 +5148,8 @@ function dbKpis(d){
     <button class="db-kpi${x.f?' fuerte':''}" onclick="${x.go}"><span class="db-kpi-n">${x.n||0}</span>
       <span class="db-kpi-d"><svg class="ic"><use href="#ci-${x.ic}"/></svg><span class="db-kpi-l">${x.l}</span></span></button>`).join('');
 }
-function dbBanner(){
-  const el=document.getElementById('db-banner'); if(!el)return;
+function dbBanner(el){
+  el=el||document.getElementById('db-banner'); if(!el)return;
   const img=CFG.banner_ruta||'';
   el.classList.toggle('con-imagen',!!img);
   el.style.setProperty('--banner-img',img?`url("${img}")`:'none');
