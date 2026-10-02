@@ -1734,7 +1734,7 @@ html[data-tema="noche"] .ia-estrella{color:var(--teal);opacity:.4}
 button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--luz);outline-offset:2px}
 .dk:focus-visible,.mob-btn:focus-visible{outline-offset:-4px;border-radius:18px}
 @media(max-width:768px){
-  .tb-right{flex:1 1 190px}                                    /* si título y buscador no caben juntos, el buscador pasa a su propia línea */
+  .tb-right{flex:1 1 250px}                                    /* si título y buscador no caben juntos, el buscador pasa a su propia línea */
   .toolbar>.search-b{flex:1 1 100%;max-width:none!important}
   .toolbar>select{flex:1 1 40%;min-width:0!important}
   .prod-cab{grid-template-columns:96px minmax(0,1fr)}
@@ -1745,7 +1745,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
   #inv-tabla tr{display:grid;grid-template-columns:1fr 1fr 44px;gap:8px 8px;align-items:center;padding:12px;margin-bottom:10px;background:var(--v1);border:1px solid var(--v1-borde);border-radius:18px}
   #inv-tabla td{display:block;padding:0;border:none;min-width:0}
   #inv-tabla td:nth-child(1){grid-column:1/3}
-  #inv-tabla td:nth-child(2){grid-column:1/3;grid-row:2}
+  #inv-tabla td:nth-child(2){grid-column:1/-1;grid-row:2}
   #inv-tabla td:nth-child(3){grid-column:1;grid-row:3}
   #inv-tabla td:nth-child(4){grid-column:2;grid-row:3}
   #inv-tabla td:nth-child(5){grid-column:1/3;grid-row:4}
@@ -1757,8 +1757,9 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
   /* blancos táctiles: lo que se toca con el dedo mide al menos 36 px (o gana un área invisible alrededor) */
   .cfgtab,.pv-tab,.rtab,.rfpill,.helptab,.bit-chip,.pill,.btn-add-g,.btn-ev,.btn-add-row{min-height:36px}
   select.pcx-resp,select.pcx-est,.pl-fila select,.pcx-cal{min-height:36px}
-  .item-del,.chip-x,.bit-fav,.item-icon,.bit-card button,.var-mv button{position:relative}
-  .item-del::after,.enc-del::after,.pago-del::after,.chip-x::after,.bit-fav::after,.item-icon::after,.bit-card button::after,.var-mv button::after{content:'';position:absolute;inset:-10px}
+  .item-del,.chip-x,.bit-fav,.item-icon,.bit-card button,.var-mv button,.pl-ref,.pcx-ref,.costo-del{position:relative}
+  .item-del::after,.enc-del::after,.pago-del::after,.chip-x::after,.bit-fav::after,.item-icon::after,.bit-card button::after,.var-mv button::after,.pl-ref::after,.pcx-ref::after,.costo-del::after{content:'';position:absolute;inset:-10px}
+  #prod-lista select,#view-configuracion .item-inp{min-height:36px}
   input[type="checkbox"],input[type="radio"]{width:20px;height:20px}
   #cli-more-toggle{min-height:36px;display:flex;align-items:center}
 }
@@ -2247,48 +2248,84 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
 
       <div id="help-manual" class="help-panel active">
         <div class="search-b" style="max-width:340px;margin-bottom:14px"><i class="ti ti-search"></i>
-          <input type="text" id="help-q" placeholder="Buscar en el manual… (ej. pagos, stock, roles)" oninput="buscarAyuda(this.value)" style="max-width:100%">
+          <input type="text" id="help-q" placeholder="Buscar en el manual… (ej. pagos, stock, roles)" aria-label="Buscar en el manual" oninput="buscarAyuda(this.value)" style="max-width:100%">
         </div>
         <div id="help-sin" style="display:none;font-size:11px;color:var(--muted);padding:8px 2px 14px">No encontré nada con esa palabra. Prueba con otro término o escríbenos por <a href="#" onclick="showHelpTab('soporte');return false" style="color:var(--teal-dk);font-weight:600">Soporte</a>.</div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">1. Crear tu primer pedido</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">Ve a <b>Pedidos → Nuevo pedido</b>. Escribe el nombre y teléfono del cliente — si ya existe, la app lo reconoce solo. Agrega al menos un Encargo con sus ítems (cantidad, detalle, valor unitario) y guarda.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">1. Moverse por la app</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">La barra de abajo te lleva a cada sección: <b>Productos, Pedidos, Clientes, Registros, Costos, Dashboard, Inventario, Producción, Bitácora, Perfil y Ajustes</b>. La luz marca dónde estás. Arriba tienes el buscador (busca en pedidos, clientes y productos a la vez), el modo noche, exportar, la campana de recordatorios, Coralyne y <b>Nuevo pedido</b>. En el teléfono la barra muestra cinco accesos; <b>Todo</b> abre el resto. Las ventanas se cierran con la X, con la tecla Escape o con el botón «atrás» del teléfono.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">2. Encargos y costos</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body"><b>Encargos</b> es lo que le cobras al cliente: categoría, subcategoría, estado y los ítems con su cantidad y valor. <b>Costos</b> es lo que te cuesta a ti producirlo (insumos, mano de obra) — no se le muestra al cliente y se resta de la ganancia en Registros.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">2. Crear un pedido</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Pulsa <b>Nuevo pedido</b>. Escribe el nombre del cliente: si ya existe, aparece para elegirlo; si no, se crea solo al guardar. Agrega al menos un ítem con su cantidad, detalle y valor unitario, pon la fecha de entrega si la hay y guarda. El pedido recibe su número consecutivo.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">3. Registrar pagos</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">En la sección Pagos de cada pedido, registra cada abono con su fecha y forma de pago. El saldo pendiente se calcula solo a partir del valor total del pedido.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">3. Encargos e ítems</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Un pedido se organiza en <b>listas de encargo</b> (#01, #02…) y cada lista tiene sus <b>ítems</b>. El ítem es la unidad de trabajo: lleva su cantidad, su detalle, su valor, su categoría, su estado y, si quieres, una nota. Al escribir el detalle aparecen tus productos guardados: elige uno y el precio se llena solo. Cada lista tiene además una anotación propia.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">4. Cómo usar los estados</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">Cada Encargo avanza por: Nuevo → Diseño → Aprobación → Producción → Listo. El pedido completo, por separado, se puede marcar como Urgente, Entregado, Cancelado o Pendiente de pago — son independientes del estado del encargo.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">4. Valores y precios</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">El valor sube solo: cada ítem suma al encargo y cada encargo suma al pedido (<b>valor sugerido</b>). Solo dos cifras se pueden fijar a mano: el <b>Valor Encargo</b> y el <b>Valor del pedido</b>; cuando lo haces queda marcado como «Ajustado manualmente». También puedes cambiar el total de un ítem para dejar un precio negociado: la app guarda el sugerido y deja el rastro en el historial. Los campos de dinero aceptan operaciones: escribe <b>5*10000</b> o <b>10000+5000</b> y se calcula.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">5. Cotizaciones</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">Marca "Es cotización" en un pedido que todavía no es un compromiso real con el cliente. Mientras esté marcada, no descuenta inventario ni cuenta como venta. Cuando el cliente confirme, desmarca la casilla y guarda — ahí se vuelve un pedido real.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">5. Pagos y abonos</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En <b>Pagos y abonos</b> registra cada pago con su fecha, monto, forma y nota. El resumen del pedido muestra total, pagado y saldo; el estado de pago (Sin pago, Abono, Pagado) se calcula solo. Las formas de pago se configuran en Ajustes → Pedidos.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">6. Fichas de producto</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">En <b>Productos</b>, crea una ficha por cada producto o servicio: nombre, categoría, tipo de precio (Unitario, Escalonado por cantidad, o Promocional con fechas de vigencia), insumos opcionales y margen.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">6. Estados y avance</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Cada ítem avanza por <b>Nuevo → Diseño → Aprobación → Producción → Listo</b> (los estados se pueden cambiar en Ajustes → Producción). El avance del pedido es el promedio de sus ítems: no se marca a mano. Aparte, el pedido tiene su marcación (en curso, entregado, cancelado) y la marca <b>Urgente</b>. Un pedido terminado se puede <b>cerrar</b> para que nadie lo edite; quien tenga el permiso puede reabrirlo.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">7. Autocompletado en el pedido</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">Al escribir el Detalle de un ítem (en Encargos o en Costos), aparecen sugerencias de tus fichas e insumos ya guardados. Selecciona una y el precio se llena solo.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">7. Cotizaciones</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Marca <b>Cotización</b> en un pedido que todavía no es un compromiso. Mientras lo sea no descuenta inventario, no cuenta como venta y oculta pagos y costos. Cuando el cliente confirma, desmarca la casilla; si le registras un abono, pasa a pedido sola.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">8. Inventario (stock)</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">En la ficha de cada producto puedes configurar "Stock actual" y "Stock mínimo". Al confirmar un pedido real (no cotización) que use ese producto, el stock baja solo. Si cancelas o eliminas ese pedido, el stock se restaura.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">8. Productos</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En <b>Productos</b> creas una ficha por cada cosa que vendes. Puede ser un <b>producto simple</b>, un <b>combo</b> (varios productos a un precio) o una <b>promoción</b> con fechas. El producto simple se cobra de cuatro maneras: por cantidad o precio fijo, por medidas (ancho × alto), por variantes (tamaños o versiones, con precios por tramo de cantidad) o por hoja (cuántas piezas rinde cada hoja). Cada combinación que vendes recibe un <b>código de venta</b> estable: si mañana piden lo mismo, se reutiliza el mismo código.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">9. Documentos y WhatsApp</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">Desde el pedido puedes generar un PDF (Cotización, Orden de Pedido o Comprobante de Venta, según el estado) y enviarlo al cliente por WhatsApp con un mensaje ya armado.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">9. Costos y Centro de Costos</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En la ficha del producto cargas sus insumos y lo que cuesta producirlo. En el pedido, la sección <b>Registro</b> guarda los costos reales de ese trabajo: es privada, no sale en los documentos del cliente. El <b>Centro de Costos</b> reúne todo: por producto, por proveedor, por categoría y en listados de costos que puedes enlazar a varios productos. Sin costos cargados no hay utilidad que mostrar.</div>
         </div>
         <div class="man-step">
-          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">10. Exportar datos y configurar el negocio</div><i class="ti ti-chevron-down man-chevron"></i></div>
-          <div class="man-body">"Exportar CSV" en el menú lateral descarga tus pedidos para abrirlos en Excel. "Configuración" guarda los datos de tu negocio, preferencias de moneda y fecha, métodos de pago e IVA.</div>
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">10. Inventario</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En <b>Inventario</b> creas los ítems físicos (por ejemplo «Camiseta blanca M» o «Lona 1 m») con su stock actual y su mínimo. En cada producto eliges cuál descuenta y cuánto. Al guardar un pedido real el stock baja solo; si lo cancelas, lo archivas o lo vuelves cotización, se restaura. Cuando un ítem llega a su mínimo aparece «Stock bajo».</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">11. Producción</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body"><b>Producción</b> muestra el trabajo por hacer en varias vistas: tablero, lista, calendario, cronograma, agenda, daños y métricas. Mueve cada trabajo de estado, asígnale un responsable, deja una observación técnica y marca la revisión de calidad. Filtra por responsable, por etiqueta, los urgentes o solo los tuyos.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">12. Documentos, WhatsApp y exportar</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Desde el pedido puedes <b>imprimir</b>, <b>descargar el PDF</b> (cotización, orden de pedido o comprobante, según el caso) y <b>compartir</b> por WhatsApp con el mensaje ya armado. <b>Exportar</b> (arriba, o en Perfil) descarga tus pedidos en CSV para abrirlos en Excel: un pedido por fila o una fila por ítem.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">13. Bitácora y recordatorios</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">La <b>Bitácora</b> es para anotar lo que no quieres perder: ideas, pendientes, precios que te pasan. Organiza las notas en tableros, márcalas como favoritas, adjúntales archivos y relaciónalas con un pedido. Los <b>recordatorios</b> se crean desde el calendario de Producción y avisan en la campana.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">14. Dashboard y Registros</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">El <b>Dashboard</b> resume el día: pedidos activos y urgentes, entregas, el reporte de ingresos, costos y utilidad (elige el período en la esquina de la gráfica), los pedidos recientes, las etapas de producción y el calendario de entregas. <b>Registros</b> da el detalle: ventas, costos, utilidades, ingresos y saldos, por el período que elijas. Ventas es lo facturado; Ingresos es el dinero que realmente entró.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">15. Coralyne, la asistente</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body"><b>Coralyne</b> responde preguntas sobre tu negocio con tus datos reales: qué entregas esta semana, quién te debe, cómo va un pedido. También puede proponerte crear o cambiar productos, clientes y pedidos: nada se guarda hasta que tú lo confirmas. Para activarla, el administrador pone la clave del proveedor de IA en Ajustes → Asistente IA.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">16. Usuarios, roles y permisos</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En Ajustes → <b>Usuarios y Roles</b> creas una cuenta para cada persona y le asignas un rol. Cada rol define qué puede hacer: crear o editar pedidos, registrar pagos, ver costos y utilidad, ver registros, gestionar producción, productos, inventario o clientes. El administrador siempre puede todo. Cada quien cambia su nombre y su contraseña en <b>Perfil</b>.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">17. Ajustes del negocio</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">En <b>Ajustes</b> pones el logo, el banner del Dashboard y los datos del negocio; eliges tus dos colores y la intensidad del fondo; configuras moneda y fecha, formas de pago, IVA, etiquetas (categorías y subcategorías) y los estados de producción. El modo noche se cambia con la luna de la barra superior.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">18. Archivo</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Aquí nada se borra por accidente: pedidos, clientes y productos se <b>archivan</b>. Dejan de aparecer en las listas, pero su información se conserva y puedes restaurarlos desde <b>Perfil → Archivo</b>.</div>
+        </div>
+        <div class="man-step">
+          <div class="man-head" onclick="toggleManual(this)"><div class="man-head-l">19. Usar la app en el teléfono</div><i class="ti ti-chevron-down man-chevron"></i></div>
+          <div class="man-body">Abre la app en el navegador del teléfono y elige <b>Añadir a pantalla de inicio</b> (en Android, desde el menú del navegador; en iPhone, desde el botón Compartir de Safari). Queda con su icono, como cualquier otra aplicación.</div>
         </div>
       </div>
       <div id="help-quienes" class="help-panel">
@@ -2388,7 +2425,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
       <button class="btn-ghost" id="btn-pdf" style="display:none" onclick="generarPdfPedido()"><i class="ti ti-download"></i>Descargar PDF</button>
       <button class="btn-ghost" id="btn-wa" style="display:none" onclick="compartirPedido()"><i class="ti ti-share"></i>Compartir</button>
       <button class="btn-danger" id="btn-del" style="display:none" onclick="archivarPed()"><i class="ti ti-archive"></i>Archivar</button>
-      <button class="mclose" onclick="cerrar()"><i class="ti ti-x"></i></button>
+      <button title="Cerrar" aria-label="Cerrar" class="mclose" onclick="cerrar()"><i class="ti ti-x"></i></button>
     </div>
   </div>
   <div class="mbody">
@@ -2541,7 +2578,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
 <!-- MODAL CLIENTE -->
 <div class="overlay" id="ovCli">
 <div class="modal" style="max-width:480px">
-  <div class="mhead"><div class="mhead-l"><div class="mtitle" id="cli-nom"></div></div><div class="mhead-actions"><button class="btn-danger" onclick="archivarCli()"><i class="ti ti-archive"></i>Archivar</button><button class="mclose" onclick="cerrarCli()"><i class="ti ti-x"></i></button></div></div>
+  <div class="mhead"><div class="mhead-l"><div class="mtitle" id="cli-nom"></div></div><div class="mhead-actions"><button class="btn-danger" onclick="archivarCli()"><i class="ti ti-archive"></i>Archivar</button><button title="Cerrar" aria-label="Cerrar" class="mclose" onclick="cerrarCli()"><i class="ti ti-x"></i></button></div></div>
   <div class="mbody" id="cli-body"></div>
 </div>
 </div>
@@ -2565,7 +2602,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
 <!-- MODAL MI PERFIL -->
 <div class="overlay" id="ovPerfil">
 <div class="modal" style="max-width:400px">
-  <div class="mhead"><div class="mhead-l"><div class="mtitle">Mi perfil</div></div><button class="mclose" onclick="cerrarPerfil()"><i class="ti ti-x"></i></button></div>
+  <div class="mhead"><div class="mhead-l"><div class="mtitle">Mi perfil</div></div><button title="Cerrar" aria-label="Cerrar" class="mclose" onclick="cerrarPerfil()"><i class="ti ti-x"></i></button></div>
   <div class="mbody" id="perfil-body"></div>
 </div>
 </div>
@@ -2574,7 +2611,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
 <!-- CÓDIGOS DE VENTA: el registro rastreable de cada configuración vendida -->
 <div class="overlay" id="ovCodigos">
 <div class="modal" style="max-width:560px">
-  <div class="mhead"><div class="mhead-l"><div class="mtitle">Códigos de venta</div></div><button class="mclose" onclick="cerrarCodigos()"><i class="ti ti-x"></i></button></div>
+  <div class="mhead"><div class="mhead-l"><div class="mtitle">Códigos de venta</div></div><button title="Cerrar" aria-label="Cerrar" class="mclose" onclick="cerrarCodigos()"><i class="ti ti-x"></i></button></div>
   <div class="mbody">
     <div class="search-b" style="margin-bottom:10px"><i class="ti ti-search"></i>
       <input type="text" id="cod-s" placeholder="Buscar por código, producto o descripción…" oninput="cargarCodigos(this.value)">
@@ -2589,7 +2626,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
 
 <div class="overlay" id="ovExp">
 <div class="modal" style="max-width:360px">
-  <div class="mhead"><div class="mhead-l"><div class="mtitle">Exportar</div></div><button class="mclose" onclick="cerrarExp()"><i class="ti ti-x"></i></button></div>
+  <div class="mhead"><div class="mhead-l"><div class="mtitle">Exportar</div></div><button title="Cerrar" aria-label="Cerrar" class="mclose" onclick="cerrarExp()"><i class="ti ti-x"></i></button></div>
   <div class="mbody">
     <div class="fg"><label>Filtrar por</label>
       <select id="exp-est"><option value="todos">Todos</option><option value="activo">Activos</option><option value="entregado">Entregados</option><option value="cancelado">Cancelados</option></select>
@@ -2611,7 +2648,7 @@ button:focus-visible,a:focus-visible,[role="button"]:focus-visible,[tabindex]:fo
 <div class="modal">
   <div class="mhead">
     <div class="mhead-l"><div class="mtitle" id="prod-tit">Nuevo producto</div></div>
-    <button class="mclose" onclick="cerrarProducto()"><i class="ti ti-x"></i></button>
+    <button title="Cerrar" aria-label="Cerrar" class="mclose" onclick="cerrarProducto()"><i class="ti ti-x"></i></button>
   </div>
   <div class="mbody">
 
@@ -3427,7 +3464,7 @@ function renderRolAjustes(keepScroll){
     <div style="display:flex;gap:7px;margin-top:11px;flex-wrap:wrap">
       <button class="btn-pri" onclick="guardarRol('${r.id}')"><i class="ti ti-device-floppy"></i> Guardar</button>
       <button class="btn-ghost" onclick="duplicarRol('${r.id}')" title="Crear una copia de este rol"><i class="ti ti-copy"></i> Duplicar</button>
-      <button class="btn-ghost" style="color:var(--rojo-tinta);margin-left:auto" onclick="eliminarRol('${r.id}')"><i class="ti ti-trash"></i></button>
+      <button title="Eliminar rol" aria-label="Eliminar rol" class="btn-ghost" style="color:var(--rojo-tinta);margin-left:auto" onclick="eliminarRol('${r.id}')"><i class="ti ti-trash"></i></button>
     </div>`;
   if(keepScroll)cont.scrollTop=scrollY;
 }
@@ -3499,8 +3536,8 @@ function renderEtiquetas(){
       </div>
       <input class="item-inp" style="flex:1;min-width:120px" type="text" value="${escHtml(c.label)}" placeholder="Etiqueta (ej: Estampados)" oninput="setEtiquetaNombre('${c.id}',this.value)">
       <input class="item-inp" style="flex:2;min-width:160px" type="text" value="${escHtml(c._subsRaw!=null?c._subsRaw:(c.subs||[]).join(', '))}" placeholder="Subetiquetas separadas por coma" oninput="setEtiquetaSubs('${c.id}',this.value)">
-      <button class="btn-add-row" style="padding:6px 10px" onclick="guardarEtiqueta('${c.id}')"><i class="ti ti-check"></i></button>
-      ${c.id==='_nueva'?'':`<button class="item-del" onclick="eliminarEtiqueta('${c.id}')"><i class="ti ti-trash"></i></button>`}
+      <button title="Guardar etiqueta" aria-label="Guardar etiqueta" class="btn-add-row" style="padding:6px 10px" onclick="guardarEtiqueta('${c.id}')"><i class="ti ti-check"></i></button>
+      ${c.id==='_nueva'?'':`<button title="Eliminar etiqueta" aria-label="Eliminar etiqueta" class="item-del" onclick="eliminarEtiqueta('${c.id}')"><i class="ti ti-trash"></i></button>`}
     </div>`).join('');
 }
 
@@ -3565,8 +3602,8 @@ function renderEstadosProduccion(){
       <input class="item-inp" style="flex:1;min-width:120px" type="text" value="${pesc(e.nombre)}" placeholder="Nombre del estado (ej: Compra de insumos)" oninput="setEstadoNombre('${e.id}',this.value)">
       <div class="ck-box"><input type="checkbox" id="est-resp-${e.id}" ${e.requiere_responsable?'checked':''} onchange="setEstadoFlag('${e.id}','requiere_responsable',this.checked)"><label for="est-resp-${e.id}">Requiere responsable</label></div>
       <div class="ck-box"><input type="checkbox" id="est-notas-${e.id}" ${e.requiere_notas?'checked':''} onchange="setEstadoFlag('${e.id}','requiere_notas',this.checked)"><label for="est-notas-${e.id}">Requiere notas</label></div>
-      <button class="btn-add-row" style="padding:6px 10px" onclick="guardarEstado('${e.id}')"><i class="ti ti-check"></i></button>
-      ${e.id==='_nuevo'?'':`<button class="item-del" onclick="eliminarEstado('${e.id}')"><i class="ti ti-trash"></i></button>`}
+      <button title="Guardar estado" aria-label="Guardar estado" class="btn-add-row" style="padding:6px 10px" onclick="guardarEstado('${e.id}')"><i class="ti ti-check"></i></button>
+      ${e.id==='_nuevo'?'':`<button title="Eliminar estado" aria-label="Eliminar estado" class="item-del" onclick="eliminarEstado('${e.id}')"><i class="ti ti-trash"></i></button>`}
     </div>`).join('');
 }
 
@@ -5508,36 +5545,6 @@ function dashDonut(margen){
       stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" data-off="${off.toFixed(1)}"></circle>
   </svg>`;
 }
-const DIAS_CORTOS=['dom','lun','mar','mié','jue','vie','sáb'];
-function dashChartIngresos(serie,hoyStr){
-  const el=document.getElementById('dash-chart-ing'); if(!el)return;
-  const max=Math.max(...serie.map(s=>s.v),1);
-  el.innerHTML=`<div class="dbar-wrap">${serie.map((s,i)=>{
-    const h=Math.round(s.v/max*88);
-    const dia=new Date(s.d+'T00:00:00');
-    const esHoy=s.d===hoyStr;
-    return `<div class="dbar-col" title="${fd(s.d)} · ${fCOP(s.v)}">
-      <div class="dbar-v">${s.v?fmtMiles(String(Math.round(s.v/1000)))+'k':''}</div>
-      <div class="dbar ${s.v?'':'cero'}" style="height:${Math.max(h,3)}px;animation-delay:${i*70}ms"></div>
-      <div class="dbar-l ${esHoy?'hoy':''}">${esHoy?'hoy':DIAS_CORTOS[dia.getDay()]}</div>
-    </div>`;
-  }).join('')}</div>`;
-}
-function dashChartProduccion(prod){
-  const el=document.getElementById('dash-chart-prod'); if(!el)return;
-  const total=ENC_ESTS.reduce((a,e)=>a+(prod[e]||0),0);
-  el.innerHTML=ENC_ESTS.map(e=>{
-    const n=prod[e]||0, pct=total?Math.round(n*100/total):0;
-    return `<div class="hbar-row"><div class="hbar-lbl"><span class="pt-dot" style="background:${ECOL_MAP[e]};margin:0"></span>${pesc(e)}</div>
-      <div class="hbar-track"><div class="hbar-fill" data-w="${pct}%" style="background:${ECOL_MAP[e]}"></div></div>
-      <div class="hbar-n">${n}</div></div>`;
-  }).join('')+`<div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px">${total} encargo${total===1?'':'s'} activos</div>`;
-  // animar los anchos y el donut en el siguiente frame (transición CSS)
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    document.querySelectorAll('.hbar-fill').forEach(b=>b.style.width=b.dataset.w);
-    document.querySelectorAll('.donut .val').forEach(c=>c.style.strokeDashoffset=c.dataset.off);
-  }));
-}
 
 /* ══ PRODUCCIÓN (Fase 4 · multi-vista Fase 4.2) ══ */
 let PROD_CARDS=[], PROD_EQUIPO=[], PROD_INV=[], prodFUrg=false, prodFMio=false;
@@ -5683,8 +5690,11 @@ function prodSetVista(v){
 function prodAjustarAlto(){
   const b=document.getElementById('prod-board'); if(!b||!b.offsetParent)return;
   const barra=[...document.querySelectorAll('.dock,.mob-nav')].find(e=>e.offsetHeight);
-  const libre=innerHeight-(b.getBoundingClientRect().top+scrollY)-(barra?barra.offsetHeight:0)-22;
-  b.style.setProperty('--col-h',Math.max(280,Math.round(libre))+'px');
+  const libre=Math.max(280,Math.round(innerHeight-(b.getBoundingClientRect().top+scrollY)-(barra?barra.offsetHeight:0)-22));
+  b.style.setProperty('--col-h',libre+'px');
+  // si aun así la página quedó más alta que la pantalla (márgenes del contenedor), se le resta la diferencia
+  const sobra=document.documentElement.scrollHeight-innerHeight;
+  if(sobra>0&&sobra<220)b.style.setProperty('--col-h',Math.max(280,libre-sobra)+'px');
 }
 addEventListener('resize',()=>requestAnimationFrame(prodAjustarAlto));
 function renderProduccion(){
@@ -6322,7 +6332,7 @@ function renderInventario(q){
       <td><input class="item-inp" type="number" step="0.01" value="${it.stock_actual??''}" placeholder="Sin seguimiento" onblur="guardarItemInv('${it.id}','stock_actual',this.value)"></td>
       <td><input class="item-inp" type="number" step="0.01" value="${it.stock_minimo??''}" placeholder="Opcional" onblur="guardarItemInv('${it.id}','stock_minimo',this.value)"></td>
       <td>${bajo?'<span class="b-pend">Stock bajo</span>':''}</td>
-      <td><button class="item-del" onclick="eliminarItemInv('${it.id}')"><i class="ti ti-x"></i></button></td>
+      <td><button title="Eliminar ítem" aria-label="Eliminar ítem" class="item-del" onclick="eliminarItemInv('${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
 }
@@ -7112,7 +7122,7 @@ function renderEncs(){
   }
   el.innerHTML=fEnc.map((enc,i)=>`
     <div class="enc-card" id="ec-${enc.id}">
-      <button class="enc-del" onclick="remEnc('${enc.id}')"><i class="ti ti-x"></i></button>
+      <button title="Quitar encargo" aria-label="Quitar encargo" class="enc-del" onclick="remEnc('${enc.id}')"><i class="ti ti-x"></i></button>
       <div class="enc-head2">Lista de encargo <span>#${String(enc.numero).padStart(2,'0')}</span></div>
       <div class="enc-body">
         <table class="items-table" id="it-${enc.id}">
@@ -7173,7 +7183,7 @@ function renderItemsHTML(enc){
         ${itemNotaAbierto.has(it.id)?`<div class="item-expand"><input class="item-inp" type="text" value="${escHtml(it.nota||'')}" placeholder="Nota: ej. 20 talla S · 10 talla XL…" oninput="setItemNota('${enc.id}','${it.id}',this.value)"></div>`:(it.nota?`<div class="item-nota">${escHtml(it.nota)}</div>`:'')}</td>
       <td style="width:92px"><input class="item-inp" id="itval-${it.id}" type="text" value="${displayMoneyVal(it.valor_unitario)}" placeholder="$ 0" style="text-align:right" oninput="setItem('${enc.id}','${it.id}','valor_unitario',this.value);previewItemUnit('${it.id}',this.value)" onfocus="focusItemVal(this,'${enc.id}','${it.id}')" onblur="blurItemVal(this,'${enc.id}','${it.id}')"><div id="itprev-${it.id}" style="font-size:11px;font-weight:600;color:var(--teal-dk);text-align:right;margin-top:2px;display:none"></div>${editado?`<div class="it-editado" title="PAM · Precio Ajustado Manualmente — el sistema sugería ${fCOP(sug)}, se cobró ${fCOP(evalExpr(it.valor_unitario)||0)}. El cálculo original no se perdió."><i class="ti ti-pencil"></i> PAM</div>`:''}</td>
       <td style="width:96px"><input class="item-inp" id="ittot-${it.id}" type="text" value="${totItem?displayMoneyVal(String(totItem)):''}" placeholder="$ 0" style="text-align:right;font-weight:600;color:var(--navy)" onchange="setItemTotal('${enc.id}','${it.id}',this.value)" title="Total del ítem — editable (precio negociado)"></td>
-      <td style="width:26px"><button class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
+      <td style="width:26px"><button title="Quitar ítem" aria-label="Quitar ítem" class="item-del" onclick="remItem('${enc.id}','${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
 }
@@ -7287,7 +7297,7 @@ function renderHojaSup(){
       <td><input class="item-inp" type="text" value="${escHtml(s.nombre||'')}" placeholder="Ej: A4" oninput="setHojaSup('${s.id}','nombre',this.value)"></td>
       <td><input class="item-inp" type="number" min="1" value="${escHtml(s.piezas||'')}" placeholder="Ej: 8" oninput="setHojaSup('${s.id}','piezas',this.value)"></td>
       <td><input class="item-inp" type="text" value="${escHtml(s.precio||'')}" placeholder="$ 0" oninput="setHojaSup('${s.id}','precio',this.value)"></td>
-      <td style="width:26px"><button class="item-del" onclick="remHojaSup('${s.id}')"><i class="ti ti-x"></i></button></td>
+      <td style="width:26px"><button title="Quitar hoja" aria-label="Quitar hoja" class="item-del" onclick="remHojaSup('${s.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
 }
 function addHojaExtra(){fProdHojaExtras.push({id:uid(),nombre:'',valor:'',tipo:'pieza'});renderHojaExtras()}
@@ -7303,7 +7313,7 @@ function renderHojaExtras(){
         <option value="hoja"${e.tipo==='hoja'?' selected':''}>por hoja</option>
         <option value="fijo"${e.tipo==='fijo'?' selected':''}>fijo (1 vez)</option>
       </select></td>
-      <td style="width:26px"><button class="item-del" onclick="remHojaExtra('${e.id}')"><i class="ti ti-x"></i></button></td>
+      <td style="width:26px"><button title="Quitar extra" aria-label="Quitar extra" class="item-del" onclick="remHojaExtra('${e.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`).join('');
 }
 let prodModoCalculo='cantidad';
@@ -7488,7 +7498,7 @@ function cvPickerHTML(v){
   const l=cvListaDe(st.lista_id), it=l&&(l.items||[]).find(x=>x.id===st.item_id);
   const esc=s=>String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   return `<div class="cv-picker" onclick="event.stopPropagation()">
-    <div class="cv-picker-hd"><span><i class="ti ti-link"></i> Vincular a un Listado de costos</span><button class="cv-close" onclick="cvVinculando=null;renderVariantes()"><i class="ti ti-x"></i></button></div>
+    <div class="cv-picker-hd"><span><i class="ti ti-link"></i> Vincular a un Listado de costos</span><button title="Cerrar" aria-label="Cerrar" class="cv-close" onclick="cvVinculando=null;renderVariantes()"><i class="ti ti-x"></i></button></div>
     ${listas.length?`
     <select class="item-inp" onchange="cvPickLista(this.value)"><option value="">— Elige lista —</option>${listas.map(x=>`<option value="${x.id}"${x.id===st.lista_id?' selected':''}>${esc(x.titulo||x.proveedor)} · ${esc(x.proveedor)}</option>`).join('')}</select>
     ${l?`<select class="item-inp" style="margin-top:5px" onchange="cvPickItem(this.value)"><option value="">— Elige ítem —</option>${(l.items||[]).map(x=>`<option value="${x.id}"${x.id===st.item_id?' selected':''}>${esc(x.descripcion)}${x.codigo?' ('+esc(x.codigo)+')':''}</option>`).join('')}</select>`:''}
@@ -8232,7 +8242,7 @@ function renderCostosFijos(){
     <div class="var-chip">
       <input class="chip-inp" type="text" value="${String(c.nombre||'').replace(/"/g,'&quot;')}" placeholder="Concepto" oninput="setCostoFijo('${c.id}','nombre',this.value)">
       <input class="chip-inp chip-val" type="text" value="${String(c.valor||'').replace(/"/g,'&quot;')}" placeholder="$ 0" oninput="setCostoFijo('${c.id}','valor',this.value)">
-      <button class="chip-x" onclick="remCostoFijo('${c.id}')"><i class="ti ti-x"></i></button>
+      <button title="Quitar costo" aria-label="Quitar costo" class="chip-x" onclick="remCostoFijo('${c.id}')"><i class="ti ti-x"></i></button>
     </div>`).join('')+'<button class="chip-add" onclick="addCostoFijo()"><i class="ti ti-plus"></i>Agregar costo fijo</button></div>';
 }
 let _acComboResults={};
@@ -8256,7 +8266,7 @@ function renderComponentes(){
     <td>${campoNombre}</td>
     <td><input class="item-inp" type="text" value="${it.cantidad_consumida||''}" placeholder="Ej: 6" oninput="setComponente('${it.id}','cantidad_consumida',this.value)"></td>
     <td style="width:100px;display:${mostrarPrecio?'table-cell':'none'}"><input class="item-inp" type="text" value="${displayMoneyVal(it.precio_unitario)}" placeholder="$ 0" oninput="setComponente('${it.id}','precio_unitario',this.value)"></td>
-    <td style="width:26px"><button class="item-del" onclick="remComponente('${it.id}')"><i class="ti ti-x"></i></button></td>
+    <td style="width:26px"><button title="Quitar componente" aria-label="Quitar componente" class="item-del" onclick="remComponente('${it.id}')"><i class="ti ti-x"></i></button></td>
   </tr>`;
   }).join('');
 }
@@ -8351,7 +8361,7 @@ function renderInsumos(){
       <td><input class="item-inp" type="text" value="${displayMoneyVal(it.costo_unitario)}" placeholder="$ 0" oninput="setInsumo('${it.id}','costo_unitario',this.value);previewInsumoUnit('${it.id}',this.value)" onfocus="focusInsumoUnit(this,'${it.id}')" onblur="blurInsumoUnit(this,'${it.id}')"><div id="insprev-${it.id}" style="font-size:11px;font-weight:600;color:var(--teal-dk);display:none"></div></td>
       <td id="inssub-${it.id}" style="text-align:right;font-weight:600;color:var(--navy);white-space:nowrap">${fCOP(subtotal)}</td>
       <td style="text-align:center"><input type="checkbox" ${it.es_variable?'checked':''} onchange="setInsumo('${it.id}','es_variable',this.checked)"></td>
-      <td style="width:26px"><button class="item-del" onclick="remInsumo('${it.id}')"><i class="ti ti-x"></i></button></td>
+      <td style="width:26px"><button title="Quitar insumo" aria-label="Quitar insumo" class="item-del" onclick="remInsumo('${it.id}')"><i class="ti ti-x"></i></button></td>
     </tr>`;
   }).join('');
   recalcPrecioSugerido();
@@ -8466,7 +8476,7 @@ function renderRangos(){
       <span class="chip-lbl">a</span>
       <input class="chip-inp chip-sm" type="text" value="${String(r.hasta||'').replace(/"/g,'&quot;')}" placeholder="${i===n-1?'+':'?'}" title="${i===n-1?'Vacío = de aquí en adelante':'Hasta cuántas unidades'}" oninput="setRango('${r.id}','hasta',this.value)">
       <input class="chip-inp chip-val" type="text" value="${displayMoneyVal(r.precio)}" placeholder="$ 0" oninput="setRango('${r.id}','precio',this.value)" onfocus="focusRangoPrecio(this,'${r.id}')" onblur="blurRangoPrecio(this,'${r.id}')">
-      <button class="chip-x" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button>
+      <button title="Quitar tramo" aria-label="Quitar tramo" class="chip-x" onclick="remRango('${r.id}')"><i class="ti ti-x"></i></button>
     </div>`).join('')+'<button class="chip-add" onclick="addRango()"><i class="ti ti-plus"></i>Agregar tramo</button></div>';
   syncDesdeRangos();
   actualizarVisibilidadPrecioBase();
@@ -9100,7 +9110,7 @@ function renderCostos(){
         <input type="text" id="costo-monto-${c.id}" value="${displayMoneyVal(c.monto)}" placeholder="$ 0" oninput="setCostoVal('${c.id}','monto',this.value)" onfocus="focusCostoVal(this,'${c.id}')" onblur="blurCostoVal(this,'${c.id}')" style="max-width:110px;width:100%">
         <div id="costprev-${c.id}" style="font-size:11px;font-weight:600;color:var(--teal-dk);margin-top:2px;display:none"></div>
       </div>
-      <button class="costo-del" onclick="remCosto('${c.id}')"><i class="ti ti-x"></i></button>
+      <button title="Quitar costo" aria-label="Quitar costo" class="costo-del" onclick="remCosto('${c.id}')"><i class="ti ti-x"></i></button>
     </div>`).join('');
   renderCostosRes();
 }
@@ -9128,8 +9138,8 @@ async function remArch(id){await api('DELETE',`/archivos/${id}`);fArch=fArch.fil
 function renderArchivos(){
   const el=document.getElementById('arch-g');
   el.innerHTML=fArch.map(a=>a.tipo?.startsWith('image/')?
-    `<div class="arch-w"><img src="${a.ruta}" class="arch-img" onclick="window.open('${a.ruta}')"><button class="arch-rm" onclick="remArch('${a.id}')"><i class="ti ti-x"></i></button></div>`:
-    `<div class="arch-w"><div class="arch-file"><i class="ti ti-file" style="font-size:18px"></i><span>${a.nombre?.slice(0,9)}</span></div><button class="arch-rm" onclick="remArch('${a.id}')"><i class="ti ti-x"></i></button></div>`
+    `<div class="arch-w"><img src="${a.ruta}" class="arch-img" alt="${escHtml(a.nombre||'Archivo adjunto')}" loading="lazy" onclick="window.open('${a.ruta}')"><button title="Quitar archivo" aria-label="Quitar archivo" class="arch-rm" onclick="remArch('${a.id}')"><i class="ti ti-x"></i></button></div>`:
+    `<div class="arch-w"><div class="arch-file"><i class="ti ti-file" style="font-size:18px"></i><span>${a.nombre?.slice(0,9)}</span></div><button title="Quitar archivo" aria-label="Quitar archivo" class="arch-rm" onclick="remArch('${a.id}')"><i class="ti ti-x"></i></button></div>`
   ).join('');
   el.innerHTML+=`<div class="arch-add" onclick="document.getElementById('file-inp').click()"><i class="ti ti-plus"></i><span>Añadir</span></div>`;
 }
@@ -9721,6 +9731,7 @@ function puedeCerrarEditor(id){
   return confirm('Tienes cambios sin guardar.\n\n¿Salir sin guardarlos?');
 }
 ['input','change'].forEach(ev=>document.addEventListener(ev,e=>{
+  if(e.target&&e.target.type==='file')return;   // un adjunto se sube al instante: no es un cambio pendiente
   const o=e.target&&e.target.closest&&e.target.closest('#ovP,#ovProd'); if(o&&o.classList.contains('open'))SUCIO[o.id]=true; },true));
 document.addEventListener('click',e=>{   // agregar o quitar filas también es un cambio
   const o=e.target&&e.target.closest&&e.target.closest('#ovP .mbody,#ovProd .mbody'); if(!o)return;

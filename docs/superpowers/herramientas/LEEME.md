@@ -29,3 +29,23 @@ fondo profundo y es ahí donde aparecen los textos que no se leen.
 rutas nuevas, que pedidos y clientes sigan ahí, y abre el Dashboard en día, noche y móvil). Lee el
 PIN de `RESPALDOS-BD/pin.txt` y no lo imprime. Mirar siempre sus capturas (`cap/prod-*.png`): los
 datos reales muestran cosas que en local no salen (p. ej. el logo oscuro del negocio en modo noche).
+
+## Barrido de fallos (2026-10-02) — herramientas nuevas
+
+| Archivo | Qué hace |
+|---|---|
+| `barrido_estatico.py` | Lee `index.html` y `server.js` sin ejecutarlos: funciones llamadas que no existen, ids rotos o repetidos, variables CSS sin definir, emojis, textos < 11 px, botones sin nombre, metadatos. |
+| `esc_scan.py` / `esc_scan2.py` | Buscan textos del usuario metidos sin escapar en atributos (`value="${…}"`) y en plantillas HTML. |
+| `canario.js` | **La prueba que manda para el escapado.** Crea en LOCAL datos «ZZ» con una etiqueta marcada y comillas, recorre las pantallas y dice dónde llega viva; comprueba que los campos conservan el texto completo. Borra lo que crea. |
+| `barrido_nav.js <ancho> <alto> [dia\|noche]` | 40 pantallas y ventanas: errores de consola, respuestas ≥400, desbordes, textos cortados, blancos táctiles chicos, imágenes rotas. Deja capturas `cap/bn-*.png`. |
+| `contacto.py salida.png columnas ancho archivos…` | Hoja de contacto con varias capturas para revisarlas de un vistazo. |
+| `func.js` | Flujos de uso: ingreso, Escape, clic fuera, períodos del Dashboard, foco de teclado, atrás, recargar, cambios sin guardar, exportar. |
+| `nav.js` | La navegación a fondo (41 casos): atrás/adelante con ventanas, editores con cambios, hoja «Todo», Coralyne, recargar. |
+| `tsrv.js` | El servidor: compresión, 304, 404 reales, robots, subidas en caja de arena, permisos de archivar y de pagos, límite de intentos. Crea y borra un rol y un usuario «ZZ». |
+| `iconos.js` | Regenera los iconos de la app (`apple-touch-icon.png`, `icon-192/512`, maskable) desde `favicon.svg`. |
+
+Orden recomendado antes de publicar: `chk_js.py` → `t2 t4 t7 t9 t9b` → `func nav tsrv canario` → `limpia_zz.js` →
+`legible.js` (fábrica y colores de producción, día y noche) → publicar → `prodcheck.js`.
+
+⚠️ `tsrv.js` hace 9 ingresos fallidos a propósito. El freno global salta a los 25 fallos en 15 minutos:
+no correrlo tres veces seguidas o el ingreso local queda pausado 15 minutos (reiniciar el servidor lo limpia).

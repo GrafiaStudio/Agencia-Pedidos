@@ -751,11 +751,14 @@ app.get('/robots.txt',(req,res)=>res.type('text/plain').send('User-agent: *\nDis
 app.use(express.static(path.join(__dirname,'public'),{index:false,maxAge:'7d'}));
 // Archivos subidos: nombre único → se pueden guardar en caché mucho tiempo. Y nunca deben poder
 // ejecutar código con la sesión de quien los abre (un .html o .svg subido corre en este mismo dominio).
-const EXT_VISIBLES=/^\.(png|jpe?g|webp|gif|avif|bmp|ico|svg|pdf|mp3|m4a|ogg|wav|webm|mp4)$/;
+// Fotos, PDF, audio y video no pueden llevar código: se sirven tal cual. Todo lo demás va en caja de
+// arena (sin scripts) y, salvo el SVG —que se usa como imagen—, se descarga en vez de abrirse.
+const EXT_INERTES=/^\.(png|jpe?g|webp|gif|avif|bmp|ico|pdf|mp3|m4a|ogg|wav|webm|mp4)$/;
 app.use('/uploads',express.static(UP_DIR,{maxAge:'30d',immutable:true,setHeaders:(res,fp)=>{
   const ext=path.extname(fp).toLowerCase();
-  if(ext!=='.pdf') res.setHeader('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src data:; media-src 'self'; sandbox");
-  if(!EXT_VISIBLES.test(ext)) res.setHeader('Content-Disposition','attachment');
+  if(EXT_INERTES.test(ext))return;
+  res.setHeader('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox");
+  if(ext!=='.svg') res.setHeader('Content-Disposition','attachment');
 }}));
 
 const storage=multer.diskStorage({
