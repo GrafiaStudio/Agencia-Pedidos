@@ -2148,7 +2148,7 @@ app.get('/api/ia/acciones',requiere('ver_registros'),(req,res)=>{
 
 // ── INFORMACIÓN DE LA APP (estática, no es dato por workspace) ──
 const APP_INFO={
-  nombre:'GRAFÍA Studio',
+  nombre:'CORAL LINE',
   fecha_actualizacion:'2026-06-26',
   novedades:[
     'Inventario: stock por producto con descuento y restauración automática.',
@@ -4437,4 +4437,4 @@ app.get('/api/archivo',(req,res)=>{
 });
 
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
-app.listen(PORT,()=>console.log(`✅ GRAFÍA Studio en http://localhost:${PORT}`));
+app.listen(PORT,()=>console.log(`✅ CORAL LINE en http://localhost:${PORT}`));
