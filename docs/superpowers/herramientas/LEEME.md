@@ -24,3 +24,8 @@ Las capturas van a `cap/` (o a `CAP_DIR` si se define). `cap/` no se sube al rep
 `COLORES="#211552,#211552" node legible.js noche` (principal,acento). Antes de publicar, medir al
 menos con fábrica y con los colores que tenga guardados producción: un acento muy oscuro hace el
 fondo profundo y es ahí donde aparecen los textos que no se leen.
+
+**Después de publicar:** `node prodcheck.js` verifica PRODUCCIÓN en solo lectura (portada, fuente,
+rutas nuevas, que pedidos y clientes sigan ahí, y abre el Dashboard en día, noche y móvil). Lee el
+PIN de `RESPALDOS-BD/pin.txt` y no lo imprime. Mirar siempre sus capturas (`cap/prod-*.png`): los
+datos reales muestran cosas que en local no salen (p. ej. el logo oscuro del negocio en modo noche).
