@@ -19,3 +19,8 @@ Las capturas van a `cap/` (o a `CAP_DIR` si se define). `cap/` no se sube al rep
 **Trampas conocidas de la medición:** un elemento tapado por la burbuja del dock puede salir como «ilegible» (comprobar con un recorte); y `compara.py` necesita Pillow.
 
 **⚠️ Pruebas que GUARDAN configuración**: `t9.js` cambia colores e intensidad del negocio `main` pero **guarda lo que había y lo restaura al final**; `tban.js` sube y quita un banner (no restaura uno previo). **No correrlas mientras el usuario esté probando la app local**: le borrarían lo que configuró. `legible.js` no guarda nada; con `FABRICA=1` mide con los colores de fábrica solo en la página de prueba.
+
+**Medir con otros colores sin guardarlos:** `FABRICA=1 node legible.js dia` (colores de fábrica) o
+`COLORES="#211552,#211552" node legible.js noche` (principal,acento). Antes de publicar, medir al
+menos con fábrica y con los colores que tenga guardados producción: un acento muy oscuro hace el
+fondo profundo y es ahí donde aparecen los textos que no se leen.

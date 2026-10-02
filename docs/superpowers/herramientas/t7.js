@@ -26,7 +26,9 @@ const fs = require('fs');
   const { b, page, errores } = await abrir();
   await page.waitForTimeout(600);
   const m = await page.evaluate(() => ({ ruta: CFG.logo_ruta, img: getComputedStyle(document.getElementById('sbLogoImg')).display, cl: getComputedStyle(document.getElementById('sbLogoCL')).display, ancho: document.getElementById('sbLogoCL').getBoundingClientRect().width }));
-  const tl = await page.evaluate(() => ({ oculto: document.getElementById('tbLogo').hidden }));
+  // se fuerza un archivo que no existe (el negocio local puede tener un logo real subido)
+  const tl = await page.evaluate(async () => { const im = document.getElementById('tbLogo'); im.hidden = false; im.src = '/uploads/no-existe-' + Date.now() + '.webp';
+    await new Promise(r => { im.addEventListener('error', r, { once: true }); setTimeout(r, 3000); }); return { oculto: im.hidden }; });
   ok('logo del negocio junto al saludo: si su archivo no carga, se oculta (no imagen rota)', tl.oculto === true, JSON.stringify(tl));
   // con un logo que sí carga, se ve el del negocio
   await page.evaluate(() => { CFG.logo_ruta = '/favicon.svg'; aplicarPerfilNegocio(); }); await page.waitForTimeout(500);

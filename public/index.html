@@ -2940,7 +2940,7 @@ function tintaMejor(fondo,osc,cla){ return contraste(fondo,osc)>=contraste(fondo
 // Quita saturación sin cambiar la luminosidad: el modo noche es teal oscuro pero apagado
 // Aleja un fondo de su tinta (aclarándolo u oscureciéndolo) hasta que se lea a 4,6:1.
 // Lo necesitan los colores de negocio de luminosidad media, donde ni el blanco ni el oscuro alcanzan.
-function alejar(bg,tinta){ let f=bg,i=0; const hacia=luminancia(tinta)>.4?'#000000':'#FFFFFF'; while(contraste(f,tinta)<4.6&&i++<24)f=mezcla(f,hacia,.07); return f; }
+function alejar(bg,tinta,min){ min=min||4.6; let f=bg,i=0; const hacia=luminancia(tinta)>.4?'#000000':'#FFFFFF'; while(contraste(f,tinta)<min&&i++<30)f=mezcla(f,hacia,.07); return f; }
 function apagar(hex,t){ const c=hexRgb(hex)||[0,0,0],g=.3*c[0]+.59*c[1]+.11*c[2]; return mezcla(hex,rgbHex([g,g,g]),t); }
 // Luminancia percibida (WCAG). Sirve para decidir si sobre un color va tinta clara u oscura:
 // si el usuario elige un principal blanco o amarillo, las letras NO pueden seguir siendo blancas.
@@ -3073,8 +3073,12 @@ function aplicarTemaColor(){
     t['barra']=`linear-gradient(90deg,${A},${mezcla(A,P,.55)})`;
     t['sel']=P; t['sel-tinta']=tintaP; t['contador']='#E20613'; t['boton']=P; t['boton-tinta']=tintaP;
     t['sombra']=alfa(OSC,.07); t['sombra-2']=alfa(OSC,.16); t['velo']=alfa(OSC,.22);
-    t['violeta']='#5F309B'; t['violeta-tinta']='#46217A'; t['violeta-suave']='rgba(95,48,155,.13)'; t['violeta-borde']='rgba(95,48,155,.28)';
-    t['ambar-tinta']='#6A4400'; t['verde-tinta']='#0F5D38'; t['rojo-tinta']='#A41E25';
+    // las tintas de estado (rojo, ámbar, verde, violeta) se oscurecen lo justo para leerse sobre una tarjeta
+    // puesta en la zona más honda del fondo: con acentos muy oscuros el fondo se vuelve profundo
+    const bajoTarjeta=mezcla(c3,'#FFFFFF',Math.min(.72,.40+.38*Math.max(0,f-1)));
+    const pisoE=c=>{ let k=c,i=0; while(contraste(k,bajoTarjeta)<4.9&&i++<24)k=mezcla(k,'#000000',.07); return k; };
+    t['violeta']='#5F309B'; t['violeta-tinta']=pisoE('#46217A'); t['violeta-suave']='rgba(95,48,155,.13)'; t['violeta-borde']='rgba(95,48,155,.28)';
+    t['ambar-tinta']=pisoE('#6A4400'); t['verde-tinta']=pisoE('#0F5D38'); t['rojo-tinta']=pisoE('#A41E25');
     t['purple']='#5F309B'; t['purple-lt']='rgba(95,48,155,.13)';
     t['amber-lt']='rgba(245,166,35,.24)'; t['red-lt']='rgba(229,72,77,.15)'; t['green-lt']='rgba(43,173,114,.19)'; t['orange-lt']='rgba(240,113,64,.16)';
   }else{
@@ -3089,7 +3093,7 @@ function aplicarTemaColor(){
     t['navy']=t['tinta']; t['navy2']=mezcla(HIELO,n0,.05); t['slate']=t['tinta-2']; t['muted']=t['tinta-3'];
     t['white']=mezcla(n0,'#FFFFFF',.07);
     t['line']=alfa(HIELO,.10); t['line-lt']=alfa(HIELO,.05);
-    t['teal-dk']=alejar(mezcla(CIAN,HIELO,.25),mezcla(mezcla(n0,'#FFFFFF',.1),A,.45)); t['acento-ink']=t['teal-dk'];   // legible también sobre el tinte del acento
+    t['teal-dk']=alejar(mezcla(CIAN,HIELO,.25),mezcla(mezcla(n0,'#FFFFFF',.14),A,.5),5.4); t['acento-ink']=t['teal-dk'];   // legible también sobre el tinte del acento
     t['teal-lt']=alfa(A,.22);
     t['v1']='linear-gradient(150deg,rgba(255,255,255,.085),rgba(255,255,255,.035))';
     t['v1-borde']=alfa(BRUMA,.15); t['v1-brillo']='rgba(255,255,255,.07)';
@@ -3110,7 +3114,7 @@ function aplicarTemaColor(){
   const fdk=noche?apagar(mezcla(P,'#000000',.5),.35):P;
   t['dock']=noche?`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,fdk,.6),.6)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(fdk,'#FFFFFF',.05),.82)},${alfa(fdk,.92)})`
                  :`radial-gradient(60% 150% at 50% 100%,${alfa(mezcla(A,P,.35),.7)},transparent 70%),linear-gradient(180deg,${alfa(mezcla(P,A,.22),.8)},${alfa(P,.9)})`;
-  t['dock-tinta']=tintaMejor(fdk,OSC,mezcla(CIAN,HIELO,.32)); t['dock-luz']=tintaMejor(fdk,OSC,HIELO); t['dock-borde']=alfa(BRUMA,.22);
+  { const cand=tintaMejor(fdk,OSC,mezcla(CIAN,HIELO,.32)); t['dock-tinta']=alejar(cand,mezcla(mezcla(fdk,A,.3),'#FFFFFF',.14),5); }   // el dock es vidrio: se mide contra su tono más claro t['dock-luz']=tintaMejor(fdk,OSC,HIELO); t['dock-borde']=alfa(BRUMA,.22);
   const burb=mezcla(CIAN,A,.35);
   t['burbuja']=`radial-gradient(120% 120% at 30% 12%,${mezcla(CIAN,'#FFFFFF',.35)},${burb} 70%)`; t['burbuja-tinta']=tintaMejor(burb,OSC,'#FFFFFF');
   // luz de vidrio que marca la pestaña activa del dock (se desliza de una a otra)
