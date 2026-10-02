@@ -257,6 +257,8 @@ try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN info_pdf TEXT DEFAUL
 // C1 · colores de marca editables: una sola fuente de verdad para la app Y el PDF.
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN color_primario TEXT DEFAULT ''"); } catch(e){}
 try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN color_acento TEXT DEFAULT ''"); } catch(e){}
+// CORAL LINE · intensidad de la piel por negocio (NULL = la de fábrica).
+try { db.exec("ALTER TABLE configuracion_negocio ADD COLUMN piel_intensidad INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_actual INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN stock_minimo INTEGER"); } catch(e){}
 try { db.exec("ALTER TABLE fichas_producto ADD COLUMN regla_lleva INTEGER"); } catch(e){}
@@ -582,9 +584,13 @@ const CFG_DEFAULTS={
   info_pdf:'',
   alertas_entrega:1,dias_anticipacion_entrega:3,
   iva_activo:0,iva_porcentaje:19,iva_desglosado:0,
-  // C1 · colores de marca (los de fábrica de GRAFÍA). Alimentan la app y el PDF.
-  color_primario:'#222B46',color_acento:'#5B7FA6'
+  // C1 · colores de marca (los de fábrica de CORAL LINE: Deep Teal + Ocean Teal). Alimentan la app y el PDF.
+  color_primario:'#0A2E3B',color_acento:'#118AA0',
+  // Intensidad de la piel: cuánta presencia tiene el color en el fondo de la app.
+  piel_intensidad:60
 };
+const PIEL_MIN=20, PIEL_MAX=100;
+const pielOk=v=>{ const n=parseInt(v,10); return Number.isInteger(n)?Math.max(PIEL_MIN,Math.min(PIEL_MAX,n)):CFG_DEFAULTS.piel_intensidad; };
 // Solo aceptamos hex #RGB o #RRGGBB (evita inyectar cualquier cosa en el CSS/PDF).
 const HEX_RE=/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const colorOk=(v,porDefecto)=>HEX_RE.test(String(v||'').trim())?String(v).trim():porDefecto;
@@ -616,7 +622,8 @@ function getConfiguracion(wsId){
     iva_porcentaje:row.iva_porcentaje??CFG_DEFAULTS.iva_porcentaje,
     iva_desglosado:row.iva_desglosado?1:0,
     color_primario:colorOk(row.color_primario,CFG_DEFAULTS.color_primario),
-    color_acento:colorOk(row.color_acento,CFG_DEFAULTS.color_acento)
+    color_acento:colorOk(row.color_acento,CFG_DEFAULTS.color_acento),
+    piel_intensidad:pielOk(row.piel_intensidad)
   };
 }
 
@@ -635,6 +642,18 @@ try {
   if(!yaCorrida){
     db.exec("UPDATE encargos SET valor=NULL WHERE valor='0'");
     db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('encargo_valor_cero_a_null');
+  }
+} catch(e){}
+// Migración única · CORAL LINE: quien nunca eligió colores (o tenía guardados los de la fábrica
+// vieja, #222B46 / #5B7FA6) pasa a la fábrica nueva. Se VACÍAN en vez de escribir el color nuevo:
+// así manda CFG_DEFAULTS. Quien eligió colores propios los conserva. Corre UNA sola vez, para
+// que un negocio pueda volver a elegir a propósito los colores viejos sin que un despliegue se los quite.
+try {
+  const yaCoral=db.prepare("SELECT 1 FROM migraciones WHERE nombre=?").get('coral_line_colores_fabrica_v1');
+  if(!yaCoral){
+    db.prepare(`UPDATE configuracion_negocio SET color_primario='', color_acento=''
+      WHERE UPPER(COALESCE(color_primario,'')) IN ('','#222B46') AND UPPER(COALESCE(color_acento,'')) IN ('','#5B7FA6')`).run();
+    db.prepare("INSERT INTO migraciones(nombre) VALUES(?)").run('coral_line_colores_fabrica_v1');
   }
 } catch(e){}
 // Migración única: backfill de las nuevas columnas _calc para datos que ya existían
@@ -2231,12 +2250,13 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
     if(b.dias_validez_cotizacion!==undefined&&(!Number.isInteger(b.dias_validez_cotizacion)||b.dias_validez_cotizacion<0))errores.push('Días de validez de cotización no válido');
     if(b.dias_anticipacion_entrega!==undefined&&(!Number.isInteger(b.dias_anticipacion_entrega)||b.dias_anticipacion_entrega<0))errores.push('Días de anticipación no válido');
     if(b.iva_porcentaje!==undefined&&(!Number.isInteger(b.iva_porcentaje)||b.iva_porcentaje<0||b.iva_porcentaje>100))errores.push('Porcentaje de IVA no válido');
+    if(b.piel_intensidad!==undefined&&(!Number.isInteger(b.piel_intensidad)||b.piel_intensidad<PIEL_MIN||b.piel_intensidad>PIEL_MAX))errores.push(`La intensidad del color debe estar entre ${PIEL_MIN} y ${PIEL_MAX}`);
     if(errores.length)return res.status(400).json({error:errores.join('. ')});
     const actual=getConfiguracion(req.wsId);
     const nuevo={...actual,...b};
     db.prepare(`INSERT INTO configuracion_negocio
-        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,info_pdf,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado,color_primario,color_acento)
-      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@info_pdf,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado,@color_primario,@color_acento)
+        (workspace_id,nombre_negocio,direccion,telefono,email,nit,moneda_prefijo,decimales,separador_miles,formato_fecha,zona_horaria,dias_validez_cotizacion,estado_default_cotizacion,metodos_pago,info_pdf,alertas_entrega,dias_anticipacion_entrega,iva_activo,iva_porcentaje,iva_desglosado,color_primario,color_acento,piel_intensidad)
+      VALUES(@workspace_id,@nombre_negocio,@direccion,@telefono,@email,@nit,@moneda_prefijo,@decimales,@separador_miles,@formato_fecha,@zona_horaria,@dias_validez_cotizacion,@estado_default_cotizacion,@metodos_pago,@info_pdf,@alertas_entrega,@dias_anticipacion_entrega,@iva_activo,@iva_porcentaje,@iva_desglosado,@color_primario,@color_acento,@piel_intensidad)
       ON CONFLICT(workspace_id) DO UPDATE SET
         nombre_negocio=excluded.nombre_negocio,direccion=excluded.direccion,telefono=excluded.telefono,
         email=excluded.email,nit=excluded.nit,moneda_prefijo=excluded.moneda_prefijo,decimales=excluded.decimales,
@@ -2244,7 +2264,7 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
         dias_validez_cotizacion=excluded.dias_validez_cotizacion,estado_default_cotizacion=excluded.estado_default_cotizacion,
         metodos_pago=excluded.metodos_pago,info_pdf=excluded.info_pdf,alertas_entrega=excluded.alertas_entrega,dias_anticipacion_entrega=excluded.dias_anticipacion_entrega,
         iva_activo=excluded.iva_activo,iva_porcentaje=excluded.iva_porcentaje,iva_desglosado=excluded.iva_desglosado,
-        color_primario=excluded.color_primario,color_acento=excluded.color_acento`)
+        color_primario=excluded.color_primario,color_acento=excluded.color_acento,piel_intensidad=excluded.piel_intensidad`)
       .run({
         workspace_id:req.wsId,
         nombre_negocio:nuevo.nombre_negocio||'',
@@ -2267,7 +2287,8 @@ app.put('/api/configuracion',requiere('configurar_sistema'),(req,res)=>{
         iva_porcentaje:Number.isInteger(nuevo.iva_porcentaje)?nuevo.iva_porcentaje:19,
         iva_desglosado:nuevo.iva_desglosado?1:0,
         color_primario:colorOk(nuevo.color_primario,CFG_DEFAULTS.color_primario),
-        color_acento:colorOk(nuevo.color_acento,CFG_DEFAULTS.color_acento)
+        color_acento:colorOk(nuevo.color_acento,CFG_DEFAULTS.color_acento),
+        piel_intensidad:pielOk(nuevo.piel_intensidad)
       });
     res.json(getConfiguracion(req.wsId));
   }catch(e){logError('PUT /api/configuracion',e);res.status(500).json({error:e.message})}

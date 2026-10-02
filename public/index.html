@@ -14,25 +14,43 @@
 @font-face{font-family:'Ostrich Sans';font-weight:900;font-style:normal;font-display:swap;src:url('/fonts/OstrichSans-Heavy.woff2') format('woff2')}
 .ic{fill:none;stroke:currentColor;stroke-width:1.35px;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 :root{
-  --navy:#222B46;--navy2:#2E3858;
-  --magenta:#4A6FA5;--yellow:#9DBBDC;
+  /* CORAL LINE · primitivos de marca (manual). No se usan sueltos: alimentan aplicarTemaColor(). */
+  --cl-hielo:#E9FFFE;--cl-bruma:#92F3F1;--cl-cian:#23D0D2;--cl-oceano:#118AA0;--cl-profundo:#0A2E3B;
+  --cl-coral:#FD518B;--cl-ambar:#FDA968;--cl-violeta:#5F309B;
+  /* Valores de arranque (día, colores de fábrica). aplicarTemaColor() los recalcula enseguida
+     con los colores del negocio, el modo y la intensidad. Los nombres viejos (--navy, --white,
+     --teal…) se conservan como alias: --navy es TINTA, --white es SUPERFICIE opaca. */
+  --navy:#0A2E3B;--navy2:#234550;
+  --magenta:#118AA0;--yellow:#23D0D2;
   --grad:linear-gradient(150deg,var(--yellow),var(--magenta));
-  --teal:#5B7FA6;--teal-lt:#EAF1F8;--teal-dk:#3E5C82;
-  --slate:#5E708A;--muted:#93A3B9;
-  --line:#E5ECF4;--line-lt:#F5F8FB;--bg:#E6EDF6;--white:#FCFDFE;
-  --amber:#F5A623;--amber-lt:#FEF4E3;
-  --red:#E5484D;--red-lt:#FDEAEA;
-  --green:#2BAD72;--green-lt:#E4F7EE;
-  --purple:#7B6EF6;--purple-lt:#EEEAFF;
-  --orange:#F07140;--orange-lt:#FEF0E8;
-  --sb-grad:linear-gradient(180deg,#3D4C7A 0%,#232C4C 52%,#161B2E 100%);
-  --brand:#222B46;--brand-txt:#FFFFFF;--brand-txt-dim:rgba(255,255,255,.35);--acento-txt:#FFFFFF;--acento-ink:#41618A;
-  --sb-txt:rgba(255,255,255,.85);--sb-txt-2:rgba(255,255,255,.45);--sb-txt-3:rgba(255,255,255,.2);--sb-line:rgba(255,255,255,.07);
-  --sb-activo-bg:linear-gradient(90deg,rgba(124,160,200,.30),rgba(124,160,200,.09));--sb-activo-barra:#7CA0C8;
-  --body-bg:linear-gradient(170deg,#EBF1F8 0%,#E3EBF5 50%,#E7EDF6 100%);
-  /* C4 · ADN de guia1.jpg: bordes MUY redondeados y sombras difusas, casi imperceptibles */
-  --r:18px;--r-sm:12px;--r-lg:28px;
-  --sh:0 6px 26px rgba(74,98,142,.07);--sh-lg:0 18px 50px rgba(74,98,142,.13);
+  --teal:#118AA0;--teal-lt:#CBEFF1;--teal-dk:#0F768A;
+  --slate:#45606A;--muted:#536D76;
+  --line:rgba(10,46,59,.10);--line-lt:rgba(10,46,59,.05);--bg:#B5E3E6;--white:#F4FFFF;
+  --amber:#F5A623;--amber-lt:rgba(245,166,35,.24);
+  --red:#E5484D;--red-lt:rgba(229,72,77,.15);
+  --green:#2BAD72;--green-lt:rgba(43,173,114,.19);
+  --purple:#5F309B;--purple-lt:rgba(95,48,155,.13);
+  --orange:#F07140;--orange-lt:rgba(240,113,64,.16);
+  --sb-grad:linear-gradient(180deg,#234550 0%,#0A2E3B 52%,#061C24 100%);
+  --brand:#0A2E3B;--brand-txt:#E9FFFE;--brand-txt-dim:rgba(233,255,254,.4);--acento-txt:#FFFFFF;--acento-ink:#0F768A;
+  --sb-txt:rgba(233,255,254,.88);--sb-txt-2:rgba(233,255,254,.5);--sb-txt-3:rgba(233,255,254,.24);--sb-line:rgba(233,255,254,.08);
+  --sb-activo-bg:linear-gradient(90deg,rgba(35,208,210,.26),rgba(35,208,210,.06));--sb-activo-barra:#23D0D2;
+  --body-bg:#B5E3E6;
+  /* tokens nuevos de la piel */
+  --tinta:#0A2E3B;--tinta-2:#45606A;--tinta-3:#536D76;
+  --luz:#23D0D2;--luz-tinta:#0A2E3B;--luz-halo:rgba(35,208,210,.42);--foco:rgba(35,208,210,.26);--bruma:#92F3F1;--hielo:#E9FFFE;
+  --atmosfera:linear-gradient(155deg,#DAF7F8,#B5E3E6 55%,#8FD0D8);
+  --v1:linear-gradient(150deg,rgba(255,255,255,.62),rgba(255,255,255,.28));--v1-borde:rgba(102,207,213,.5);--v1-brillo:rgba(255,255,255,.8);
+  --v2:rgba(255,255,255,.66);--v2-borde:rgba(255,255,255,.75);--v2-opaco:#F4FFFF;
+  --vf:linear-gradient(140deg,#107F94,#0F6E82 55%,#0E5C6E);--vf-tinta:#FFFFFF;--vf-borde:rgba(146,243,241,.45);
+  --campo:rgba(255,255,255,.62);--pista:rgba(255,255,255,.66);--barra:linear-gradient(90deg,#118AA0,#0D5768);
+  --pri:linear-gradient(135deg,#23D0D2,#1BB3BD);--pri-tinta:#0A2E3B;--sel:#0A2E3B;--sel-tinta:#E9FFFE;--contador:#E20613;
+  --sombra:rgba(10,46,59,.07);--sombra-2:rgba(10,46,59,.16);
+  --violeta:#5F309B;--violeta-tinta:#46217A;--violeta-suave:rgba(95,48,155,.13);--violeta-borde:rgba(95,48,155,.28);
+  --ambar-tinta:#6E4600;--verde-tinta:#0F5D38;--rojo-tinta:#9E1A21;
+  /* Forma: tarjeta 24 · interior 12–16 · píldoras 999. Sombras difusas, casi imperceptibles. */
+  --r:16px;--r-sm:12px;--r-lg:24px;
+  --sh:0 14px 34px rgba(10,46,59,.07);--sh-lg:0 18px 44px rgba(10,46,59,.16);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Montserrat',sans-serif;background:var(--body-bg);background-attachment:fixed;color:var(--navy);font-size:13px;min-height:100vh}
@@ -975,6 +993,11 @@ html[data-tema="noche"] .cl-pick{background:#161D2C}
 /* el logo del menú suele venir oscuro: en noche se aclara un poco para que no desaparezca */
 html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
 
+/* CORAL LINE · deslizante de intensidad de la piel */
+.pi-range{flex:1;padding:0;border:none;background:none;box-shadow:none;height:28px;accent-color:var(--teal);cursor:pointer}
+.pi-range:hover,.pi-range:focus{background:none;box-shadow:none;border:none}
+.pi-valor{font-family:'Ostrich Sans',sans-serif;font-weight:900;font-size:26px;line-height:1;letter-spacing:.04em;color:var(--navy);min-width:38px;text-align:right}
+
 /* C1 · selector de colores de marca */
 .cl-row{display:flex;align-items:center;gap:9px}
 .cl-pick{width:48px;height:38px;padding:3px;border-radius:11px;border:1.5px solid var(--line);background:var(--white);cursor:pointer;flex-shrink:0}
@@ -1747,17 +1770,24 @@ html[data-tema="noche"] .sb-logo img{filter:brightness(1.35)}
           <div><label>Color principal</label>
             <div class="cl-row">
               <input type="color" class="cl-pick" id="cfg-color-primario" oninput="cfgColorCambio('primario',this.value)">
-              <input type="text" class="cl-hex" id="cfg-color-primario-hex" placeholder="#222B46" oninput="cfgColorCambio('primario',this.value,true)">
+              <input type="text" class="cl-hex" id="cfg-color-primario-hex" placeholder="#0A2E3B" oninput="cfgColorCambio('primario',this.value,true)">
             </div>
             <div class="cl-hint">Menú lateral, títulos y encabezado del PDF.</div>
           </div>
           <div><label>Color de acento</label>
             <div class="cl-row">
               <input type="color" class="cl-pick" id="cfg-color-acento" oninput="cfgColorCambio('acento',this.value)">
-              <input type="text" class="cl-hex" id="cfg-color-acento-hex" placeholder="#5B7FA6" oninput="cfgColorCambio('acento',this.value,true)">
+              <input type="text" class="cl-hex" id="cfg-color-acento-hex" placeholder="#118AA0" oninput="cfgColorCambio('acento',this.value,true)">
             </div>
             <div class="cl-hint">Botones, enlaces y detalles destacados.</div>
           </div>
+        </div>
+        <div class="fg" style="max-width:640px"><label for="cfg-intensidad">Intensidad del color</label>
+          <div class="cl-row">
+            <input type="range" class="pi-range" id="cfg-intensidad" min="20" max="100" step="1" value="60" oninput="cfgIntensidadCambio(this.value)">
+            <output class="pi-valor" id="cfg-intensidad-v" for="cfg-intensidad">60</output>
+          </div>
+          <div class="cl-hint">Cuánta presencia tiene el color en el fondo de la app. Más bajo, más claro y neutro; más alto, más profundo. Se ve al instante y se guarda con el botón Guardar.</div>
         </div>
         <button class="btn-add-row" type="button" onclick="cfgColoresFabrica()"><i class="ti ti-arrow-back-up"></i>Volver a los colores de fábrica</button>
       </div>
@@ -2561,7 +2591,11 @@ const METODOS_PAGO_CATALOGO=[
 /* C1 · TOKENS DE COLOR DE MARCA — una sola fuente de verdad para la app y el PDF.
    El usuario define 2 colores; el resto de tonos (hover, fondos suaves, degradado del
    menú) se derivan solos para que nunca queden combinaciones rotas. */
-const COLOR_FABRICA={primario:'#222B46',acento:'#5B7FA6'};
+const COLOR_FABRICA={primario:'#0A2E3B',acento:'#118AA0'};   // CORAL LINE: Deep Teal + Ocean Teal
+const CL={cian:'#23D0D2',bruma:'#92F3F1',hielo:'#E9FFFE'};        // los otros tres colores del manual
+// Intensidad: cuánta presencia tiene el color en el fondo. Ajuste del negocio (Configuración).
+const PIEL_DEF=60, PIEL_MIN=20, PIEL_MAX=100;
+function pielIntensidad(){ const n=parseInt(typeof CFG!=='undefined'&&CFG?CFG.piel_intensidad:NaN,10); return Number.isFinite(n)?Math.max(PIEL_MIN,Math.min(PIEL_MAX,n)):PIEL_DEF; }
 function hexRgb(h){
   let s=String(h||'').trim().replace('#','');
   if(s.length===3)s=s.split('').map(c=>c+c).join('');
@@ -2576,6 +2610,12 @@ function mezcla(hex,destino,cuanto){
   return rgbHex(a.map((v,i)=>v+(b[i]-v)*cuanto));
 }
 function colorValido(h){ return !!hexRgb(h); }
+function alfa(hex,a){ const c=hexRgb(hex)||[0,0,0]; return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+function contraste(a,b){ const x=luminancia(a),y=luminancia(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); }
+// De dos tintas posibles, la que mejor se lee sobre ese fondo (la app; el PDF sigue con tintaSobre)
+function tintaMejor(fondo,osc,cla){ return contraste(fondo,osc)>=contraste(fondo,cla)?osc:cla; }
+// Quita saturación sin cambiar la luminosidad: el modo noche es teal oscuro pero apagado
+function apagar(hex,t){ const c=hexRgb(hex)||[0,0,0],g=.3*c[0]+.59*c[1]+.11*c[2]; return mezcla(hex,rgbHex([g,g,g]),t); }
 // Luminancia percibida (WCAG). Sirve para decidir si sobre un color va tinta clara u oscura:
 // si el usuario elige un principal blanco o amarillo, las letras NO pueden seguir siendo blancas.
 function luminancia(hex){
@@ -2626,8 +2666,15 @@ function cfgColorCambio(cual,val,desdeTexto){
   aplicarTemaColor();
 }
 function cfgColoresFabrica(){
-  CFG.color_primario=COLOR_FABRICA.primario; CFG.color_acento=COLOR_FABRICA.acento;
-  pintarColoresCfg(); aplicarTemaColor(); toast('Colores de fábrica restaurados (recuerda Guardar)');
+  CFG.color_primario=COLOR_FABRICA.primario; CFG.color_acento=COLOR_FABRICA.acento; CFG.piel_intensidad=PIEL_DEF;
+  pintarColoresCfg(); aplicarTemaColor(); toast('Colores e intensidad de fábrica restaurados (recuerda Guardar)');
+}
+// Intensidad de la piel: igual que los colores, se ve en vivo y se guarda al Guardar
+function cfgIntensidadCambio(v){
+  const n=parseInt(v,10);
+  CFG.piel_intensidad=Number.isFinite(n)?Math.max(PIEL_MIN,Math.min(PIEL_MAX,n)):PIEL_DEF;
+  const o=document.getElementById('cfg-intensidad-v'); if(o)o.textContent=CFG.piel_intensidad;
+  aplicarTemaColor();
 }
 function pintarColoresCfg(){
   const p=colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario;
@@ -2635,67 +2682,101 @@ function pintarColoresCfg(){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
   set('cfg-color-primario',p); set('cfg-color-primario-hex',p.toUpperCase());
   set('cfg-color-acento',a);   set('cfg-color-acento-hex',a.toUpperCase());
+  const pi=pielIntensidad(), o=document.getElementById('cfg-intensidad-v');
+  set('cfg-intensidad',pi); if(o)o.textContent=pi;
 }
 function aplicarTemaColor(){
-  const p=colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario;
-  const a=colorValido(CFG.color_acento)?CFG.color_acento:COLOR_FABRICA.acento;
-  const noche=esNoche();
-  const raiz=document.documentElement;
-  raiz.dataset.tema=noche?'noche':'dia';
-  const s=raiz.style;
+  /* PIEL CORAL LINE. Entra: los dos colores del negocio + modo día/noche + intensidad.
+     Sale: TODOS los tokens. Con los colores de fábrica se usan los cinco del manual; si el
+     negocio los cambia, hielo, bruma y luz se derivan de su acento. Ninguna tinta se fija:
+     se elige la que mejor se lee sobre cada superficie. Referencia probada:
+     docs/superpowers/muestras/coral-line-piel.html */
+  const P=(colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario).toUpperCase();
+  const A=(colorValido(CFG.color_acento)?CFG.color_acento:COLOR_FABRICA.acento).toUpperCase();
+  const noche=esNoche(), f=pielIntensidad()/PIEL_DEF, lim=v=>Math.max(0,Math.min(1,v));
+  const fab=P===COLOR_FABRICA.primario&&A===COLOR_FABRICA.acento;
+  const CIAN=fab?CL.cian:mezcla(A,'#FFFFFF',.30), BRUMA=fab?CL.bruma:mezcla(A,'#FFFFFF',.58), HIELO=fab?CL.hielo:mezcla(A,'#FFFFFF',.91);
+  let OSC=P,n=0; while(luminancia(OSC)>.06&&n++<30)OSC=mezcla(OSC,'#000000',.12);   // tinta oscura que siempre se lee
+  const raiz=document.documentElement; raiz.dataset.tema=noche?'noche':'dia';
+  const t={};
 
   // --- marca (igual en día y noche) ---
-  s.setProperty('--brand',p);
-  s.setProperty('--brand-txt',tintaSobre(p));                       // tinta legible SOBRE la marca
-  s.setProperty('--brand-txt-dim',mezcla(tintaSobre(p),p,.42));
-  s.setProperty('--acento-txt',tintaSobre(a));
-  // Acento usado como TINTA sobre superficie clara (iconos, detalles): si el acento elegido
-  // es muy claro se perdería sobre el blanco — se oscurece hasta ser legible (regla de C2).
-  s.setProperty('--acento-ink',noche?a:inkSeguro(a));
-  s.setProperty('--teal',a);
-  s.setProperty('--teal-dk',mezcla(a,'#000000',.22));
-  s.setProperty('--magenta',a);
-  s.setProperty('--yellow',mezcla(a,'#FFFFFF',.45));
+  const tintaP=tintaMejor(P,OSC,HIELO);
+  t['brand']=P; t['brand-txt']=tintaP; t['brand-txt-dim']=mezcla(tintaP,P,.42);
+  t['acento-txt']=tintaMejor(A,OSC,'#FFFFFF');
+  t['teal']=A; t['magenta']=A; t['yellow']=CIAN;
+  t['luz']=CIAN; t['luz-tinta']=tintaMejor(CIAN,OSC,'#FFFFFF'); t['luz-halo']=alfa(CIAN,noche?.28:.42); t['foco']=alfa(CIAN,.26);
+  t['bruma']=BRUMA; t['hielo']=HIELO;
+  t['pri']=`linear-gradient(135deg,${CIAN},${mezcla(CIAN,A,.42)})`; t['pri-tinta']=tintaMejor(mezcla(CIAN,A,.42),OSC,'#FFFFFF');
+  // menú lateral: su tinta también se calcula, por si el principal es claro
+  t['sb-txt']=tintaP; t['sb-txt-2']=mezcla(tintaP,P,.42); t['sb-txt-3']=mezcla(tintaP,P,.70); t['sb-line']=mezcla(tintaP,P,.88);
+  t['sb-activo-bg']=`linear-gradient(90deg,${mezcla(P,tintaP,.22)},${mezcla(P,tintaP,.06)})`; t['sb-activo-barra']=tintaMejor(P,mezcla(CIAN,OSC,.3),CIAN);
+  t['sb-grad']=`linear-gradient(180deg,${mezcla(P,'#FFFFFF',.10)} 0%,${P} 52%,${mezcla(P,'#000000',.38)} 100%)`;
 
-  // --- menú lateral: su tinta también se calcula, por si el principal es claro ---
-  const tintaSb=tintaSobre(p);
-  s.setProperty('--sb-txt',tintaSb);
-  s.setProperty('--sb-txt-2',mezcla(tintaSb,p,.42));
-  s.setProperty('--sb-txt-3',mezcla(tintaSb,p,.70));
-  s.setProperty('--sb-line',mezcla(tintaSb,p,.88));
-  // ítem activo del menú: también derivado, si no quedaba azul fijo (invisible sobre un menú claro)
-  s.setProperty('--sb-activo-bg',`linear-gradient(90deg,${mezcla(p,tintaSb,.22)},${mezcla(p,tintaSb,.06)})`);
-  s.setProperty('--sb-activo-barra',mezcla(p,tintaSb,.55));
-  s.setProperty('--sb-grad',`linear-gradient(180deg,${mezcla(p,'#FFFFFF',.18)} 0%,${p} 52%,${mezcla(p,'#000000',.38)} 100%)`);
-
-  // --- neutros: lo único que cambia entre día y noche ---
-  if(noche){
-    s.setProperty('--navy','#E8EDF7');        // tinta principal (clara)
-    s.setProperty('--navy2','#F2F6FC');
-    s.setProperty('--slate','#AFBDD2');
-    s.setProperty('--muted','#8496AF');
-    s.setProperty('--white','#1B2233');       // superficies (tarjetas, modales)
-    s.setProperty('--bg','#0E1320');
-    s.setProperty('--line','#2C3650');
-    s.setProperty('--line-lt','#232C42');
-    s.setProperty('--teal-lt',mezcla(a,'#0E1320',.80));
-    s.setProperty('--body-bg','linear-gradient(170deg,#141A29 0%,#111726 50%,#131926 100%)');
+  let atm;
+  if(!noche){
+    const c1=mezcla(HIELO,A,lim(.07*f)),c2=mezcla(HIELO,A,lim(.24*f)),c3=mezcla(HIELO,A,lim(.52*f));
+    atm=[`linear-gradient(120deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,0) 30%)`,
+      `linear-gradient(112deg,transparent 40%,rgba(255,255,255,.20) 46%,transparent 55%)`,
+      `linear-gradient(112deg,transparent 63%,rgba(255,255,255,.12) 69%,transparent 78%)`,
+      `radial-gradient(52% 42% at 58% 0%,rgba(190,182,238,${lim(.30*f)}),transparent 72%)`,
+      `radial-gradient(78% 88% at 100% 100%,${c3},transparent 70%)`,
+      `linear-gradient(155deg,${c1} 0%,${c2} 55%,${mezcla(c2,c3,.55)} 100%)`];
+    t['bg']=c2;
+    t['tinta']=OSC; t['tinta-2']=mezcla(OSC,'#FFFFFF',.24); t['tinta-3']=mezcla(OSC,'#FFFFFF',.30);
+    t['navy']=OSC; t['navy2']=mezcla(OSC,'#FFFFFF',.10); t['slate']=t['tinta-2']; t['muted']=t['tinta-3'];
+    t['white']=mezcla(HIELO,'#FFFFFF',.5);                 // superficie OPACA (ventanas, paneles que flotan)
+    t['line']=alfa(OSC,.10); t['line-lt']=alfa(OSC,.05);
+    t['teal-dk']=contraste(A,'#FFFFFF')>=3.6?mezcla(A,OSC,.22):mezcla(A,OSC,.5); t['acento-ink']=t['teal-dk'];
+    t['teal-lt']=mezcla(HIELO,A,.14);
+    t['v1']='linear-gradient(150deg,rgba(255,255,255,.62),rgba(255,255,255,.28))';
+    t['v1-borde']=alfa(mezcla(BRUMA,A,.34),.5); t['v1-brillo']='rgba(255,255,255,.8)';
+    t['v2']='rgba(255,255,255,.66)'; t['v2-borde']='rgba(255,255,255,.75)'; t['v2-opaco']=t['white'];
+    const f1=mezcla(A,OSC,.12),f2=mezcla(A,OSC,.30),f3=mezcla(A,OSC,.50);
+    t['vf']=`linear-gradient(140deg,${f1},${f2} 55%,${f3})`; t['vf-tinta']=tintaMejor(f1,OSC,'#FFFFFF'); t['vf-borde']=alfa(BRUMA,.45);
+    t['campo']='rgba(255,255,255,.62)'; t['pista']='rgba(255,255,255,.66)';
+    t['barra']=`linear-gradient(90deg,${A},${mezcla(A,P,.55)})`;
+    t['sel']=P; t['sel-tinta']=tintaP; t['contador']='#E20613';
+    t['sombra']=alfa(OSC,.07); t['sombra-2']=alfa(OSC,.16);
+    t['violeta']='#5F309B'; t['violeta-tinta']='#46217A'; t['violeta-suave']='rgba(95,48,155,.13)'; t['violeta-borde']='rgba(95,48,155,.28)';
+    t['ambar-tinta']='#6E4600'; t['verde-tinta']='#0F5D38'; t['rojo-tinta']='#9E1A21';
+    t['purple']='#5F309B'; t['purple-lt']='rgba(95,48,155,.13)';
+    t['amber-lt']='rgba(245,166,35,.24)'; t['red-lt']='rgba(229,72,77,.15)'; t['green-lt']='rgba(43,173,114,.19)'; t['orange-lt']='rgba(240,113,64,.16)';
   }else{
-    s.setProperty('--navy','#222B46');
-    s.setProperty('--navy2','#2E3858');
-    s.setProperty('--slate','#5E708A');
-    s.setProperty('--muted','#93A3B9');
-    s.setProperty('--white','#FCFDFE');
-    s.setProperty('--bg','#E6EDF6');
-    s.setProperty('--line','#E5ECF4');
-    s.setProperty('--line-lt','#F5F8FB');
-    s.setProperty('--teal-lt',mezcla(a,'#FFFFFF',.90));
-    s.setProperty('--body-bg','linear-gradient(170deg,#EBF1F8 0%,#E3EBF5 50%,#E7EDF6 100%)');
+    const n0=apagar(mezcla(P,'#000000',.22),.30),n1=apagar(mezcla(P,'#000000',.50),.35);
+    atm=[`linear-gradient(120deg,rgba(255,255,255,.035) 0%,rgba(255,255,255,0) 30%)`,
+      `linear-gradient(112deg,transparent 40%,rgba(255,255,255,.022) 46%,transparent 55%)`,
+      `radial-gradient(52% 42% at 58% 0%,rgba(130,110,210,${lim(.07*f)}),transparent 72%)`,
+      `radial-gradient(78% 88% at 100% 100%,${alfa(A,lim(.20*f))},transparent 70%)`,
+      `linear-gradient(155deg,${apagar(mezcla(P,A,.08),.25)} 0%,${n0} 45%,${n1} 100%)`];
+    t['bg']=n0;
+    t['tinta']=mezcla(HIELO,n0,.12); t['tinta-2']=mezcla(HIELO,n0,.28); t['tinta-3']=mezcla(HIELO,n0,.40);
+    t['navy']=t['tinta']; t['navy2']=mezcla(HIELO,n0,.05); t['slate']=t['tinta-2']; t['muted']=t['tinta-3'];
+    t['white']=mezcla(n0,'#FFFFFF',.07);
+    t['line']=alfa(HIELO,.10); t['line-lt']=alfa(HIELO,.05);
+    t['teal-dk']=mezcla(CIAN,HIELO,.25); t['acento-ink']=t['teal-dk'];
+    t['teal-lt']=alfa(A,.22);
+    t['v1']='linear-gradient(150deg,rgba(255,255,255,.085),rgba(255,255,255,.035))';
+    t['v1-borde']=alfa(BRUMA,.15); t['v1-brillo']='rgba(255,255,255,.07)';
+    t['v2']=alfa(mezcla(n0,'#FFFFFF',.06),.72); t['v2-borde']=alfa(BRUMA,.2); t['v2-opaco']=t['white'];
+    const f1=mezcla(A,n0,.28),f2=mezcla(A,n0,.5),f3=mezcla(A,n0,.68);
+    t['vf']=`linear-gradient(140deg,${f1},${f2} 55%,${f3})`; t['vf-tinta']=tintaMejor(f1,OSC,HIELO); t['vf-borde']=alfa(BRUMA,.22);
+    t['campo']='rgba(255,255,255,.065)'; t['pista']='rgba(255,255,255,.10)';
+    t['barra']=`linear-gradient(90deg,${mezcla(A,CIAN,.5)},${A})`;
+    t['sel']=mezcla(A,n0,.22); t['sel-tinta']=tintaMejor(t['sel'],OSC,HIELO); t['contador']='#FF5F6B';
+    t['sombra']='rgba(0,0,0,.22)'; t['sombra-2']='rgba(0,0,0,.38)';
+    t['violeta']='#B48BEA'; t['violeta-tinta']='#CFB4F7'; t['violeta-suave']='rgba(150,110,220,.24)'; t['violeta-borde']='rgba(180,139,234,.34)';
+    t['ambar-tinta']='#FFCF85'; t['verde-tinta']='#86E2B4'; t['rojo-tinta']='#FFA3A7';
+    t['purple']='#B48BEA'; t['purple-lt']='rgba(150,110,220,.24)';
+    t['amber-lt']='rgba(245,166,35,.22)'; t['red-lt']='rgba(229,72,77,.24)'; t['green-lt']='rgba(43,173,114,.22)'; t['orange-lt']='rgba(240,113,64,.22)';
   }
+  t['atmosfera']=atm.join(','); t['body-bg']=t['atmosfera'];
+  t['sh']=`0 14px 34px ${t['sombra']}`; t['sh-lg']=`0 18px 44px ${t['sombra-2']}`;
+  const s=raiz.style; Object.entries(t).forEach(([k,v])=>s.setProperty('--'+k,v));
 }
 const CFG_DEFAULTS={
   nombre_negocio:'',logo_ruta:'',direccion:'',telefono:'',email:'',nit:'',
-  color_primario:COLOR_FABRICA.primario,color_acento:COLOR_FABRICA.acento,
+  color_primario:COLOR_FABRICA.primario,color_acento:COLOR_FABRICA.acento,piel_intensidad:PIEL_DEF,
   moneda_prefijo:'$',decimales:0,separador_miles:'.',formato_fecha:'DD/MM/AAAA',
   zona_horaria:'America/Bogota',dias_validez_cotizacion:15,estado_default_cotizacion:0,
   metodos_pago:[{key:'efectivo',label:'Efectivo',datos:'',activo:true},{key:'transferencia',label:'Transferencia',datos:'',activo:true},{key:'nequi',label:'Nequi',datos:'',activo:true},{key:'daviplata',label:'Daviplata',datos:'',activo:true}],
@@ -3079,6 +3160,7 @@ async function guardarConfiguracion(){
     nit:document.getElementById('cfg-nit').value.trim(),
     color_primario:colorValido(CFG.color_primario)?CFG.color_primario:COLOR_FABRICA.primario,
     color_acento:colorValido(CFG.color_acento)?CFG.color_acento:COLOR_FABRICA.acento,
+    piel_intensidad:pielIntensidad(),
     moneda_prefijo:document.getElementById('cfg-moneda-prefijo').value.trim()||'$',
     decimales:document.getElementById('cfg-decimales').checked?1:0,
     separador_miles:document.getElementById('cfg-separador').value,
